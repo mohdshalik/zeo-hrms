@@ -1,0 +1,27 @@
+<!-- <!DOCTYPE html>
+<html>
+<head>
+    <title>Request Approved</title>
+</head>
+<body>
+    <p>Dear {{ request_type }},</p>
+    <p>Your request ({{ doc_number }}) has been approved.</p>
+    <p>Regards,<br/>Your Company</p>
+</body>
+</html> -->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Request Approved</title>
+</head>
+<body>
+    <p>Dear {{ recipient_name }},</p>
+    <p>Your request has been approved:</p>
+    <ul>
+        <li><strong>Request Number:</strong> {{ doc_number }}</li>
+        <li><strong>Request Type:</strong> {{ request_type }}</li>
+    </ul>
+    <p>Thank you.</p>
+</body>
+</html> 
