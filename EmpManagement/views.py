@@ -54,8 +54,10 @@ from .tasks import send_document_expiry_notifications_for_all_tenants
 from django.core.cache import cache
 import redis
 import json
-# from LeaveManagement .serializer import AttendanceSerializer
+from LeaveManagement .serializer import AttendanceSerializer
+
 r = redis.StrictRedis(host='localhost', port=6379, db=0)
+
 class CustomAuthentication(BaseAuthentication):
     def authenticate(self, request):
         user = request.user
@@ -237,6 +239,13 @@ class EmpViewSet(viewsets.ModelViewSet):
         attendance = user.get_attendance()
         serializer = AttendanceSerializer(attendance, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    # @action(detail=True, methods=['get'])
+    # def lvapprovals(self, request, pk=None):
+    #     user = self.get_object()
+    #     attendance = user.get_attendance()
+    #     serializer = AttendanceSerializer(attendance, many=True)
+    #     return Response(serializer.data, status=status.HTTP_200_OK)
     # def get_queryset(self):
     #     user = self.request.user
     #     if user.is_authenticated:

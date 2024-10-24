@@ -11,8 +11,9 @@ import uuid
 from tenant_users.tenants.models import TenantBase,UserProfile
 from tenant_users.tenants.tasks import provision_tenant
 from django_tenants.models import TenantMixin, DomainMixin
-from EmpManagement.models import Approval
-from EmpManagement.models import RequestNotification
+from EmpManagement.models import Approval,RequestNotification
+
+
 
 
 class company(TenantBase):
@@ -61,4 +62,7 @@ class CustomUser(UserProfile):
     def get_requestsnotification(self):
         # Fetch approvals assigned to this user
         return RequestNotification.objects.filter(recipient_user=self).order_by('-created_at')
-
+    def get_lv_approvals(self):
+        from LeaveManagement.models import LeaveApproval
+        # Fetch approvals assigned to this user
+        return LeaveApproval.objects.filter(approver=self).order_by('-created_at')

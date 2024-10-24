@@ -7,9 +7,9 @@ from datetime import datetime, timedelta
 from django.db.models import Field
 from . serializer import(LeaveTypeSerializer,LeaveEntitlementSerializer,ApplicableSerializer,EmployeeLeaveBalanceSerializer,AccrualSerializer,ResetSerializer,LeaveRequestSerializer,
                          AttendanceSerializer,ShiftSerializer,WeeklyShiftScheduleSerializer,ImportAttendanceSerializer,EmployeeMappingSerializer,LeaveReportSerializer,LvApprovalLevelSerializer,
-                         LvApprovalSerializer)
+                         LvApprovalSerializer,LvEmailTemplateSerializer,LvApprovalNotifySerializer,LvCommonWorkflowSerializer)
 from .models import (leave_type,leave_entitlement,applicablity_critirea,emp_leave_balance,leave_accrual_transaction,leave_reset_transaction,employee_leave_request,Attendance,Shift,
-                     WeeklyShiftSchedule,EmployeeMachineMapping,LeaveReport,LeaveApprovalLevels,LeaveApproval
+                     WeeklyShiftSchedule,EmployeeMachineMapping,LeaveReport,LeaveApprovalLevels,LeaveApproval,LvEmailTemplate,LvApprovalNotify,LvCommonWorkflow
                      
                      )
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -35,8 +35,13 @@ class LeaveTypeviewset(viewsets.ModelViewSet):
     queryset = leave_type.objects.all()
     serializer_class = LeaveTypeSerializer
     
+class LvEmailTemplateviewset(viewsets.ModelViewSet):
+    queryset = LvEmailTemplate.objects.all()
+    serializer_class = LvEmailTemplateSerializer
 
-
+class LvApprovalNotifyviewset(viewsets.ModelViewSet):
+    queryset = LvApprovalNotify.objects.all()
+    serializer_class = LvApprovalNotifySerializer
 # class LeavePolicyviewset(viewsets.ModelViewSet):
 #     queryset = leave_policy.objects.all()
 #     serializer_class = LeavePolicySerializer
@@ -675,6 +680,27 @@ class LvApprovalLevelViewset(viewsets.ModelViewSet):
     queryset=LeaveApprovalLevels.objects.all()
     serializer_class=LvApprovalLevelSerializer
 
+class LvCommonWorkflowViewset(viewsets.ModelViewSet):
+    queryset=LvCommonWorkflow.objects.all()
+    serializer_class=LvCommonWorkflowSerializer
+
 class LvApprovalViewset(viewsets.ModelViewSet):
     queryset=LeaveApproval.objects.all()
     serializer_class=LvApprovalSerializer
+    lookup_field = 'pk'
+
+    @action(detail=True, methods=['post'])
+    def approve(self, request, pk=None):
+        approval = self.get_object()
+        note = request.data.get('note')  # Get the note from the request
+        approval.approve(note=note)
+        return Response({'status': 'approved', 'note': note}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def reject(self, request, pk=None):
+        approval = self.get_object()
+        note = request.data.get('note')  # Get the note from the request
+        approval.reject(note=note)
+        return Response({'status': 'rejected', 'note': note}, status=status.HTTP_200_OK)
+    
+    

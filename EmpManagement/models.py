@@ -35,6 +35,8 @@ from django.utils import timezone
 from django.core.mail import EmailMultiAlternatives,get_connection, send_mail
 from django.core.serializers.json import DjangoJSONEncoder
 from django.apps import apps
+
+
 # from LeaveManagement.models import Attendance
 # from LeaveManagement.models import Shift
 
@@ -154,6 +156,10 @@ class emp_master(models.Model):
         from LeaveManagement.models import Attendance
         # Fetch approvals assigned to this user
         return Attendance.objects.filter(employee=self)
+
+ 
+
+
 
 # @receiver(post_save, sender=assign_weekend)
 # def update_emp_weekend_calendar(sender, instance, **kwargs):
@@ -606,21 +612,6 @@ class EmailTemplate(models.Model):
         if self.use_common_template:
             return f"Common {self.template_type} template"
         return f"{self.template_type} for {self.request_type.name if self.request_type else 'None'}"
-
-    # def __str__(self):
-    #     return f"{self.template_type} for {self.request_type.name}"
-
-# class CommonEmailTemplate(models.Model):
-#     template_type = models.CharField(max_length=50, choices=[
-#         ('request_created', 'Request Created'),
-#         ('request_approved', 'Request Approved'),
-#         ('request_rejected', 'Request Rejected')
-#     ])
-#     subject = models.CharField(max_length=255)
-#     body = models.TextField()
-#     def __str__(self):
-#         return self.template_type
-
 
 
 class EmailConfiguration(models.Model):

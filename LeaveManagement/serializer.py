@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import (leave_type,leave_entitlement,emp_leave_balance,leave_accrual_transaction,employee_leave_request,
                      applicablity_critirea,leave_reset_transaction,Attendance,Shift,WeeklyShiftSchedule,EmployeeMachineMapping,LeaveReport,
-                     LeaveApprovalLevels,LeaveApproval
+                     LeaveApprovalLevels,LeaveApproval,LvApprovalNotify,LvEmailTemplate,LvCommonWorkflow
 
                      )
 
@@ -27,10 +27,6 @@ class ResetSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-
-
-
-
 class LeaveEntitlementSerializer(serializers.ModelSerializer):
     class Meta:
         model = leave_entitlement
@@ -43,9 +39,18 @@ class LeaveEntitlementSerializer(serializers.ModelSerializer):
 #         fields = '__all__'
 
 class LeaveRequestSerializer(serializers.ModelSerializer):
+    
     class Meta:
         model = employee_leave_request
         fields = '__all__'
+    def to_representation(self, instance):
+        rep = super(LeaveRequestSerializer, self).to_representation(instance)
+        if instance.employee:  
+            rep['employee'] = instance.employee.emp_first_name
+        if instance.leave_type:  
+            rep['leave_type'] = instance.leave_type.name
+        
+        return rep
     def validate(self, data):
         leave_type = data['leave_type']
         is_half_day = data.get('is_half_day', False)
@@ -125,7 +130,36 @@ class LvApprovalLevelSerializer(serializers.ModelSerializer):
     class Meta:
         model = LeaveApprovalLevels
         fields = '__all__'
+    def to_representation(self, instance):
+        rep = super(LvApprovalLevelSerializer, self).to_representation(instance)
+        if instance.request_type:  
+            rep['request_type'] = instance.request_type.name
+        if instance.approver:  
+            rep['approver'] = instance.approver.username    
+        return rep
 class LvApprovalSerializer(serializers.ModelSerializer):
     class Meta:
         model = LeaveApproval
+        fields = '__all__'
+    def to_representation(self, instance):
+        rep = super(LvApprovalSerializer, self).to_representation(instance)
+        if instance.approver:
+            rep['approver'] = instance.approver.username   
+        if instance.leave_request:
+            rep['leave_request'] = instance.leave_request.leave_type.name  
+        return rep
+   
+
+class LvEmailTemplateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LvEmailTemplate
+        fields = '__all__'
+class LvApprovalNotifySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LvApprovalNotify
+        fields = '__all__'
+
+class LvCommonWorkflowSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LvCommonWorkflow
         fields = '__all__'

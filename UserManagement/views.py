@@ -18,9 +18,9 @@ from .signals import add_company_to_superusers
 from rest_framework.views import APIView
 from EmpManagement.models import Approval
 from rest_framework.exceptions import NotFound
-from EmpManagement .serializer import ApprovalSerializer
-from EmpManagement.serializer import ReqNotifySerializer
-
+from EmpManagement .serializer import ApprovalSerializer,ReqNotifySerializer
+from LeaveManagement.serializer import LvApprovalSerializer
+from LeaveManagement.models import LeaveApproval
 # Create your views here.
 #usergroups or roles
 class RegisterUserAPIView(viewsets.ModelViewSet):
@@ -69,38 +69,19 @@ class RegisterUserAPIView(viewsets.ModelViewSet):
         approvals = user.get_requestsnotification()
         serializer = ReqNotifySerializer(approvals, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+    # @action(detail=True, methods=['get'])
+    # def lvapprovals(self, request, pk=None):
+    #     user = self.get_object()  # Assuming this gets the user object
+    #     approvals = LeaveApproval.objects.filter(approver=user)  # Correct queryset
+    #     serializer = LvApprovalSerializer(approvals, many=True)  # Serialize the queryset
+    #     return Response(serializer.data, status=status.HTTP_200_OK)
+    @action(detail=True, methods=['get'])
+    def lvapprovals(self, request, pk=None):
+        user = self.get_object()
+        approvals = user.get_lv_approvals()
+        serializer = LvApprovalSerializer(approvals, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
      
-    @action(detail=True, methods=['post'], url_path='approvals/(?P<approval_id>[^/.]+?)/approve')
-    def approve(self, request, pk=None, approval_id=None):
-        user = self.get_object()
-
-        # Fetch the approval object
-        try:
-            approval = Approval.objects.get(pk=approval_id, approver=user)
-        except Approval.DoesNotExist:
-            return Response({'detail': 'Approval not found or not authorized.'}, status=status.HTTP_404_NOT_FOUND)
-
-        # Approve the request
-        note = request.data.get('note', '')  # Optional note for the approval
-        approval.approve(note=note)
-
-        return Response({'status': 'approved', 'approval_id': approval.id}, status=status.HTTP_200_OK)
-
-    @action(detail=True, methods=['post'], url_path='approvals/(?P<approval_id>[^/.]+?)/reject')
-    def reject(self, request, pk=None, approval_id=None):
-        user = self.get_object()
-
-        # Fetch the approval object
-        try:
-            approval = Approval.objects.get(pk=approval_id, approver=user)
-        except Approval.DoesNotExist:
-            return Response({'detail': 'Approval not found or not authorized.'}, status=status.HTTP_404_NOT_FOUND)
-
-        # Reject the request
-        note = request.data.get('note', '')  # Optional note for rejection
-        approval.reject(note=note)
-
-        return Response({'status': 'rejected', 'approval_id': approval.id}, status=status.HTTP_200_OK)
 
 class CompanyViewSet(viewsets.ModelViewSet):
     queryset = company.objects.all()

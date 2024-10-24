@@ -1,7 +1,6 @@
 from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from datetime import date
 from django.contrib.auth import get_user_model
 from datetime import datetime, timedelta,timezone, time
 from django.db.models.signals import post_save
@@ -10,12 +9,12 @@ from django.db.models.signals import pre_save
 from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from datetime import date
 from django.contrib.auth import get_user_model
 from UserManagement.models import CustomUser
-from datetime import date
-# import datetime
-from datetime import datetime  # Import the 'datetime' class from the 'datetime' module
+from EmpManagement.models import EmailConfiguration
+from django.core.mail import EmailMultiAlternatives,get_connection, send_mail
+from django.template import Context, Template
+from django.utils.html import strip_tags
 
 # Create your models here.
 
@@ -46,10 +45,19 @@ class leave_type(models.Model):
     valid_from = models.DateField()
     valid_to = models.DateField(null=True,blank=True)
     include_weekend_and_holiday = models.BooleanField(default=False)
+    use_common_workflow = models.BooleanField(default=False)
     # allow_opening_balance =models.BooleanField(default=False)
     def __str__(self):
         return f"{self.name}"
+    def get_email_template(self, template_type):
+        # Try fetching a specific template for the request type
+        email_templates = self.email_templates.filter(template_type=template_type)
 
+        # Check if there are multiple templates and handle appropriately
+        if email_templates.count() > 1:
+            raise ValueError(f"Multiple email templates found for template type '{template_type}' and request type '{self.name}'")
+        elif email_templates.exists():
+            return email_templates.first()
 
 
 class leave_entitlement(models.Model):  
@@ -230,8 +238,102 @@ class applicablity_critirea(models.Model):
     designation = models.ManyToManyField('OrganisationManager.desgntn_master',blank=True)
     role = models.ManyToManyField('OrganisationManager.ctgry_master',blank=True)
 
+class LvEmailTemplate(models.Model):
+    request_type = models.ForeignKey('leave_type', related_name='email_templates', on_delete=models.CASCADE,null=True)
+    template_type = models.CharField(max_length=50, choices=[
+        ('request_created', 'Request Created'),
+        ('request_approved', 'Request Approved'),
+        ('request_rejected', 'Request Rejected')
+    ])
+    subject = models.CharField(max_length=255)
+    body = models.TextField()
+    
+class LvApprovalNotify(models.Model):
+    recipient_user = models.ForeignKey('UserManagement.CustomUser', null=True, blank=True,on_delete=models.CASCADE)
+    recipient_employee = models.ForeignKey('EmpManagement.emp_master', null=True, blank=True, on_delete=models.CASCADE)
+    message = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_read = models.BooleanField(default=False)
 
+    def __str__(self):
+        if self.recipient_user:
+            return f"Notification for {self.recipient_user.username}: {self.message}"
+        else:
+            return f"Notification for employee: {self.message}"    
+    
+    def send_email_notification(self, template_type, context):
+         # Try to retrieve the active email configuration
+        try:
+            email_config = EmailConfiguration.objects.get(is_active=True)
+            use_custom_config = True
+        except EmailConfiguration.DoesNotExist:
+            use_custom_config = False
+            default_email = settings.EMAIL_HOST_USER
 
+        # Use custom or default email configuration
+        if use_custom_config:
+            default_email = email_config.email_host_user
+            connection = get_connection(
+                host=email_config.email_host,
+                port=email_config.email_port,
+                username=email_config.email_host_user,
+                password=email_config.email_host_password,
+                use_tls=email_config.email_use_tls,
+            )
+        else:
+            connection = get_connection(
+                host=settings.EMAIL_HOST,
+                port=settings.EMAIL_PORT,
+                username=settings.EMAIL_HOST_USER,
+                password=settings.EMAIL_HOST_PASSWORD,
+                use_tls=settings.EMAIL_USE_TLS,
+            )
+
+        # Determine recipient email and name
+        to_email = None
+        recipient_name = None
+        if self.recipient_user and self.recipient_user.email:
+            to_email = self.recipient_user.email
+            recipient_name = self.recipient_user.username
+        elif self.recipient_employee and self.recipient_employee.emp_personal_email:
+            to_email = self.recipient_employee.emp_personal_email
+            recipient_name = self.recipient_employee.emp_first_name
+
+        if to_email:
+            context.update({'recipient_name': recipient_name})
+
+            # Fetch the email template
+            try:
+                email_template = LvEmailTemplate.objects.get(template_type=template_type)
+                subject = email_template.subject
+                template = Template(email_template.body)
+                html_message = template.render(Context(context))
+            except LvEmailTemplate.DoesNotExist:
+                subject = "Request Notification"
+            plain_message = strip_tags(html_message)
+
+            # Send the email
+            email = EmailMultiAlternatives(
+                subject=subject,
+                body=plain_message,
+                from_email=default_email,  # From email
+                to=[to_email],  # Recipient list
+                connection=connection,
+                headers={'From': 'zeosoftware@abc.com'}  # Custom header
+            )
+            email.attach_alternative(html_message, "text/html")
+            email.send(fail_silently=False)
+class LvCommonWorkflow(models.Model):
+    level = models.IntegerField()
+    role = models.CharField(max_length=50, null=True, blank=True)
+    approver = models.ForeignKey('UserManagement.CustomUser', null=True, blank=True, on_delete=models.SET_NULL)
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['level'], name='Lv_common_workflow_level')
+        ]
+    def __str__(self):
+        return f"Level {self.level} - {self.role or self.approver}"
+      
 class employee_leave_request(models.Model):
     LEAVE_STATUS_CHOICES = [
         ('pending', 'Pending'),
@@ -250,11 +352,12 @@ class employee_leave_request(models.Model):
     reason = models.TextField()
     status = models.CharField(max_length=10, choices=LEAVE_STATUS_CHOICES, default='pending')
     applied_on = models.DateField(auto_now_add=True)
-    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_leaves')
-    approved_on = models.DateField(null=True, blank=True)
+    # approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_leaves')
+    # approved_on = models.DateField(null=True, blank=True)
     dis_half_day = models.BooleanField(default=False)  # True if it's a half-day leave
     half_day_period = models.CharField(max_length=20, choices=HALF_DAY_CHOICES, null=True, blank=True)  # First Half / Second Half
-
+    created_by=models.ForeignKey('UserManagement.CustomUser',on_delete=models.CASCADE,null=True,blank=True)
+    number_of_days = models.FloatField(default=1)
     def clean(self):
         super().clean()
         # Validate if half-day leave is allowed for this leave type
@@ -265,31 +368,152 @@ class employee_leave_request(models.Model):
         if self.dis_half_day and self.start_date != self.end_date:
             raise ValidationError("Half-day leave should be on the same day.")
 
-    # def save(self, *args, **kwargs):
-    #     # Perform proration calculation if necessary
-    #     if self.leave_type.leave_entitlement.prorate_accrual:
-    #         accrual_transaction = leave_accrual_transaction.objects.create(
-    #             employee=self.employee,
-    #             leave_type=self.leave_type,
-    #             accrual_date=datetime.now(),
-    #             amount=self.leave_type.leave_entitlement.calculate_prorated_leave()
-    #         )
-    #         accrual_transaction.save()
+    def save(self, *args, **kwargs):
+        if self.start_date and self.end_date:
+            delta = (self.end_date - self.start_date).days + 1  # Add 1 to include both start and end date
 
-    #     # Deduct the appropriate amount of leave based on half-day or full-day leave
-    #     leave_balance = emp_leave_balance.objects.get(employee=self.employee, leave_type=self.leave_type)
+            # If it's a half-day leave, count it as 0.5 day
+            if self.dis_half_day:
+                self.number_of_days = 0.5
+            else:
+                self.number_of_days = delta
+        # # Perform proration calculation if necessary
+        # if self.leave_type.leave_entitlement.prorate_accrual:
+        #     accrual_transaction = leave_accrual_transaction.objects.create(
+        #         employee=self.employee,
+        #         leave_type=self.leave_type,
+        #         accrual_date=datetime.now(),
+        #         amount=self.leave_type.leave_entitlement.calculate_prorated_leave()
+        #     )
+        #     accrual_transaction.save()
+
+        # # Deduct the appropriate amount of leave based on half-day or full-day leave
+        # leave_balance = emp_leave_balance.objects.get(employee=self.employee, leave_type=self.leave_type)
         
-    #     if self.dis_half_day and self.leave_type.allow_half_day:
-    #     # Deduct half a day if allowed and the request is for half-day leave
-    #         self.employee.leave_balance.deduct_leave(is_half_day=True)
-    #     else:
-    #         # Deduct full day leave
-    #         self.employee.leave_balance.deduct_leave()
+        # if self.dis_half_day and self.leave_type.allow_half_day:
+        # # Deduct half a day if allowed and the request is for half-day leave
+        #     self.employee.leave_balance.deduct_leave(is_half_day=True)
+        # else:
+        #     # Deduct full day leave
+        #     self.employee.leave_balance.deduct_leave()
 
-    #     super().save(*args, **kwargs)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.employee} - {self.leave_type} from {self.start_date} to {self.end_date}"
+    
+    def move_to_next_level(self):
+        if self.approvals.filter(status=LeaveApproval.REJECTED).exists():
+            self.status = 'Rejected'
+            self.save()
+
+            # Notify rejection
+            notification = LvApprovalNotify.objects.create(
+                recipient_user=self.created_by,
+                message=f"Your request for  {self.leave_type} has been rejected."
+            )
+            notification.send_email_notification('request_rejected', {
+                'request_type': self.leave_type,
+                'rejection_reason': 'Reason for rejection...',
+                'emp_gender': self.employee.emp_gender,
+                'emp_date_of_birth': self.employee.emp_date_of_birth,
+                'emp_personal_email': self.employee.emp_personal_email,
+                'emp_company_email': self.employee.emp_company_email,
+                'emp_branch_name': self.employee.emp_branch_id,
+                'emp_department_name': self.employee.emp_dept_id,
+                'emp_designation_name': self.employee.emp_desgntn_id,
+            })
+
+            if self.employee:
+                notification = LvApprovalNotify.objects.create(
+                    recipient_employee=self.employee,
+                    message=f"Request {self.leave_type} has been rejected."
+                )
+                notification.send_email_notification('request_rejected', {
+                    'request_type': self.leave_type,
+                    'rejection_reason': 'Reason for rejection...',
+                    'emp_gender': self.employee.emp_gender,
+                    'emp_date_of_birth': self.employee.emp_date_of_birth,
+                    'emp_personal_email': self.employee.emp_personal_email,
+                    'emp_company_email': self.employee.emp_company_email,
+                    'emp_branch_name': self.employee.emp_branch_id,
+                    'emp_department_name': self.employee.emp_dept_id,
+                    'emp_designation_name': self.employee.emp_desgntn_id,
+                })
+            return
+
+        current_approved_levels = self.approvals.filter(status=LeaveApproval.APPROVED).count()
+
+        if self.leave_type.use_common_workflow:
+            next_level = LvCommonWorkflow.objects.filter(level=current_approved_levels + 1).first()
+        else:
+            next_level = LeaveApprovalLevels.objects.filter(request_type=self.leave_type, level=current_approved_levels + 1).first()
+
+        if next_level:
+            last_approval = self.approvals.order_by('-level').first()
+            LeaveApproval.objects.create(
+                leave_request=self,
+                approver=next_level.approver,
+                role=next_level.role,
+                level=next_level.level,
+                status=LeaveApproval.PENDING,
+                note=last_approval.note if last_approval else None
+            )
+
+            # Notify next approver
+            notification = LvApprovalNotify.objects.create(
+                recipient_user=next_level.approver,
+                message=f"New request for approval: {self.leave_type}, employee: {self.employee}"
+            )
+            notification.send_email_notification('request_created', {
+                'request_type': self.leave_type,
+                'employee_name': self.employee.emp_first_name,
+                'reason': self.reason,
+                'note': last_approval.note if last_approval else None,
+                'emp_gender': self.employee.emp_gender,
+                'emp_date_of_birth': self.employee.emp_date_of_birth,
+                'emp_personal_email': self.employee.emp_personal_email,
+                'emp_company_email': self.employee.emp_company_email,
+                'emp_branch_name': self.employee.emp_branch_id,
+                'emp_department_name': self.employee.emp_dept_id,
+                'emp_designation_name': self.employee.emp_desgntn_id,
+            })
+        else:
+            self.status = 'Approved'
+            self.save()
+
+            # Notify the creator about approval
+            notification = LvApprovalNotify.objects.create(
+                recipient_user=self.created_by,
+                message=f"Your request {self.leave_type} has been approved."
+            )
+            notification.send_email_notification('request_approved', {
+                'request_type': self.leave_type,
+                'emp_gender': self.employee.emp_gender,
+                'emp_date_of_birth': self.employee.emp_date_of_birth,
+                'emp_personal_email': self.employee.emp_personal_email,
+                'emp_company_email': self.employee.emp_company_email,
+                'emp_branch_name': self.employee.emp_branch_id,
+                'emp_department_name': self.employee.emp_dept_id,
+                'emp_designation_name': self.employee.emp_desgntn_id,
+            })
+
+            if self.employee:
+                notification = LvApprovalNotify.objects.create(
+                    recipient_employee=self.employee,
+                    message=f"Request {self.leave_type} has been approved."
+                )
+                notification.send_email_notification('request_approved', {
+                    'request_type': self.leave_type,
+                    'emp_gender': self.employee.emp_gender,
+                    'emp_date_of_birth': self.employee.emp_date_of_birth,
+                    'emp_personal_email': self.employee.emp_personal_email,
+                    'emp_company_email': self.employee.emp_company_email,
+                    'emp_branch_name': self.employee.emp_branch_id,
+                    'emp_department_name': self.employee.emp_dept_id,
+                    'emp_designation_name': self.employee.emp_desgntn_id,
+                })
+    
 
 class LeaveApprovalLevels(models.Model):
     level = models.IntegerField()
@@ -320,6 +544,95 @@ class LeaveApproval(models.Model):
     created_at = models.DateField(auto_now_add=True)
     updated_at = models.DateField(auto_now=True)
 
+    def approve(self,note=None):
+        self.status = self.APPROVED
+        if note:
+            self.note = note
+        self.save()
+        self.leave_request.move_to_next_level()
+   
+    def reject(self,note=None):
+        self.status = self.REJECTED
+        if note:
+            self.note = note
+        self.save()
+        self.leave_request.status = 'Rejected'
+        self.leave_request.save()
+
+
+        notification = LvApprovalNotify.objects.create(
+            recipient_user=self.leave_request.created_by,
+            message=f"Your request {self.leave_request} has been rejected."
+        )
+        notification.send_email_notification('request_rejected', {
+            'request_type': self.leave_request,
+            'rejection_reason': 'Reason for rejection...',  # Add actual reason if available
+            'emp_gender': self.leave_request.employee.emp_gender,
+            'emp_date_of_birth': self.leave_request.employee.emp_date_of_birth,
+            'emp_personal_email': self.leave_request.employee.emp_personal_email,
+            'emp_company_email': self.leave_request.employee.emp_company_email,
+            'emp_branch_name': self.leave_request.employee.emp_branch_id,
+            'emp_department_name': self.leave_request.employee.emp_dept_id,
+            'emp_designation_name': self.leave_request.employee.emp_desgntn_id,
+            'emp_hired_date':self.leave_request.employee.emp_hired_date,
+
+        })
+
+        if self.leave_request.employee:
+            notification = LvApprovalNotify.objects.create(
+                recipient_employee=self.leave_request.employee,
+                message=f"Request {self.leave_request} has been rejected."
+            )
+            notification.send_email_notification('request_rejected', {
+            'request_type': self.leave_request,
+            'rejection_reason': 'Reason for rejection...',  # Add actual reason if available
+            'emp_gender': self.leave_request.employee.emp_gender,
+            'emp_date_of_birth': self.leave_request.employee.emp_date_of_birth,
+            'emp_personal_email': self.leave_request.employee.emp_personal_email,
+            'emp_company_email': self.leave_request.employee.emp_company_email,
+            'emp_branch_name': self.leave_request.employee.emp_branch_id,
+            'emp_department_name': self.leave_request.employee.emp_dept_id,
+            'emp_designation_name': self.leave_request.employee.emp_desgntn_id,
+            'emp_hired_date':self.leave_request.employee.emp_hired_date,
+
+        })
+
+@receiver(post_save, sender=employee_leave_request)
+def create_initial_approval(sender, instance, created, **kwargs):
+    if created:
+        if instance.leave_type.use_common_workflow:
+            first_level = LvCommonWorkflow.objects.order_by('level').first()
+        else:
+        # Select the first approval level
+            first_level = LeaveApprovalLevels.objects.filter(request_type=instance.leave_type).order_by('level').first()
+
+        if first_level:
+            # Prevent duplicate creation of approvals at the same level
+            if not instance.approvals.filter(level=first_level.level).exists():
+                LeaveApproval.objects.create(
+                    leave_request=instance,
+                    approver=first_level.approver,
+                    role=first_level.role,
+                    level=first_level.level,
+                    status=LeaveApproval.PENDING
+                )
+            # Notify first approver
+            notification = LvApprovalNotify.objects.create(
+                recipient_user=first_level.approver,
+                message=f"New request for approval: {instance.leave_type}, employee: {instance.employee}"
+            )
+            notification.send_email_notification('request_created', {
+                'request_type': instance.leave_type,
+                'employee_name': instance.employee.emp_first_name,
+                'reason': instance.reason,
+                'emp_gender':instance.employee.emp_gender,
+                'emp_date_of_birth':instance.employee.emp_date_of_birth,
+                'emp_personal_email':instance.employee.emp_personal_email,
+                'emp_company_email':instance.employee.emp_company_email,
+                'emp_branch_name':instance.employee.emp_branch_id,
+                'emp_department_name':instance.employee.emp_dept_id,
+                'emp_designation_name':instance.employee.emp_desgntn_id,
+            }) 
 
 
 class EmployeeMachineMapping(models.Model):

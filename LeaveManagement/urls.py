@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from .views import (Applicableviewset,LeaveTypeviewset,LeaveEntitlementviewset,LeaveRequestviewset,LeaveTypeViewSet,leave_balance_viewset,Acrualviewset,Resetviewset,
                     AttendanceViewSet,ShiftViewSet,WeeklyShiftScheduleViewSet,ImportAttendanceViewSet,EmployeeMachineMappingViewset,Leave_ReportViewset,LvApprovalLevelViewset,
-                    LvApprovalViewset
+                    LvApprovalViewset,LvEmailTemplateviewset,LvApprovalNotifyviewset,LvCommonWorkflowViewset
                    
 )
 
@@ -16,7 +16,7 @@ router.register(r'reset', Resetviewset, basename='reset')
 router.register(r'leave-type', LeaveTypeviewset, basename='leave_type')
 router.register(r'leave-entitlement', LeaveEntitlementviewset, basename='leave_entitlement')
 # router.register(r'leave-policy', LeavePolicyviewset, basename='leave_policy')
-router.register(r'emp-leave', LeaveRequestviewset, basename='emp_leave')
+router.register(r'emp-leave-request', LeaveRequestviewset, basename='emp_leave-request')
 router.register(r'emp-foreign', LeaveTypeViewSet, basename='emp_foreign')
 router.register(r'attendance', AttendanceViewSet, basename='attendance')
 router.register(r'shifts', ShiftViewSet,basename='shifts')
@@ -26,6 +26,9 @@ router.register(r'employee-mapping', EmployeeMachineMappingViewset, basename='em
 router.register(r'leave-report', Leave_ReportViewset, basename='leave-report')
 router.register(r'leave-approval-levels', LvApprovalLevelViewset, basename='leave-approval-levels')
 router.register(r'leave-approvals', LvApprovalViewset, basename='leave-approvals')
+router.register(r'leave-template', LvEmailTemplateviewset, basename='leave-template')
+router.register(r'leave-ApprovalNotify', LvApprovalNotifyviewset, basename='leave-ApprovalNotify')
+router.register(r'leave-common-workflow', LvCommonWorkflowViewset, basename='leave-common-workflow')
 urlpatterns = [
     # Other paths
     path('api/', include(router.urls)),

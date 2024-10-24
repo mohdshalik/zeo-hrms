@@ -21,6 +21,8 @@ from .models import (emp_family,EmpJobHistory,EmpQualification,Emp_Documents,Emp
                      )
 
 from OrganisationManager.serializer import CompanyPolicySerializer
+from LeaveManagement.models import employee_leave_request
+from LeaveManagement.serializer import LvApprovalSerializer
 
 '''employee set'''
 #EMPLOYEE FAMILY
@@ -287,6 +289,13 @@ class ApprovalSerializer(serializers.ModelSerializer):
             rep['approver'] = instance.approver.username
         
         return rep       
+class LvRqstApprovalSerializer(serializers.ModelSerializer):
+    approvals = LvApprovalSerializer(many=True, read_only=True)  # Include approval details
+
+    class Meta:
+        model = employee_leave_request
+        fields = ['id', 'approvals']
+        
 class GeneralRequestApprovalSerializer(serializers.ModelSerializer):
     approvals = ApprovalSerializer(many=True, read_only=True)  # Include approval details
 
@@ -298,6 +307,7 @@ class GeneralRequestApprovalSerializer(serializers.ModelSerializer):
 #EMPLOYEE SERIALIZER
 class EmpSerializer(serializers.ModelSerializer):
     requests = GeneralRequestApprovalSerializer(many=True, read_only=True, source='generalrequest_set')
+    leave_rqsts = LvRqstApprovalSerializer(many=True, read_only=True, source='employee_leave_request_set')
     custom_fields = serializers.SerializerMethodField()
     custom_fields = Emp_CustomFieldValueSerializer(many=True, read_only=True)
     emp_family = EmpFamSerializer(many=True, read_only=True)
