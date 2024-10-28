@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from django.conf import settings
 from datetime import date
+import logging
 from .models import (emp_family,Emp_Documents,EmpJobHistory,EmpLeaveRequest,EmpQualification,GeneralRequest,RequestType,
                      emp_master,notification,EmpFamily_CustomField,EmpJobHistory_CustomField,
                      EmpQualification_CustomField,EmpDocuments_CustomField,LanguageSkill,MarketingSkill,ProgrammingLanguageSkill,
@@ -1122,7 +1123,7 @@ class Emp_DocumentViewSet(viewsets.ModelViewSet):
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
-
+logging.basicConfig(level=logging.DEBUG)
 class Doc_ReportViewset(viewsets.ModelViewSet):
     queryset = Doc_Report.objects.all()
     serializer_class = DocumentReportSerializer
@@ -1302,61 +1303,195 @@ class Doc_ReportViewset(viewsets.ModelViewSet):
             'report_id': report_id
         }) 
 
-    
-    ###################################
-    
+    date_filtered_data = []  
+    start_date = None  
+    end_date = None    
+
     @action(detail=False, methods=['post'])
     def filter_by_date(self, request, *args, **kwargs):
         report_id = request.data.get('report_id')
-        start_date = request.data.get('start_date')
-        end_date = request.data.get('end_date')
+        start_date_str = request.data.get('start_date')
+        end_date_str = request.data.get('end_date')
 
-        if not report_id or not start_date or not end_date:
+        if not report_id or not start_date_str or not end_date_str:
             return Response({'status': 'error', 'message': 'Missing required parameters'}, status=400)
 
-        try:
-            report_instance = Doc_Report.objects.get(id=report_id)
-            report_data = json.loads(report_instance.report_data.read().decode('utf-8'))
-        except Doc_Report.DoesNotExist:
-            return Response({'status': 'error', 'message': 'Report not found'}, status=404)
-
+        # Helper function to parse date strings
         def parse_date(date_str):
             formats = ['%d-%m-%Y', '%Y-%m-%d', '%d/%m/%Y', '%Y/%m/%d', '%d.%m.%Y', '%Y.%m.%d']
             for fmt in formats:
                 try:
-                    return datetime.strptime(date_str, fmt)
+                    return datetime.strptime(date_str, fmt).date()
                 except ValueError:
                     continue
+            print(f"Date parsing failed for: {date_str}")
             return None
 
-        start_date = parse_date(start_date)
-        end_date = parse_date(end_date)
+        # Parse start and end dates
+        start_date = parse_date(start_date_str)
+        end_date = parse_date(end_date_str)
 
         if not start_date or not end_date:
-            return Response({'status': 'error', 'message': 'Invalid date format. Accepted formats are dd-mm-yyyy, yyyy-mm-dd, dd/mm/yyyy, yyyy/mm/dd, dd.mm.yyyy, yyyy.mm.dd.'}, status=400)
+            return Response({
+                'status': 'error',
+                'message': 'Invalid date format. Accepted formats are dd-mm-yyyy, yyyy-mm-dd, dd/mm/yyyy, yyyy/mm/dd, dd.mm.yyyy, yyyy.mm.dd.'
+            }, status=400)
 
-        date_filtered_data = [
-            row for row in report_data
-            if 'emp_doc_expiry_date' in row and row['emp_doc_expiry_date'] and
-            parse_date(row['emp_doc_expiry_date']) and
-            start_date <= parse_date(row['emp_doc_expiry_date']) <= end_date
-        ]
+        # Fetch the report instance and data
+        report_instance = get_object_or_404(Doc_Report, id=report_id)
+        report_data = json.loads(report_instance.report_data.read().decode('utf-8'))
 
-        # Debugging statement
-        print("Date filtered data:", date_filtered_data)
+        # Filter based on date range
+        date_filtered_data = []
+        for row in report_data:
+            expiry_date_str = row.get('emp_doc_expiry_date')
+            expiry_date = parse_date(expiry_date_str)
 
-        # Store filtered data in session
-        request.session['date_filtered_data'] = date_filtered_data
-        request.session.modified = True
+            # Log expiry date and filtering range
+            print(f"Expiry date: {expiry_date}, Start date: {start_date}, End date: {end_date}")
 
+            if expiry_date and start_date <= expiry_date <= end_date:
+                date_filtered_data.append(row)
+
+        # Log filtered data results
+        print(f"Date-filtered data: {date_filtered_data}")
+
+        # Save filtered data and dates for further use
+        self.date_filtered_data = date_filtered_data
+        self.start_date = start_date
+        self.end_date = end_date
 
         return JsonResponse({
             'date_filtered_data': date_filtered_data,
             'report_id': report_id,
-            'start_date':start_date,
-            'end_date':end_date
+            'start_date': start_date_str,
+            'end_date': end_date_str
         })
+
+    @action(detail=False, methods=['post'])
+    def filter_document_report(self, request, *args, **kwargs):
+        report_id = request.data.get('report_id')
+        start_date_str = request.data.get('start_date')
+        end_date_str = request.data.get('end_date')
+
+        if not report_id or not start_date_str or not end_date_str:
+            return JsonResponse({'status': 'error', 'message': 'Missing required parameters'}, status=400)
+
+        # Helper function to parse dates
+        def parse_date(date_str):
+            formats = ['%d-%m-%Y', '%Y-%m-%d', '%d/%m/%Y', '%Y/%m/%d', '%d.%m.%Y', '%Y.%m.%d']
+            for fmt in formats:
+                try:
+                    return datetime.strptime(date_str, fmt).date()
+                except ValueError:
+                    continue
+            return None
+
+        # Parse start and end dates
+        start_date = parse_date(start_date_str)
+        end_date = parse_date(end_date_str)
+
+        if not start_date or not end_date:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Invalid date format. Accepted formats: dd-mm-yyyy, yyyy-mm-dd, dd/mm/yyyy, yyyy/mm/dd, dd.mm.yyyy, yyyy.mm.dd.'
+            }, status=400)
+
+        # Fetch report data
+        report_instance = get_object_or_404(Doc_Report, id=report_id)
+        report_data = json.loads(report_instance.report_data.read().decode('utf-8'))
+
+        # Initial filter by date
+        date_filtered_data = []
+        for row in report_data:
+            expiry_date_str = row.get('emp_doc_expiry_date')
+            expiry_date = parse_date(expiry_date_str)
+
+            if expiry_date and start_date <= expiry_date <= end_date:
+                date_filtered_data.append(row)
+
+        # Log initial date filtering result
+        print(f"Data after date filtering: {date_filtered_data}")
+
+        # Retrieve additional field filter criteria
+        selected_fields = [key for key in request.data.keys() if key not in ('report_id', 'start_date', 'end_date')]
+        filter_criteria = {
+            field: [val.strip() for val in request.data.getlist(field) if val.strip()]
+            for field in selected_fields
+            if request.data.getlist(field)
+        }
+
+        # Apply additional filters based on selected fields
+        filtered_data = [row for row in date_filtered_data if self.match_filter_criteria(row, filter_criteria)]
+
+        # Log final filtered data
+        print(f"Final filtered data after applying field criteria: {filtered_data}")
+
+        return JsonResponse({
+            'filtered_data': filtered_data,
+            'report_id': report_id,
+        })
+
+    def match_filter_criteria(self, row_data, filter_criteria):
+        for field, values in filter_criteria.items():
+            row_value = row_data.get(field, '').strip()
+            if row_value not in values:
+                return False
+        return True
     
+    ###################################
+    
+    # @action(detail=False, methods=['post'])
+    # def filter_by_date(self, request, *args, **kwargs):
+    #     report_id = request.data.get('report_id')
+    #     start_date = request.data.get('start_date')
+    #     end_date = request.data.get('end_date')
+
+    #     if not report_id or not start_date or not end_date:
+    #         return Response({'status': 'error', 'message': 'Missing required parameters'}, status=400)
+
+    #     try:
+    #         report_instance = Doc_Report.objects.get(id=report_id)
+    #         report_data = json.loads(report_instance.report_data.read().decode('utf-8'))
+    #     except Doc_Report.DoesNotExist:
+    #         return Response({'status': 'error', 'message': 'Report not found'}, status=404)
+
+    #     def parse_date(date_str):
+    #         formats = ['%d-%m-%Y', '%Y-%m-%d', '%d/%m/%Y', '%Y/%m/%d', '%d.%m.%Y', '%Y.%m.%d']
+    #         for fmt in formats:
+    #             try:
+    #                 return datetime.strptime(date_str, fmt)
+    #             except ValueError:
+    #                 continue
+    #         return None
+
+    #     start_date = parse_date(start_date)
+    #     end_date = parse_date(end_date)
+
+    #     if not start_date or not end_date:
+    #         return Response({'status': 'error', 'message': 'Invalid date format. Accepted formats are dd-mm-yyyy, yyyy-mm-dd, dd/mm/yyyy, yyyy/mm/dd, dd.mm.yyyy, yyyy.mm.dd.'}, status=400)
+
+    #     date_filtered_data = [
+    #         row for row in report_data
+    #         if 'emp_doc_expiry_date' in row and row['emp_doc_expiry_date'] and
+    #         parse_date(row['emp_doc_expiry_date']) and
+    #         start_date <= parse_date(row['emp_doc_expiry_date']) <= end_date
+    #     ]
+
+    #     # Debugging statement
+    #     print("Date filtered data:", date_filtered_data)
+
+    #     # Store filtered data in session
+    #     request.session['date_filtered_data'] = date_filtered_data
+    #     request.session.modified = True
+
+
+    #     return JsonResponse({
+    #         'date_filtered_data': date_filtered_data,
+    #         'report_id': report_id,
+    #         'start_date':start_date,
+    #         'end_date':end_date
+    #     })
     
     
     @action(detail=False, methods=['post'])
@@ -1437,63 +1572,130 @@ class Doc_ReportViewset(viewsets.ModelViewSet):
         return unique_values
        
     
-    @action(detail=False, methods=['post'])
-    def filter_document_report(self, request, *args, **kwargs):
-        report_id = request.data.get('report_id')
+    # @action(detail=False, methods=['post'])
+    # def filter_document_report(self, request, *args, **kwargs):
+    #     report_id = request.data.get('report_id')
+    #     if not report_id:
+    #         return Response({'status': 'error', 'message': 'Report ID is missing'}, status=400)
+
+    #     try:
+    #         report_instance = Doc_Report.objects.get(id=report_id)
+    #         report_data = json.loads(report_instance.report_data.read().decode('utf-8'))
+    #     except Doc_Report.DoesNotExist:
+    #         return Response({'status': 'error', 'message': 'Report not found'}, status=404)
+
+    #     # Get date-filtered data from session if available, otherwise use full report data
+    #     filtered_data = request.session.get('date_filtered_data', report_data)
+
+    #     # Debugging statement
+    #     print("Data retrieved for field filtration:", filtered_data)
+
+    #     if not filtered_data:
+    #         return Response({'status': 'error', 'message': 'No date-filtered data available'}, status=404)
+
+    #     # Get selected fields and filter criteria from request
+    #     selected_fields = [key for key in request.data.keys() if key not in ('report_id', 'csrfmiddlewaretoken')]
+    #     print("Selected fields:", selected_fields)
+        
+    #     filter_criteria = {}
+    #     for field in selected_fields:
+    #         values = [val.strip() for val in request.data.getlist(field) if val.strip()]
+    #         if values:
+    #             filter_criteria[field] = values
+
+    #     print("Filter criteria:", filter_criteria)  # Debugging statement
+
+    #     # Apply field value filters to date-filtered data
+    #     filtered_data = [row for row in filtered_data if self.match_filter_criteria(row, filter_criteria)]
+
+    #     print("Filtered data after applying field filters:", filtered_data)  # Debugging statement
+
+    #     # Save filtered data to session for Excel generation
+    #     request.session['filtered_data'] = filtered_data
+    #     request.session.modified = True
+
+    #     return JsonResponse({
+    #         'filtered_data': filtered_data,
+    #         'report_id': report_id,
+    #     })
+
+    # def match_filter_criteria(self, row_data, filter_criteria):
+    #     for field, values in filter_criteria.items():
+    #         row_value = row_data.get(field, '').strip() if row_data.get(field) else ''
+    #         print(f"Checking field {field} with values {values} against row value {row_value}")  # Debugging statement
+    #         if row_value not in values:
+    #             return False
+    #     return True 
+    
+    @action(detail=False, methods=['get'])
+    def generate_excel_report(self, request, *args, **kwargs):
+        report_id = request.GET.get('report_id')
         if not report_id:
-            return Response({'status': 'error', 'message': 'Report ID is missing'}, status=400)
+            return HttpResponse('Report ID is missing', status=400)
+
+        filtered_data = request.session.get('filtered_data')
+        if not filtered_data:
+            return HttpResponse('No filtered data available', status=400)
+
+        # Mapping of internal field names to display names 
+        field_names_mapping = {
+            "emp_id": "Employee Code",
+            "emp_first_name": "First Name",
+            "emp_active_date": "Active Date",
+            "emp_branch_id": "Branch",
+            "emp_dept_id": "Department",
+            "emp_desgntn_id": "Designation",
+            "emp_ctgry_id": "Category",
+            "emp_doc_type": "Document Type",
+            "emp_doc_number": "Document Number",
+            "emp_doc_issued_date": "Issued Date",
+            "emp_doc_expiry_date": "Expiry Date",
+            "is_active": "Active",
+        }
 
         try:
-            report_instance = Doc_Report.objects.get(id=report_id)
-            report_data = json.loads(report_instance.report_data.read().decode('utf-8'))
-        except Doc_Report.DoesNotExist:
-            return Response({'status': 'error', 'message': 'Report not found'}, status=404)
+            report_instance = Doc_Report.objects.get(id=int(report_id))
+        except (Doc_Report.DoesNotExist, ValueError):
+            return HttpResponse('Invalid or missing Report ID', status=404)
 
-        # Get date-filtered data from session if available, otherwise use full report data
-        filtered_data = request.session.get('date_filtered_data', report_data)
-
-        # Debugging statement
-        print("Data retrieved for field filtration:", filtered_data)
-
-        if not filtered_data:
-            return Response({'status': 'error', 'message': 'No date-filtered data available'}, status=404)
-
-        # Get selected fields and filter criteria from request
-        selected_fields = [key for key in request.data.keys() if key not in ('report_id', 'csrfmiddlewaretoken')]
-        print("Selected fields:", selected_fields)
+        # Create an Excel workbook
+        workbook = openpyxl.Workbook()
+        sheet = workbook.active
+        sheet.title = 'Filtered Report'
         
-        filter_criteria = {}
-        for field in selected_fields:
-            values = [val.strip() for val in request.data.getlist(field) if val.strip()]
-            if values:
-                filter_criteria[field] = values
+        # Define style for header row
+        header_style = NamedStyle(name="header_style")
+        header_style.font = Font(bold=True, color="FFFFFF")
+        header_style.fill = PatternFill(start_color="0070C0", end_color="0070C0", fill_type="solid")
 
-        print("Filter criteria:", filter_criteria)  # Debugging statement
+        # Add header row to Excel using display names and apply style
+        if filtered_data:
+            headers = [field_names_mapping.get(field_name, field_name) for field_name in filtered_data[0].keys()]
+            sheet.append(headers)
+            for cell in sheet[1]:
+                cell.style = header_style
 
-        # Apply field value filters to date-filtered data
-        filtered_data = [row for row in filtered_data if self.match_filter_criteria(row, filter_criteria)]
+        # Add data rows to Excel using values from filtered_data
+        for row in filtered_data:
+            row_values = [row.get(field_name, '') for field_name in filtered_data[0].keys()]
+            sheet.append(row_values)
 
-        print("Filtered data after applying field filters:", filtered_data)  # Debugging statement
+        # Autofit column widths
+        for column_cells in sheet.columns:
+            length = max(len(str(cell.value)) for cell in column_cells)
+            sheet.column_dimensions[column_cells[0].column_letter].width = length + 2
 
-        # Save filtered data to session for Excel generation
-        request.session['filtered_data'] = filtered_data
-        request.session.modified = True
+        # Save the workbook to a BytesIO stream
+        excel_file = BytesIO()
+        workbook.save(excel_file)
+        excel_file.seek(0)
 
-        return JsonResponse({
-            'filtered_data': filtered_data,
-            'report_id': report_id,
-        })
+        # Prepare the response with Excel file as attachment
+        response = HttpResponse(excel_file, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = f'attachment; filename=filtered_report_{report_id}.xlsx'
 
-    def match_filter_criteria(self, row_data, filter_criteria):
-        for field, values in filter_criteria.items():
-            row_value = row_data.get(field, '').strip() if row_data.get(field) else ''
-            print(f"Checking field {field} with values {values} against row value {row_value}")  # Debugging statement
-            if row_value not in values:
-                return False
-        return True
-
-#####################
-    # @action(detail=False, methods=['post'])
+        return response
+     # @action(detail=False, methods=['post'])
     # def filter_by_date(self, request, *args, **kwargs):
     #     report_id = request.data.get('report_id')
     #     start_date = request.data.get('start_date')
@@ -1663,75 +1865,6 @@ class Doc_ReportViewset(viewsets.ModelViewSet):
     #         if row_value not in values:
     #             return False
     #     return True
-
-    @action(detail=False, methods=['get'])
-    def generate_excel_report(self, request, *args, **kwargs):
-        report_id = request.GET.get('report_id')
-        if not report_id:
-            return HttpResponse('Report ID is missing', status=400)
-
-        filtered_data = request.session.get('filtered_data')
-        if not filtered_data:
-            return HttpResponse('No filtered data available', status=400)
-
-        # Mapping of internal field names to display names 
-        field_names_mapping = {
-            "emp_id": "Employee Code",
-            "emp_first_name": "First Name",
-            "emp_active_date": "Active Date",
-            "emp_branch_id": "Branch",
-            "emp_dept_id": "Department",
-            "emp_desgntn_id": "Designation",
-            "emp_ctgry_id": "Category",
-            "emp_doc_type": "Document Type",
-            "emp_doc_number": "Document Number",
-            "emp_doc_issued_date": "Issued Date",
-            "emp_doc_expiry_date": "Expiry Date",
-            "is_active": "Active",
-        }
-
-        try:
-            report_instance = Doc_Report.objects.get(id=int(report_id))
-        except (Doc_Report.DoesNotExist, ValueError):
-            return HttpResponse('Invalid or missing Report ID', status=404)
-
-        # Create an Excel workbook
-        workbook = openpyxl.Workbook()
-        sheet = workbook.active
-        sheet.title = 'Filtered Report'
-        
-        # Define style for header row
-        header_style = NamedStyle(name="header_style")
-        header_style.font = Font(bold=True, color="FFFFFF")
-        header_style.fill = PatternFill(start_color="0070C0", end_color="0070C0", fill_type="solid")
-
-        # Add header row to Excel using display names and apply style
-        if filtered_data:
-            headers = [field_names_mapping.get(field_name, field_name) for field_name in filtered_data[0].keys()]
-            sheet.append(headers)
-            for cell in sheet[1]:
-                cell.style = header_style
-
-        # Add data rows to Excel using values from filtered_data
-        for row in filtered_data:
-            row_values = [row.get(field_name, '') for field_name in filtered_data[0].keys()]
-            sheet.append(row_values)
-
-        # Autofit column widths
-        for column_cells in sheet.columns:
-            length = max(len(str(cell.value)) for cell in column_cells)
-            sheet.column_dimensions[column_cells[0].column_letter].width = length + 2
-
-        # Save the workbook to a BytesIO stream
-        excel_file = BytesIO()
-        workbook.save(excel_file)
-        excel_file.seek(0)
-
-        # Prepare the response with Excel file as attachment
-        response = HttpResponse(excel_file, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        response['Content-Disposition'] = f'attachment; filename=filtered_report_{report_id}.xlsx'
-
-        return response
 
 # class Bulkupload_DocumentViewSet(viewsets.ModelViewSet):
 #     queryset = Emp_Documents.objects.all()
@@ -2485,6 +2618,145 @@ class GeneralReportViewset(viewsets.ModelViewSet):
             if row_value not in values:
                 return False
         return True
+    
+    # @action(detail=False, methods=['post'])
+    # def filter_by_date(self, request, *args, **kwargs):
+    #     report_id = request.data.get('report_id')
+    #     start_date_str = request.data.get('start_date')
+    #     end_date_str = request.data.get('end_date')
+
+    #     if not report_id or not start_date_str or not end_date_str:
+    #         return Response({'status': 'error', 'message': 'Missing required parameters'}, status=400)
+
+    #     # Date parsing helper function
+    #     def parse_date(date_str):
+    #         if date_str is None:
+    #             return None
+    #         formats = ['%d-%m-%Y', '%Y-%m-%d', '%d/%m/%Y', '%Y/%m/%d', '%d.%m.%Y', '%Y.%m.%d']
+    #         for fmt in formats:
+    #             try:
+    #                 return datetime.strptime(date_str, fmt)
+    #             except ValueError:
+    #                 continue
+    #         return None
+
+    #     # Parse start and end dates
+    #     start_date = parse_date(start_date_str)
+    #     end_date = parse_date(end_date_str)
+
+    #     # Check if parsing succeeded
+    #     if not start_date or not end_date:
+    #         return Response({
+    #             'status': 'error',
+    #             'message': 'Invalid date format. Accepted formats are dd-mm-yyyy, yyyy-mm-dd, dd/mm/yyyy, yyyy/mm/dd, dd.mm.yyyy, yyyy.mm.dd.'
+    #         }, status=400)
+
+    #     # Fetch report data
+    #     report_instance = get_object_or_404(GeneralRequestReport, id=report_id)
+    #     report_data = json.loads(report_instance.report_data.read().decode('utf-8'))
+
+    #     # Filter data based on the date range
+    #     date_filtered_data = [
+    #         row for row in report_data
+    #         if 'created_at_date' in row and row['created_at_date'] and
+    #         parse_date(row['created_at_date']) and
+    #         start_date <= parse_date(row['created_at_date']) <= end_date
+    #     ]
+
+    #     # Store filtered data in a variable instead of session
+    #     self.date_filtered_data = date_filtered_data
+
+    #     return JsonResponse({
+    #         'date_filtered_data': date_filtered_data,
+    #         'report_id': report_id,
+    #         'start_date': start_date_str,
+    #         'end_date': end_date_str
+    #     })
+
+    # @action(detail=False, methods=['post'])
+    # def generate_filter_table(self, request, *args, **kwargs):
+    #     selected_fields = request.POST.getlist('selected_fields')
+    #     report_id = request.data.get('report_id')
+
+    #     # Fetch previously filtered date data from the `apply_date_filter` method
+    #     date_filtered_data = getattr(self, 'date_filtered_data', [])
+    #     print("previous",date_filtered_data)
+
+    #     # If no date-filtered data, attempt to fetch full report
+    #     if not date_filtered_data:
+    #         report_instance = get_object_or_404(GeneralRequestReport, id=report_id)
+    #         report_data = json.loads(report_instance.report_data.read().decode('utf-8'))
+    #         date_filtered_data = report_data
+
+    #     # Default to all fields if no specific fields selected
+    #     if not selected_fields and date_filtered_data:
+    #         selected_fields = list(date_filtered_data[0].keys())
+
+    #     # Get unique values for selected_fields from date-filtered data
+    #     unique_values = self.get_unique_values_for_fields(date_filtered_data, selected_fields)
+
+    #     processed_unique_values = {
+    #         field: {'values': values}
+    #         for field, values in unique_values.items()
+    #     }
+
+    #     return JsonResponse({
+    #         'selected_fields': selected_fields,
+    #         'report_id': report_id,
+    #         'report_content': date_filtered_data,
+    #         'unique_values': processed_unique_values,
+    #         # 'column_headings': column_headings
+    #     })
+
+    # def get_unique_values_for_fields(self, data, selected_fields):
+    #     unique_values = {field: set() for field in selected_fields}
+    #     for record in data:
+    #         for field in selected_fields:
+    #             if field in record:
+    #                 unique_values[field].add(record[field])
+
+    #     for field in unique_values:
+    #         unique_values[field] = list(unique_values[field])
+    #     return unique_values
+
+    # @action(detail=False, methods=['post'])
+    # def general_filter_report(self, request, *args, **kwargs):
+    #     report_id = request.data.get('report_id')
+    #     if not report_id:
+    #         return Response({'status': 'error', 'message': 'Report ID is missing'}, status=400)
+
+    #     report_instance = get_object_or_404(GeneralRequestReport, id=report_id)
+    #     report_data = json.loads(report_instance.report_data.read().decode('utf-8'))
+
+    #     # Use previously filtered date data if available
+    #     filtered_data = getattr(self, 'date_filtered_data', report_data)
+       
+
+    #     # Get selected fields and filter criteria from request
+    #     selected_fields = [key for key in request.data.keys() if key not in ('report_id', 'csrfmiddlewaretoken')]
+    #     filter_criteria = {
+    #         field: [val.strip() for val in request.data.getlist(field) if val.strip()]
+    #         for field in selected_fields
+    #         if request.data.getlist(field)
+    #     }
+
+    #     # Apply field value filters to date-filtered data
+    #     filtered_data = [row for row in filtered_data if self.match_filter_criteria(row, filter_criteria)]
+    #     print("prevfilter",filtered_data)
+    #     # Save filtered data to variable for Excel generation
+    #     self.filtered_data = filtered_data
+
+    #     return JsonResponse({
+    #         'filtered_data': filtered_data,
+    #         'report_id': report_id,
+    #     })
+
+    # def match_filter_criteria(self, row_data, filter_criteria):
+    #     for field, values in filter_criteria.items():
+    #         row_value = row_data.get(field, '').strip() if row_data.get(field) else ''
+    #         if row_value not in values:
+    #             return False
+    #     return True
     
     @action(detail=False, methods=['get'])
     def generate_excel_view(self, request, *args, **kwargs):

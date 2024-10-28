@@ -3,8 +3,8 @@ from rest_framework.routers import DefaultRouter
 
 from .views import (Applicableviewset,LeaveTypeviewset,LeaveEntitlementviewset,LeaveRequestviewset,LeaveTypeViewSet,leave_balance_viewset,Acrualviewset,Resetviewset,
                     AttendanceViewSet,ShiftViewSet,WeeklyShiftScheduleViewSet,ImportAttendanceViewSet,EmployeeMachineMappingViewset,Leave_ReportViewset,LvApprovalLevelViewset,
-                    LvApprovalViewset,LvEmailTemplateviewset,LvApprovalNotifyviewset,LvCommonWorkflowViewset
-                   
+                    LvApprovalViewset,LvEmailTemplateviewset,LvApprovalNotifyviewset,LvCommonWorkflowViewset,LvRejectionViewset,Lv_Approval_ReportViewset,
+                    AttendanceReportViewset
 )
 
 router = DefaultRouter()
@@ -29,6 +29,10 @@ router.register(r'leave-approvals', LvApprovalViewset, basename='leave-approvals
 router.register(r'leave-template', LvEmailTemplateviewset, basename='leave-template')
 router.register(r'leave-ApprovalNotify', LvApprovalNotifyviewset, basename='leave-ApprovalNotify')
 router.register(r'leave-common-workflow', LvCommonWorkflowViewset, basename='leave-common-workflow')
+router.register(r'leave-rejection-reason', LvRejectionViewset, basename='leave-rejection-reason')
+router.register(r'Lv_Approval_Report', Lv_Approval_ReportViewset, basename='Lv_Approval_Report')
+router.register(r'AttendanceReport', AttendanceReportViewset, basename='AttendanceReport')
+
 urlpatterns = [
     # Other paths
     path('api/', include(router.urls)),

@@ -7,10 +7,10 @@ from datetime import datetime, timedelta
 from django.db.models import Field
 from . serializer import(LeaveTypeSerializer,LeaveEntitlementSerializer,ApplicableSerializer,EmployeeLeaveBalanceSerializer,AccrualSerializer,ResetSerializer,LeaveRequestSerializer,
                          AttendanceSerializer,ShiftSerializer,WeeklyShiftScheduleSerializer,ImportAttendanceSerializer,EmployeeMappingSerializer,LeaveReportSerializer,LvApprovalLevelSerializer,
-                         LvApprovalSerializer,LvEmailTemplateSerializer,LvApprovalNotifySerializer,LvCommonWorkflowSerializer)
+                         LvApprovalSerializer,LvEmailTemplateSerializer,LvApprovalNotifySerializer,LvCommonWorkflowSerializer,LvRejectionReasonSerializer,LvApprovalReportSerializer,AttendanceReportSerializer)
 from .models import (leave_type,leave_entitlement,applicablity_critirea,emp_leave_balance,leave_accrual_transaction,leave_reset_transaction,employee_leave_request,Attendance,Shift,
-                     WeeklyShiftSchedule,EmployeeMachineMapping,LeaveReport,LeaveApprovalLevels,LeaveApproval,LvEmailTemplate,LvApprovalNotify,LvCommonWorkflow
-                     
+                     WeeklyShiftSchedule,EmployeeMachineMapping,LeaveReport,LeaveApprovalLevels,LeaveApproval,LvEmailTemplate,LvApprovalNotify,LvCommonWorkflow,LvRejectionReason,LeaveApprovalReport,
+                     AttendanceReport
                      )
 from rest_framework.parsers import MultiPartParser, FormParser
 from EmpManagement.models import emp_master
@@ -22,6 +22,7 @@ from io import BytesIO
 import pandas as pd,openpyxl
 from openpyxl.styles import PatternFill,Alignment,Font,NamedStyle
 from django.core.exceptions import ValidationError
+from rest_framework.decorators import action
 # from rest_framework import status
 # from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -97,6 +98,30 @@ class Resetviewset(viewsets.ModelViewSet):
 class LeaveRequestviewset(viewsets.ModelViewSet):
     queryset = employee_leave_request.objects.all()
     serializer_class = LeaveRequestSerializer
+
+    @action(detail=False, methods=['get'], url_path='leave-request-history')
+    def employee_leave_request(self, request):
+        employee_id = request.query_params.get('employee_id')
+        if not employee_id:
+            return Response({'error': 'Employee ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        requests = employee_leave_request.objects.filter(employee_id=employee_id).order_by('-applied_on')
+     
+        # Manually serialize the fields you want
+        history_data = []
+        for request in requests:
+            history_data.append({
+                'start_date': request.start_date,
+                'end_date': request.end_date,
+                'leave_type': request.leave_type.name if request.leave_type else None,
+                'reason': request.reason ,
+                'status': request.status,
+                'applied_on': request.applied_on,
+                'number_of_days':request.number_of_days
+            })
+
+        return Response(history_data, status=status.HTTP_200_OK)
+    
 #     def get_serializer_class(self):
 #         if self.request.method in ['POST', 'PUT']:
 #             return EmployeeLeaveSerializer
@@ -415,6 +440,7 @@ class Leave_ReportViewset(viewsets.ModelViewSet):
                 general_data[field] = value
             report_data.append(general_data)
         return report_data
+    
     @action(detail=False, methods=['get'])
     def select_filter_fields(self, request, *args, **kwargs):
         available_fields = self.get_available_fields()
@@ -684,6 +710,10 @@ class LvCommonWorkflowViewset(viewsets.ModelViewSet):
     queryset=LvCommonWorkflow.objects.all()
     serializer_class=LvCommonWorkflowSerializer
 
+class LvRejectionViewset(viewsets.ModelViewSet):
+    queryset=LvRejectionReason.objects.all()
+    serializer_class=LvRejectionReasonSerializer
+
 class LvApprovalViewset(viewsets.ModelViewSet):
     queryset=LeaveApproval.objects.all()
     serializer_class=LvApprovalSerializer
@@ -696,11 +726,460 @@ class LvApprovalViewset(viewsets.ModelViewSet):
         approval.approve(note=note)
         return Response({'status': 'approved', 'note': note}, status=status.HTTP_200_OK)
 
+    # @action(detail=True, methods=['post'])
+    # def reject(self, request, pk=None):
+    #     approval = self.get_object()
+    #     note = request.data.get('note')  # Get the note from the request
+    #     approval.reject(note=note)
+    #     return Response({'status': 'rejected', 'note': note}, status=status.HTTP_200_OK)
     @action(detail=True, methods=['post'])
     def reject(self, request, pk=None):
         approval = self.get_object()
-        note = request.data.get('note')  # Get the note from the request
-        approval.reject(note=note)
-        return Response({'status': 'rejected', 'note': note}, status=status.HTTP_200_OK)
+        note = request.data.get('note')
+        rejection_reason_id = request.data.get('rejection_reason_id')
+
+        if not rejection_reason_id:
+            raise ValidationError("Rejection reason is required.")
+
+        try:
+            rejection_reason = LvRejectionReason.objects.get(id=rejection_reason_id)
+        except LvRejectionReason.DoesNotExist:
+            raise ValidationError("Invalid rejection reason.")
+
+        approval.reject(rejection_reason=rejection_reason, note=note)
+        return Response({'status': 'rejected', 'note': note, 'rejection_reason': rejection_reason.reason_text}, status=status.HTTP_200_OK)
+
+class Lv_Approval_ReportViewset(viewsets.ModelViewSet):
+    queryset = LeaveApprovalReport.objects.all()
+    serializer_class = LvApprovalReportSerializer
+    def __init__(self, *args, **kwargs):
+        super(Lv_Approval_ReportViewset, self).__init__(*args, **kwargs)
+        self.lv_apprvl_std_report_exists()
+    def get_available_fields(self):
+        excluded_fields = {'id', 'created_by'}
+        included_emp_master_fields = { 'emp_first_name', 'emp_dept_id', 'emp_desgntn_id', 'emp_ctgry_id'}
+        
+        display_names = {
+            "employee": "Employee Code",
+            "emp_first_name": "First Name",
+            "emp_branch_id":"Branches",
+            "emp_dept_id": "Department",
+            "emp_desgntn_id": "Designation",
+            "emp_ctgry_id": "Category",
+            "leave_request": "Leave Request",
+            "approver":"Approver",
+            "level":"Level",
+            "created_at": "Approve/Reject Date",
+            "status":"Status",
+            "note": "Comments",
+            "rejection_reason":"Rejection Reason",
+           
+        }
+
+        emp_master_fields = [field.name for field in emp_master._meta.get_fields() if isinstance(field, Field) and field.name in included_emp_master_fields]
+        leave_approval_fields = [field.name for field in LeaveApproval._meta.get_fields() if isinstance(field, Field) and field.name not in excluded_fields]
+        
+        available_fields = {field: display_names.get(field, field) for field in emp_master_fields + leave_approval_fields}
+        return available_fields
+
+    @action(detail=False, methods=['get'])
+    def select_approve_report_fields(self, request, *args, **kwargs):
+        available_fields = self.get_available_fields()
+        return Response({'available_fields': available_fields})
+       
+    @action(detail=False, methods=['post'])
+    def generate_leave_report(self, request, *args, **kwargs):
+        if request.method == 'POST':
+            try:
+                file_name = request.POST.get('file_name', 'report')
+                fields_to_include = request.POST.getlist('fields', [])
+                # from_date = parse_date(request.POST.get('from_date'))
+                # to_date = parse_date(request.POST.get('to_date'))
+            except Exception as e:
+                return JsonResponse({'status': 'error', 'message': str(e)})
+            
+            if not fields_to_include:
+                fields_to_include = list(self.get_available_fields().keys())
+            
+            leavereport = LeaveApproval.objects.all()
+            # documents = self.filter_documents_by_date_range(documents)
+
+            report_data = self.generate_report_data(fields_to_include,leavereport)
+            file_path = os.path.join(settings.MEDIA_ROOT, file_name + '.json')
+            with open(file_path, 'w') as file:
+                json.dump(report_data, file, default=str)  # Serialize dates to string format
+
+
+            LeaveApprovalReport.objects.create(file_name=file_name, report_data=file_name + '.json')
+            return JsonResponse({'status': 'success', 'file_path': file_path,'selected_fields_data': fields_to_include,})
+        return JsonResponse({'status': 'error', 'message': 'Invalid request method'})
+
+   
+    def lv_apprvl_std_report_exists(self):
+        # Update the standard report if it exists, otherwise create a new one
+        if LeaveReport.objects.filter(file_name='lv_approv_std_report').exists():
+            self.generate_standard_report()
+        else:
+            self.generate_standard_report()
     
+    def generate_standard_report(self):
+        try:
+            file_name = 'lv_approv_std_report'
+            fields_to_include = self.get_available_fields().keys()
+            leavereport = LeaveApproval.objects.all()
+
+            report_data = self.generate_report_data(fields_to_include, leavereport)
+            file_path = os.path.join(settings.MEDIA_ROOT, file_name + '.json')
+
+            # Save report data to a file
+            with open(file_path, 'w') as file:
+                json.dump(report_data, file, default=str)
+
+            # Update or create the standard report entry in the database
+            LeaveApprovalReport.objects.update_or_create(
+                file_name=file_name,
+                defaults={'report_data': file_name + '.json'}
+            )
+
+            print("Standard report generated successfully.")
+
+        except Exception as e:
+            print(f"Error generating standard report: {str(e)}")
+
+    @action(detail=False, methods=['get'])
+    def std_report(self, request, *args, **kwargs):
+        try:
+            # Ensure the standard report is up-to-date
+            self.generate_standard_report()
+            report = LeaveApprovalReport.objects.get(file_name='lv_approv_std_report')
+            serializer = self.get_serializer(report)
+            return Response(serializer.data)
+        except LeaveApprovalReport.DoesNotExist:
+            return Response({"error": "Standard report not found."}, status=status.HTTP_404_NOT_FOUND)
     
+    def generate_report_data(self, fields_to_include, generalreport):
+        # Fetch fields from emp_master and leave_approval models
+        emp_master_fields = [field.name for field in emp_master._meta.get_fields() if isinstance(field, Field) and field.name != 'id']
+        leave_approval_fields = [field.name for field in LeaveApproval._meta.get_fields() if isinstance(field, Field) and field.name != 'id']
+
+        report_data = []
+
+        for document in generalreport:
+            general_data = {}
+
+            # Access the related leave_request object and employee object
+            leave_request = document.leave_request
+            employee = leave_request.employee if leave_request else None
+
+            for field in fields_to_include:
+                if field in emp_master_fields and employee:
+                    # Get field value from employee
+                    value = getattr(employee, field, 'N/A')
+                elif field in leave_approval_fields:
+                    # Get field value from leave_approval
+                    value = getattr(document, field, 'N/A')
+                elif field == 'leave_type' and leave_request:
+                    # Access leave_type through leave_request
+                    value = leave_request.leave_type.name if leave_request.leave_type else 'N/A'
+                elif field == 'reason' and leave_request:
+                    value = leave_request.reason
+                elif field == 'applied_on' and leave_request:
+                    value = leave_request.applied_on.isoformat() if leave_request.applied_on else 'N/A'
+                else:
+                    value = 'N/A'
+                # Format date fields
+                if isinstance(value, date):
+                    value = value.isoformat()
+                general_data[field] = value
+            report_data.append(general_data)
+        return report_data
+    
+    @action(detail=False, methods=['get'])
+    def select_filter_fields(self, request, *args, **kwargs):
+        available_fields = self.get_available_fields()
+        selected_fields = request.session.get('selected_fields', [])
+        report_id = request.GET.get('report_id')  # Get report_id from query parameters      
+        return Response({
+            'available_fields': available_fields,
+            'selected_fields': selected_fields,
+            'report_id': report_id
+        })
+    
+    @action(detail=False, methods=['post'])
+    def filter_by_date(self, request, *args, **kwargs):
+        report_id = request.data.get('report_id')
+        start_date = request.data.get('start_date')
+        end_date = request.data.get('end_date')
+
+        if not report_id or not start_date or not end_date:
+            return Response({'status': 'error', 'message': 'Missing required parameters'}, status=400)
+
+        try:
+            report_instance = LeaveReport.objects.get(id=report_id)
+            report_data = json.loads(report_instance.report_data.read().decode('utf-8'))
+        except LeaveReport.DoesNotExist:
+            return Response({'status': 'error', 'message': 'Report not found'}, status=404)
+
+        def parse_date(date_str):
+            formats = ['%d-%m-%Y', '%Y-%m-%d', '%d/%m/%Y', '%Y/%m/%d', '%d.%m.%Y', '%Y.%m.%d']
+            for fmt in formats:
+                try:
+                    return datetime.strptime(date_str, fmt)
+                except ValueError:
+                    continue
+            return None
+
+        start_date = parse_date(start_date)
+        end_date = parse_date(end_date)
+
+        if not start_date or not end_date:
+            return Response({'status': 'error', 'message': 'Invalid date format. Accepted formats are dd-mm-yyyy, yyyy-mm-dd, dd/mm/yyyy, yyyy/mm/dd, dd.mm.yyyy, yyyy.mm.dd.'}, status=400)
+
+        date_filtered_data = [
+            row for row in report_data
+            if 'created_at' in row and row['created_at'] and
+            parse_date(row['created_at']) and
+            start_date <= parse_date(row['created_at']) <= end_date
+        ]
+
+        # Store filtered data in session
+        request.session['date_filtered_data'] = date_filtered_data
+        request.session.modified = True
+        return JsonResponse({
+            'date_filtered_data': date_filtered_data,
+            'report_id': report_id,
+        })
+
+    @action(detail=False, methods=['post'])
+    def approval_filter_table(self, request, *args, **kwargs):
+        selected_fields = request.POST.getlist('selected_fields')
+        report_id = request.data.get('report_id')
+
+        # Save selected fields to session
+        request.session['selected_fields'] = selected_fields
+
+        # Fetch date-filtered report data from session
+        date_filtered_data = request.session.get('date_filtered_data', [])
+        
+        if not date_filtered_data:
+            return JsonResponse({'status': 'error', 'message': 'No date-filtered data available'})
+
+        if not selected_fields:
+            selected_fields = list(date_filtered_data[0].keys()) if date_filtered_data else []
+            
+        column_headings = {
+            "employee": "Employee Code",
+            "emp_first_name": "First Name",
+            "emp_branch_id": "Branches",
+            "emp_dept_id": "Department",
+            "emp_desgntn_id": "Designation",
+            "emp_ctgry_id": "Category",
+            "leave_request": "Leave Request",
+            "approver": "Approver",
+            "level": "Level",
+            "created_at": "Approve/Reject Date",
+            "status": "Status",
+            "note": "Comments",
+            "rejection_reason": "Rejection Reason",
+        }
+
+        unique_values = self.get_unique_values_for_fields(date_filtered_data, selected_fields)
+
+        processed_unique_values = {
+            field: {'values': values}
+            for field, values in unique_values.items()
+        }
+
+        return JsonResponse({
+            'selected_fields': selected_fields,
+            'report_id': report_id,
+            'report_content': date_filtered_data,
+            'unique_values': processed_unique_values,
+            'column_headings': column_headings
+        })
+
+    def get_unique_values_for_fields(self, data, selected_fields):
+        unique_values = {field: set() for field in selected_fields}
+        for record in data:
+            for field in selected_fields:
+                if field in record:
+                    unique_values[field].add(record[field])
+        
+        return {field: list(values) for field, values in unique_values.items()}
+
+    @action(detail=False, methods=['post'])
+    def approval_filter_report(self, request, *args, **kwargs):
+        report_id = request.data.get('report_id')
+        if not report_id:
+            return Response({'status': 'error', 'message': 'Report ID is missing'}, status=400)
+
+        # Retrieve date-filtered data from the session
+        date_filtered_data = request.session.get('date_filtered_data', [])
+
+        if not date_filtered_data:
+            return Response({'status': 'error', 'message': 'No date-filtered data available'}, status=404)
+
+        selected_fields = [key for key in request.data.keys() if key not in ('report_id', 'csrfmiddlewaretoken')]
+        
+        filter_criteria = {}
+        for field in selected_fields:
+            values = [val.strip() for val in request.data.getlist(field) if val.strip()]
+            if values:
+                filter_criteria[field] = values
+
+        filtered_data = [row for row in date_filtered_data if self.match_filter_criteria(row, filter_criteria)]
+
+        request.session['filtered_data'] = filtered_data
+        request.session.modified = True
+
+        return JsonResponse({
+            'filtered_data': filtered_data,
+            'report_id': report_id,
+        })
+
+    def match_filter_criteria(self, row_data, filter_criteria):
+        for field, values in filter_criteria.items():
+            row_value = row_data.get(field, '').strip() if row_data.get(field) else ''
+            if row_value not in values:
+                return False
+        return True
+class AttendanceReportViewset(viewsets.ModelViewSet):
+    queryset = AttendanceReport.objects.all()
+    serializer_class = AttendanceReportSerializer
+    
+    def __init__(self, *args, **kwargs):
+        super(AttendanceReportViewset, self).__init__(*args, **kwargs)
+        self.attendance_standard_report_exists()
+    def get_available_fields(self):
+        excluded_fields = {'id', 'created_by'}
+        included_emp_master_fields = { 'emp_first_name', 'emp_dept_id', 'emp_desgntn_id', 'emp_ctgry_id'}
+        
+        display_names = {
+            "employee": "Employee Code",
+            "emp_first_name": "First Name",
+            "emp_branch_id":"Branches",
+            "emp_dept_id": "Department",
+            "emp_desgntn_id": "Designation",
+            "emp_ctgry_id": "Category",
+            "shift": "Leave Type",
+            "date": "Reason",
+            "check_in_time":"Status",
+            "check_out_time": "Approved Request",
+            "total_hours":"Request Date",
+           
+        }
+
+        emp_master_fields = [field.name for field in emp_master._meta.get_fields() if isinstance(field, Field) and field.name in included_emp_master_fields]
+        attendance_fields = [field.name for field in Attendance._meta.get_fields() if isinstance(field, Field) and field.name not in excluded_fields]
+        
+        available_fields = {field: display_names.get(field, field) for field in emp_master_fields + attendance_fields}
+        return available_fields
+
+    @action(detail=False, methods=['get'])
+    def select_attendancereport_fields(self, request, *args, **kwargs):
+        available_fields = self.get_available_fields()
+        return Response({'available_fields': available_fields})
+       
+    @action(detail=False, methods=['post'])
+    def generate_leave_report(self, request, *args, **kwargs):
+        if request.method == 'POST':
+            try:
+                file_name = request.POST.get('file_name', 'report')
+                fields_to_include = request.POST.getlist('fields', [])
+                # from_date = parse_date(request.POST.get('from_date'))
+                # to_date = parse_date(request.POST.get('to_date'))
+            except Exception as e:
+                return JsonResponse({'status': 'error', 'message': str(e)})
+            
+            if not fields_to_include:
+                fields_to_include = list(self.get_available_fields().keys())
+            
+            attendancereport = Attendance.objects.all()
+            # documents = self.filter_documents_by_date_range(documents)
+
+            report_data = self.generate_report_data(fields_to_include,attendancereport)
+            file_path = os.path.join(settings.MEDIA_ROOT, file_name + '.json')
+            with open(file_path, 'w') as file:
+                json.dump(report_data, file, default=str)  # Serialize dates to string format
+
+
+            AttendanceReport.objects.create(file_name=file_name, report_data=file_name + '.json')
+            return JsonResponse({'status': 'success', 'file_path': file_path,'selected_fields_data': fields_to_include,})
+        return JsonResponse({'status': 'error', 'message': 'Invalid request method'})
+
+   
+    def attendance_standard_report_exists(self):
+        # Update the standard report if it exists, otherwise create a new one
+        if AttendanceReport.objects.filter(file_name='attendance_std_report').exists():
+            self.generate_standard_report()
+        else:
+            self.generate_standard_report()
+    
+    def generate_standard_report(self):
+        try:
+            file_name = 'attendance_std_report'
+            fields_to_include = self.get_available_fields().keys()
+            attendancereport = Attendance.objects.all()
+
+            report_data = self.generate_report_data(fields_to_include, attendancereport)
+            file_path = os.path.join(settings.MEDIA_ROOT, file_name + '.json')
+
+            # Save report data to a file
+            with open(file_path, 'w') as file:
+                json.dump(report_data, file, default=str)
+
+            # Update or create the standard report entry in the database
+            AttendanceReport.objects.update_or_create(
+                file_name=file_name,
+                defaults={'report_data': file_name + '.json'}
+            )
+
+            print("Standard report generated successfully.")
+
+        except Exception as e:
+            print(f"Error generating standard report: {str(e)}")
+
+    @action(detail=False, methods=['get'])
+    def std_report(self, request, *args, **kwargs):
+        try:
+            # Ensure the standard report is up-to-date
+            self.generate_standard_report()
+            report = AttendanceReport.objects.get(file_name='attendance_std_report')
+            serializer = self.get_serializer(report)
+            return Response(serializer.data)
+        except AttendanceReport.DoesNotExist:
+            return Response({"error": "Standard report not found."}, status=status.HTTP_404_NOT_FOUND)
+    
+    def generate_report_data(self, fields_to_include,generalreport):
+        column_headings = {
+            "employee": "Employee Code",
+            "emp_first_name": "First Name",
+            "emp_branch_id":"Branches",
+            "emp_dept_id": "Department",
+            "emp_desgntn_id": "Designation",
+            "emp_ctgry_id": "Category",
+            "leave_type": "Leave Type",
+            "reason": "Reason",
+            "status":"Status",
+            "approved_by": "Approved Request",
+            "applied_on":"Request Date",
+        }
+
+        emp_master_fields = [field.name for field in emp_master._meta.get_fields() if isinstance(field, Field) and field.name != 'id']
+        leave_request_fields = [field.name for field in Attendance._meta.get_fields() if isinstance(field, Field) and field.name != 'id']
+
+        report_data = []
+        for document in generalreport:
+            general_data = {}
+            for field in fields_to_include:
+                if field in emp_master_fields:
+                    value = getattr(document.employee, field, 'N/A')
+                    if isinstance(value, date):
+                        value = value.isoformat()
+                elif field in leave_request_fields:
+                    value = getattr(document, field, 'N/A')
+                else:
+                    value = 'N/A'
+                general_data[field] = value
+            report_data.append(general_data)
+        return report_data

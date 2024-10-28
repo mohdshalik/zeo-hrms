@@ -402,6 +402,9 @@ class employee_leave_request(models.Model):
     def __str__(self):
         return f"{self.employee} - {self.leave_type} from {self.start_date} to {self.end_date}"
     
+    # def get_employee_requests(employee_id):
+    #     return employee_leave_request.objects.filter(employee_id=employee_id).order_by('-applied_on')
+     
     def move_to_next_level(self):
         if self.approvals.filter(status=LeaveApproval.REJECTED).exists():
             self.status = 'Rejected'
@@ -514,6 +517,11 @@ class employee_leave_request(models.Model):
                     'emp_designation_name': self.employee.emp_desgntn_id,
                 })
     
+class LvRejectionReason(models.Model):
+    reason_text = models.CharField(max_length=255, unique=True)
+
+    def __str__(self):
+        return self.reason_text
 
 class LeaveApprovalLevels(models.Model):
     level = models.IntegerField()
@@ -541,6 +549,7 @@ class LeaveApproval(models.Model):
     level = models.IntegerField(default=1)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES,default=PENDING)
     note = models.TextField(null=True, blank=True)
+    rejection_reason = models.ForeignKey(LvRejectionReason,null=True, blank=True, on_delete=models.SET_NULL)
     created_at = models.DateField(auto_now_add=True)
     updated_at = models.DateField(auto_now=True)
 
@@ -551,7 +560,16 @@ class LeaveApproval(models.Model):
         self.save()
         self.leave_request.move_to_next_level()
    
-    def reject(self,note=None):
+    # def reject(self,note=None):
+    #     self.status = self.REJECTED
+    #     if note:
+    #         self.note = note
+    #     self.save()
+    #     self.leave_request.status = 'Rejected'
+    #     self.leave_request.save()
+    def reject(self, rejection_reason, note=None):
+        if rejection_reason:
+            self.rejection_reason = rejection_reason
         self.status = self.REJECTED
         if note:
             self.note = note
@@ -559,14 +577,13 @@ class LeaveApproval(models.Model):
         self.leave_request.status = 'Rejected'
         self.leave_request.save()
 
-
         notification = LvApprovalNotify.objects.create(
             recipient_user=self.leave_request.created_by,
             message=f"Your request {self.leave_request} has been rejected."
         )
         notification.send_email_notification('request_rejected', {
             'request_type': self.leave_request,
-            'rejection_reason': 'Reason for rejection...',  # Add actual reason if available
+            'rejection_reason': self.rejection_reason.reason_text if self.rejection_reason else "No reason provided",  # Add actual reason if available
             'emp_gender': self.leave_request.employee.emp_gender,
             'emp_date_of_birth': self.leave_request.employee.emp_date_of_birth,
             'emp_personal_email': self.leave_request.employee.emp_personal_email,
@@ -585,7 +602,7 @@ class LeaveApproval(models.Model):
             )
             notification.send_email_notification('request_rejected', {
             'request_type': self.leave_request,
-            'rejection_reason': 'Reason for rejection...',  # Add actual reason if available
+            'rejection_reason': self.rejection_reason.reason_text if self.rejection_reason else "No reason provided",  # Add actual reason if available
             'emp_gender': self.leave_request.employee.emp_gender,
             'emp_date_of_birth': self.leave_request.employee.emp_date_of_birth,
             'emp_personal_email': self.leave_request.employee.emp_personal_email,
@@ -721,6 +738,30 @@ class LeaveReport(models.Model):
         )
     
     
+    def __str__(self):
+        return self.file_name 
+    
+class LeaveApprovalReport(models.Model):
+    file_name = models.CharField(max_length=100,null=True,unique=True)
+    report_data = models.FileField(upload_to='leave_approval_report/', null=True, blank=True)
+    class Meta:
+        permissions = (
+            ('export_report', 'Can export report'),
+            # Add more custom permissions here
+        )
+       
+    def __str__(self):
+        return self.file_name 
+
+class AttendanceReport(models.Model):
+    file_name = models.CharField(max_length=100,null=True,unique=True)
+    report_data = models.FileField(upload_to='attendance_report/', null=True, blank=True)
+    class Meta:
+        permissions = (
+            ('export_report', 'Can export report'),
+            # Add more custom permissions here
+        )
+       
     def __str__(self):
         return self.file_name 
 

@@ -19,8 +19,9 @@ from rest_framework.views import APIView
 from EmpManagement.models import Approval
 from rest_framework.exceptions import NotFound
 from EmpManagement .serializer import ApprovalSerializer,ReqNotifySerializer
-from LeaveManagement.serializer import LvApprovalSerializer
-from LeaveManagement.models import LeaveApproval
+from LeaveManagement.serializer import LvApprovalSerializer,LvApprovalNotifySerializer
+from LeaveManagement.models import LeaveApproval,LvApprovalNotify
+from EmpManagement.models import Approval,RequestNotification
 # Create your views here.
 #usergroups or roles
 class RegisterUserAPIView(viewsets.ModelViewSet):
@@ -59,28 +60,32 @@ class RegisterUserAPIView(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'])
     def approvals(self, request, pk=None):
         user = self.get_object()
-        approvals = user.get_approvals()
+        approvals = Approval.objects.filter(approver=user).order_by('-created_at')
         serializer = ApprovalSerializer(approvals, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     @action(detail=True, methods=['get'])
     def approvalnotification(self, request, pk=None):
         user = self.get_object()
-        approvals = user.get_requestsnotification()
+        approvals = RequestNotification.objects.filter(recipient_user=user).order_by('-created_at')
         serializer = ReqNotifySerializer(approvals, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
-    # @action(detail=True, methods=['get'])
-    # def lvapprovals(self, request, pk=None):
-    #     user = self.get_object()  # Assuming this gets the user object
-    #     approvals = LeaveApproval.objects.filter(approver=user)  # Correct queryset
-    #     serializer = LvApprovalSerializer(approvals, many=True)  # Serialize the queryset
-    #     return Response(serializer.data, status=status.HTTP_200_OK)
+    
     @action(detail=True, methods=['get'])
     def lvapprovals(self, request, pk=None):
-        user = self.get_object()
-        approvals = user.get_lv_approvals()
-        serializer = LvApprovalSerializer(approvals, many=True)
+        user = self.get_object()  # Assuming this gets the user object
+        approvals = LeaveApproval.objects.filter(approver=user).order_by('-created_at')  
+        serializer = LvApprovalSerializer(approvals, many=True)  
         return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    @action(detail=True, methods=['get'])
+    def lvapprovalnotification(self, request, pk=None):
+        user = self.get_object()
+        approvals = LvApprovalNotify.objects.filter(recipient_user=user).order_by('-created_at')
+        serializer = LvApprovalNotifySerializer(approvals, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    
      
 
 class CompanyViewSet(viewsets.ModelViewSet):
