@@ -19,3 +19,5 @@ class BranchEmailBackend(EmailBackend):
         self.use_ssl = self.branch_email_config.get('EMAIL_USE_SSL', settings.EMAIL_USE_SSL)
 
         return super().open()
+from django.utils.deprecation import MiddlewareMixin
+

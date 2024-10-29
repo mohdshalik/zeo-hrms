@@ -103,7 +103,7 @@ CORS_ALLOW_METHODS = [
 MIDDLEWARE = [
     # 'UserManagement.middleware.RequestIDTenantMiddleware',
 
-
+    
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -121,6 +121,16 @@ MIDDLEWARE = [
 
 
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': 'redis://127.0.0.1:6379/1',  # Change as needed
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+        }
+    }
+}
+
 ROOT_URLCONF = 'zeo.urls'
 
 TEMPLATES = [

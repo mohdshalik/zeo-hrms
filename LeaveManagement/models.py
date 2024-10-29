@@ -765,6 +765,18 @@ class AttendanceReport(models.Model):
     def __str__(self):
         return self.file_name 
 
+class lvBalanceReport(models.Model):
+    file_name = models.CharField(max_length=100,null=True,unique=True)
+    report_data = models.FileField(upload_to='lvbalance_report/', null=True, blank=True)
+    class Meta:
+        permissions = (
+            ('export_report', 'Can export report'),
+            # Add more custom permissions here
+        )
+       
+    def __str__(self):
+        return self.file_name
+
     
     
     
