@@ -10,10 +10,10 @@ from datetime import datetime, timedelta
 from django.db.models import Field
 from . serializer import(LeaveTypeSerializer,LeaveEntitlementSerializer,ApplicableSerializer,EmployeeLeaveBalanceSerializer,AccrualSerializer,ResetSerializer,LeaveRequestSerializer,
                          AttendanceSerializer,ShiftSerializer,WeeklyShiftScheduleSerializer,ImportAttendanceSerializer,EmployeeMappingSerializer,LeaveReportSerializer,LvApprovalLevelSerializer,
-                         LvApprovalSerializer,LvEmailTemplateSerializer,LvApprovalNotifySerializer,LvCommonWorkflowSerializer,LvRejectionReasonSerializer,LvApprovalReportSerializer,AttendanceReportSerializer)
+                         LvApprovalSerializer,LvEmailTemplateSerializer,LvApprovalNotifySerializer,LvCommonWorkflowSerializer,LvRejectionReasonSerializer,LvApprovalReportSerializer,AttendanceReportSerializer,lvBalanceReportSerializer)
 from .models import (leave_type,leave_entitlement,applicablity_critirea,emp_leave_balance,leave_accrual_transaction,leave_reset_transaction,employee_leave_request,Attendance,Shift,
                      WeeklyShiftSchedule,EmployeeMachineMapping,LeaveReport,LeaveApprovalLevels,LeaveApproval,LvEmailTemplate,LvApprovalNotify,LvCommonWorkflow,LvRejectionReason,LeaveApprovalReport,
-                     AttendanceReport
+                     AttendanceReport,lvBalanceReport
                      )
 from rest_framework.parsers import MultiPartParser, FormParser
 from EmpManagement.models import emp_master
@@ -1008,11 +1008,11 @@ class AttendanceReportViewset(viewsets.ModelViewSet):
             "emp_dept_id": "Department",
             "emp_desgntn_id": "Designation",
             "emp_ctgry_id": "Category",
-            "shift": "Leave Type",
-            "date": "Reason",
-            "check_in_time":"Status",
-            "check_out_time": "Approved Request",
-            "total_hours":"Request Date",
+            "shift": "Shift",
+            "date": "Date",
+            "check_in_time":"Check In",
+            "check_out_time": "Check Out",
+            "total_hours":"Total Hours",
            
         }
 
@@ -1256,3 +1256,130 @@ class AttendanceReportViewset(viewsets.ModelViewSet):
             'filtered_data': filtered_data,
             'report_id': report_id,
         })
+class LvBalanceReportViewset(viewsets.ModelViewSet):
+    queryset = lvBalanceReport.objects.all()
+    serializer_class = lvBalanceReportSerializer
+
+    def __init__(self, *args, **kwargs):
+        super(LvBalanceReportViewset, self).__init__(*args, **kwargs)
+        self.lvbalance_standard_report_exists()
+    def get_available_fields(self):
+        excluded_fields = {'id', 'created_by'}
+        included_emp_master_fields = { 'emp_first_name', 'emp_dept_id', 'emp_desgntn_id', 'emp_ctgry_id'}
+        
+        display_names = {
+            "employee": "Employee Code",
+            "emp_first_name": "First Name",
+            "emp_branch_id":"Branches",
+            "emp_dept_id": "Department",
+            "emp_desgntn_id": "Designation",
+            "emp_ctgry_id": "Category",
+            "leave_type": "Leave Type",
+            "balance": "Balance",
+            "openings":"Openings",
+            
+           
+        }
+
+        emp_master_fields = [field.name for field in emp_master._meta.get_fields() if isinstance(field, Field) and field.name in included_emp_master_fields]
+        leave_balance = [field.name for field in emp_leave_balance._meta.get_fields() if isinstance(field, Field) and field.name not in excluded_fields]
+        
+        available_fields = {field: display_names.get(field, field) for field in emp_master_fields + leave_balance}
+        return available_fields
+
+    @action(detail=False, methods=['get'])
+    def select_attendancereport_fields(self, request, *args, **kwargs):
+        available_fields = self.get_available_fields()
+        return Response({'available_fields': available_fields})
+       
+    @action(detail=False, methods=['post'])
+    def generate_leave_report(self, request, *args, **kwargs):
+        if request.method == 'POST':
+            try:
+                file_name = request.POST.get('file_name', 'report')
+                fields_to_include = request.POST.getlist('fields', [])
+                # from_date = parse_date(request.POST.get('from_date'))
+                # to_date = parse_date(request.POST.get('to_date'))
+            except Exception as e:
+                return JsonResponse({'status': 'error', 'message': str(e)})
+            
+            if not fields_to_include:
+                fields_to_include = list(self.get_available_fields().keys())
+            
+            attendancereport = emp_leave_balance.objects.all()
+            # documents = self.filter_documents_by_date_range(documents)
+
+            report_data = self.generate_report_data(fields_to_include,attendancereport)
+            file_path = os.path.join(settings.MEDIA_ROOT, file_name + '.json')
+            with open(file_path, 'w') as file:
+                json.dump(report_data, file, default=str)  # Serialize dates to string format
+
+
+            lvBalanceReport.objects.create(file_name=file_name, report_data=file_name + '.json')
+            return JsonResponse({'status': 'success', 'file_path': file_path,'selected_fields_data': fields_to_include,})
+        return JsonResponse({'status': 'error', 'message': 'Invalid request method'})
+
+   
+    def lvbalance_standard_report_exists(self):
+        # Update the standard report if it exists, otherwise create a new one
+        if lvBalanceReport.objects.filter(file_name='lvbalance_std_report').exists():
+            self.generate_standard_report()
+        else:
+            self.generate_standard_report()
+    
+    def generate_standard_report(self):
+        try:
+            file_name = 'lvbalance_std_report'
+            fields_to_include = self.get_available_fields().keys()
+            lvbalancereport = emp_leave_balance.objects.all()
+
+            report_data = self.generate_report_data(fields_to_include, lvbalancereport)
+            file_path = os.path.join(settings.MEDIA_ROOT, file_name + '.json')
+
+            # Save report data to a file
+            with open(file_path, 'w') as file:
+                json.dump(report_data, file, default=str)
+
+            # Update or create the standard report entry in the database
+            lvBalanceReport.objects.update_or_create(
+                file_name=file_name,
+                defaults={'report_data': file_name + '.json'}
+            )
+
+            print("Standard report generated successfully.")
+
+        except Exception as e:
+            print(f"Error generating standard report: {str(e)}")
+
+    @action(detail=False, methods=['get'])
+    def std_report(self, request, *args, **kwargs):
+        try:
+            # Ensure the standard report is up-to-date
+            self.generate_standard_report()
+            report = lvBalanceReport.objects.get(file_name='lvbalance_std_report')
+            serializer = self.get_serializer(report)
+            return Response(serializer.data)
+        except lvBalanceReport.DoesNotExist:
+            return Response({"error": "Standard report not found."}, status=status.HTTP_404_NOT_FOUND)
+    
+    def generate_report_data(self, fields_to_include,generalreport):
+        emp_master_fields = [field.name for field in emp_master._meta.get_fields() if isinstance(field, Field) and field.name != 'id']
+        leave_request_fields = [field.name for field in emp_leave_balance._meta.get_fields() if isinstance(field, Field) and field.name != 'id']
+
+        report_data = []
+        for document in generalreport:
+            general_data = {}
+            for field in fields_to_include:
+                if field in emp_master_fields:
+                    value = getattr(document.employee, field, 'N/A')
+                    if isinstance(value, date):
+                        value = value.isoformat()
+                elif field in leave_request_fields:
+                    value = getattr(document, field, 'N/A')
+                else:
+                    value = 'N/A'
+                general_data[field] = value
+            report_data.append(general_data)
+        return report_data
+    
+

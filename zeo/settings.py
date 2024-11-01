@@ -265,10 +265,16 @@ CELERY_BEAT_SCHEDULE = {
         # 'schedule': timedelta(days=1),
 
     },
-    # 'schedule-simple_task':{
-    #     'task': 'OrganisationManager.tasks.simple_task',
-    #     'schedule': crontab(hour=17, minute=50)
-    # },
+    'leave-accruals':{
+        'task':'LeaveManagement.tasks.accrue_leaves',
+        'schedule': crontab(hour=13, minute=30)
+
+    },
+    'reset-leave-balances':{
+        'task':'LeaveManagement.tasks.reset_leave_balances',
+        'schedule': crontab(hour=13, minute=30)
+
+    }
 }
 # CELERY_BEAT_SCHEDULE_FILENAME = 'celerybeat-schedule'  # Save Celery Beat schedule state
 

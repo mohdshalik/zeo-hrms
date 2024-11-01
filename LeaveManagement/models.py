@@ -370,13 +370,45 @@ class employee_leave_request(models.Model):
 
     def save(self, *args, **kwargs):
         if self.start_date and self.end_date:
-            delta = (self.end_date - self.start_date).days + 1  # Add 1 to include both start and end date
+            # Get the employee's leave balance record
+            leave_balance = emp_leave_balance.objects.get(employee=self.employee, leave_type=self.leave_type)
 
-            # If it's a half-day leave, count it as 0.5 day
+            # Calculate leave days considering weekends and holidays
             if self.dis_half_day:
                 self.number_of_days = 0.5
             else:
-                self.number_of_days = delta
+                self.number_of_days = leave_balance.get_leave_days(self.start_date, self.end_date)
+
+        # Deduct leave only if the status is set to 'approved' and it's a new request (not an update)
+        if self.status == 'approved' and not self.pk:
+            leave_balance.deduct_leave(self.number_of_days)
+
+        super().save(*args, **kwargs)  # Call the parent class's save method
+
+    def __str__(self):
+        return f"{self.employee} - {self.leave_type} from {self.start_date} to {self.end_date}"
+
+    # def save(self, *args, **kwargs):
+    #     if self.start_date and self.end_date:
+    #         delta = (self.end_date - self.start_date).days + 1  # Add 1 to include both start and end date
+
+    #         # If it's a half-day leave, count it as 0.5 day
+    #         if self.dis_half_day:
+    #             self.number_of_days = 0.5
+    #         else:
+    #             self.number_of_days = delta
+        
+    #     if self.status == 'approved' and not self.pk:
+    #         # Calculate leave days based on whether it's a half-day or full-day leave
+    #         if self.dis_half_day:
+    #             leave_days = 0.5
+    #         else:
+    #             leave_balance = emp_leave_balance.objects.get(employee=self.employee, leave_type=self.leave_type)
+    #             leave_days = leave_balance.get_leave_days(self.start_date, self.end_date, include_weekends_holidays=self.leave_type.include_weekend_and_holiday)
+
+    #         # Deduct the calculated leave days from the employee's leave balance
+    #         leave_balance.deduct_leave(leave_days)
+
         # # Perform proration calculation if necessary
         # if self.leave_type.leave_entitlement.prorate_accrual:
         #     accrual_transaction = leave_accrual_transaction.objects.create(
@@ -397,7 +429,7 @@ class employee_leave_request(models.Model):
         #     # Deduct full day leave
         #     self.employee.leave_balance.deduct_leave()
 
-        super().save(*args, **kwargs)
+        # super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.employee} - {self.leave_type} from {self.start_date} to {self.end_date}"
@@ -528,8 +560,6 @@ class LeaveApprovalLevels(models.Model):
     role = models.CharField(max_length=50, null=True, blank=True)  # Use this for role-based approval like 'CEO' or 'Manager'
     approver = models.ForeignKey('UserManagement.CustomUser', null=True, blank=True, on_delete=models.SET_NULL)  # Use this for user-based approval
     request_type = models.ForeignKey('leave_type', related_name='leave_approval_levels', on_delete=models.CASCADE, null=True, blank=True)  # Nullable for common workflow
-    # min_leave=models.IntegerField(default=0)
-    # max_leave=models.IntegerField()
     class Meta:
         unique_together = ('level', 'request_type')
 
