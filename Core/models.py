@@ -3,14 +3,15 @@ from django.db import models
 # Create your models here.
 #COUNTRY MODELS
 class cntry_mstr(models.Model):
-
-    country_code=models.CharField(max_length=150,unique=True,null=True)
-    country_name = models.CharField(max_length=50,unique=True)
-
+    country_name = models.CharField(max_length=50, unique=True)
+    timezone = models.CharField(
+        max_length=100, 
+        help_text="Set timezone as per IANA timezone database format, e.g., 'America/New_York'"
+    )
     is_active = models.BooleanField(default=True)
+
     def __str__(self):
         return self.country_name
-
 
 #STATE MODEL
 class state_mstr(models.Model):

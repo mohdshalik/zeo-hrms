@@ -18,7 +18,7 @@ class CountrySerializer(serializers.ModelSerializer):
     # br_updated_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
     class Meta:
         model = cntry_mstr
-        fields = ('id','country_name','is_active','states_set')
+        fields = '__all__'
 
 class CntryBulkUploadSerializer(serializers.ModelSerializer):  
     file = serializers.FileField(write_only=True) 

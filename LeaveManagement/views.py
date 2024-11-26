@@ -8,12 +8,16 @@ import redis
 from rest_framework import viewsets,filters, status
 from datetime import datetime, timedelta
 from django.db.models import Field
+from . permissions import (LeaveTypePermission,LeaveEntitlementPermission,EmpLeaveBalancePermission,ApplicabilityCriteriaPermission,EmployeeLeaveRequestPermission,LvEmailTemplatePermission,
+LvCommonWorkflowPermission,LvRejectionReasonPermission,LeaveApprovalLevelsPermission,EmployeeMachineMappingPermission,ShiftPermission,WeeklyShiftSchedulePermission,AttendancePermission,
+LeaveReportPermission,LeaveApprovalReportPermission,AttendanceReportPermission,LvBalanceReportPermission)
+
 from . serializer import(LeaveTypeSerializer,LeaveEntitlementSerializer,ApplicableSerializer,EmployeeLeaveBalanceSerializer,AccrualSerializer,ResetSerializer,LeaveRequestSerializer,
-                         AttendanceSerializer,ShiftSerializer,WeeklyShiftScheduleSerializer,ImportAttendanceSerializer,EmployeeMappingSerializer,LeaveReportSerializer,LvApprovalLevelSerializer,
+                         AttendanceSerializer,ShiftSerializer,WeeklyShiftScheduleSerializer,ImportAttendanceSerializer,EmployeeMappingSerializer,LeaveReportSerializer,LvApprovalLevelSerializer,EmployeeYearlyCalendarSerializer,
                          LvApprovalSerializer,LvEmailTemplateSerializer,LvApprovalNotifySerializer,LvCommonWorkflowSerializer,LvRejectionReasonSerializer,LvApprovalReportSerializer,AttendanceReportSerializer,lvBalanceReportSerializer)
 from .models import (leave_type,leave_entitlement,applicablity_critirea,emp_leave_balance,leave_accrual_transaction,leave_reset_transaction,employee_leave_request,Attendance,Shift,
                      WeeklyShiftSchedule,EmployeeMachineMapping,LeaveReport,LeaveApprovalLevels,LeaveApproval,LvEmailTemplate,LvApprovalNotify,LvCommonWorkflow,LvRejectionReason,LeaveApprovalReport,
-                     AttendanceReport,lvBalanceReport
+                     AttendanceReport,lvBalanceReport,EmployeeYearlyCalendar
                      )
 from rest_framework.parsers import MultiPartParser, FormParser
 from EmpManagement.models import emp_master
@@ -38,10 +42,13 @@ from django.shortcuts import get_object_or_404
 class LeaveTypeviewset(viewsets.ModelViewSet):
     queryset = leave_type.objects.all()
     serializer_class = LeaveTypeSerializer
+    # permission_classes = [LeaveTypePermission] 
     
 class LvEmailTemplateviewset(viewsets.ModelViewSet):
     queryset = LvEmailTemplate.objects.all()
     serializer_class = LvEmailTemplateSerializer
+    permission_classes = [LvEmailTemplatePermission] 
+    
 
 class LvApprovalNotifyviewset(viewsets.ModelViewSet):
     queryset = LvApprovalNotify.objects.all()
@@ -53,6 +60,7 @@ class LvApprovalNotifyviewset(viewsets.ModelViewSet):
 class LeaveEntitlementviewset(viewsets.ModelViewSet):
     queryset = leave_entitlement.objects.all()
     serializer_class = LeaveEntitlementSerializer
+    permission_classes = [LeaveEntitlementPermission]
     def perform_create(self, serializer):
         instance = serializer.save()
         self.process_accrual(instance)
@@ -77,12 +85,14 @@ class LeaveEntitlementviewset(viewsets.ModelViewSet):
 class Applicableviewset(viewsets.ModelViewSet):
     queryset = applicablity_critirea.objects.all()
     serializer_class = ApplicableSerializer
+    permission_classes = [ApplicabilityCriteriaPermission] 
+
 
 
 class leave_balance_viewset(viewsets.ModelViewSet):
     queryset = emp_leave_balance.objects.all()
     serializer_class = EmployeeLeaveBalanceSerializer
-
+    permission_classes = [EmpLeaveBalancePermission] 
 
 class Acrualviewset(viewsets.ModelViewSet):
     queryset = leave_accrual_transaction.objects.all()
@@ -101,6 +111,21 @@ class Resetviewset(viewsets.ModelViewSet):
 class LeaveRequestviewset(viewsets.ModelViewSet):
     queryset = employee_leave_request.objects.all()
     serializer_class = LeaveRequestSerializer
+    permission_classes = [EmployeeLeaveRequestPermission]
+    def get_queryset(self):
+        # Filter queryset based on user access
+        if self.request.user.is_ess:
+            # Return only requests related to the ESS user's employee record
+            return self.queryset.filter(employee__emp_code=self.request.user.username)
+        return super().get_queryset()  # Non-ESS users can access as per their permissions
+
+    def perform_create(self, serializer):
+        if self.request.user.is_ess:
+            # Set the employee field to the ESS user's employee record
+            employee = self.request.user.emp_master  # Assuming a OneToOne relationship or similar
+            serializer.save(employee=employee, created_by=self.request.user)
+        else:
+            serializer.save(created_by=self.request.user)
 
     @action(detail=False, methods=['get'], url_path='leave-request-history')
     def employee_leave_request(self, request):
@@ -161,14 +186,20 @@ class LeaveTypeViewSet(viewsets.ViewSet):
 class EmployeeMachineMappingViewset(viewsets.ModelViewSet):
     queryset =EmployeeMachineMapping.objects.all()
     serializer_class = EmployeeMappingSerializer
+    permission_classes = [EmployeeMachineMappingPermission] 
+    
 
 class ShiftViewSet(viewsets.ModelViewSet):
     queryset = Shift.objects.all()
     serializer_class = ShiftSerializer
+    permission_classes = [ShiftPermission] 
+
+    
 
 class WeeklyShiftScheduleViewSet(viewsets.ModelViewSet):
     queryset = WeeklyShiftSchedule.objects.all()
     serializer_class = WeeklyShiftScheduleSerializer
+    permission_classes = [WeeklyShiftSchedulePermission] 
 
     # POST method to assign a weekly shift schedule to an employee
     @action(detail=False, methods=['post'])
@@ -213,6 +244,8 @@ class WeeklyShiftScheduleViewSet(viewsets.ModelViewSet):
 class AttendanceViewSet(viewsets.ModelViewSet):
     queryset = Attendance.objects.all()
     serializer_class = AttendanceSerializer
+    permission_classes = [AttendancePermission] 
+    
     @action(detail=False, methods=['post'])
     def check_in(self, request):
         emp_id = request.data.get("employee_id")
@@ -306,6 +339,8 @@ class ImportAttendanceViewSet(viewsets.ModelViewSet):
 class Leave_ReportViewset(viewsets.ModelViewSet):
     queryset = LeaveReport.objects.all()
     serializer_class = LeaveReportSerializer
+    permission_classes = [LeaveReportPermission] 
+
 
     def __init__(self, *args, **kwargs):
         super(Leave_ReportViewset, self).__init__(*args, **kwargs)
@@ -605,14 +640,18 @@ class Leave_ReportViewset(viewsets.ModelViewSet):
 class LvApprovalLevelViewset(viewsets.ModelViewSet):
     queryset=LeaveApprovalLevels.objects.all()
     serializer_class=LvApprovalLevelSerializer
+    permission_classes = [LeaveApprovalLevelsPermission]
+
 
 class LvCommonWorkflowViewset(viewsets.ModelViewSet):
     queryset=LvCommonWorkflow.objects.all()
     serializer_class=LvCommonWorkflowSerializer
+    permission_classes = [LvCommonWorkflowPermission]
 
 class LvRejectionViewset(viewsets.ModelViewSet):
     queryset=LvRejectionReason.objects.all()
     serializer_class=LvRejectionReasonSerializer
+    permission_classes = [LvRejectionReasonPermission]
 
 class LvApprovalViewset(viewsets.ModelViewSet):
     queryset=LeaveApproval.objects.all()
@@ -676,6 +715,8 @@ class LvApprovalViewset(viewsets.ModelViewSet):
 class Lv_Approval_ReportViewset(viewsets.ModelViewSet):
     queryset = LeaveApprovalReport.objects.all()
     serializer_class = LvApprovalReportSerializer
+    permission_classes = [LeaveApprovalReportPermission]
+    
     def __init__(self, *args, **kwargs):
         super(Lv_Approval_ReportViewset, self).__init__(*args, **kwargs)
         self.lv_apprvl_std_report_exists()
@@ -993,6 +1034,9 @@ class Lv_Approval_ReportViewset(viewsets.ModelViewSet):
 class AttendanceReportViewset(viewsets.ModelViewSet):
     queryset = AttendanceReport.objects.all()
     serializer_class = AttendanceReportSerializer
+    permission_classes = [AttendanceReportPermission]
+
+    
     
     def __init__(self, *args, **kwargs):
         super(AttendanceReportViewset, self).__init__(*args, **kwargs)
@@ -1259,6 +1303,9 @@ class AttendanceReportViewset(viewsets.ModelViewSet):
 class LvBalanceReportViewset(viewsets.ModelViewSet):
     queryset = lvBalanceReport.objects.all()
     serializer_class = lvBalanceReportSerializer
+    permission_classes = [LvBalanceReportPermission]
+
+    
 
     def __init__(self, *args, **kwargs):
         super(LvBalanceReportViewset, self).__init__(*args, **kwargs)
@@ -1383,3 +1430,6 @@ class LvBalanceReportViewset(viewsets.ModelViewSet):
         return report_data
     
 
+class EmployeeYearlyCalendarViewset(viewsets.ModelViewSet):
+    queryset = EmployeeYearlyCalendar.objects.all()
+    serializer_class = EmployeeYearlyCalendarSerializer

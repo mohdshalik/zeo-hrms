@@ -16,6 +16,9 @@ from django.core.mail import EmailMultiAlternatives,get_connection, send_mail
 from django.template import Context, Template
 from django.utils.html import strip_tags
 
+from django.utils import timezone
+# from LeaveManagement.models import leave_type
+
 # Create your models here.
 
 class leave_type(models.Model):
@@ -46,6 +49,7 @@ class leave_type(models.Model):
     valid_to = models.DateField(null=True,blank=True)
     include_weekend_and_holiday = models.BooleanField(default=False)
     use_common_workflow = models.BooleanField(default=False)
+    created_at=models.DateTimeField(default=timezone.now)
     # allow_opening_balance =models.BooleanField(default=False)
     def __str__(self):
         return f"{self.name}"
@@ -69,7 +73,6 @@ class leave_entitlement(models.Model):
         ('years', 'Years'),
         ('months', 'Months'),
         ('days','days')
-
     ]
     ROUND_OF_TYPE = [ 
         ('nearest_lowest','nearest_lowest'),
@@ -106,45 +109,33 @@ class leave_entitlement(models.Model):
         ('start_and_end_of_policy', 'Start and End of Policy'),
         ('do_not_prorate', 'Do not Prorate')
     ]
-    leave_type = models.ForeignKey(leave_type, on_delete=models.CASCADE)
+    leave_type = models.ForeignKey('leave_type', on_delete=models.CASCADE)
     effective_after = models.PositiveIntegerField(default=0)
     effective_after_unit = models.CharField(max_length=10, choices=TIME_UNIT_CHOICES, default='months')
     effective_after_from = models.CharField(max_length=20, choices=EFFECTIVE_AFTER_CHOICES)
-
-
     accrual = models.BooleanField(default=False)
     accrual_rate = models.FloatField(default=0, help_text="Accrual rate per period (e.g., days/months/yearly)")
     accrual_frequency = models.CharField(max_length=20, choices=TIME_UNIT_CHOICES)
     accrual_month = models.CharField(max_length=3, choices=MONTH_CHOICES, default='Jan',null=True,blank=True)
     accrual_day = models.CharField(max_length=10, choices=DAY_CHOICES, default='1st')
     round_of = models.CharField(choices=ROUND_OF_TYPE,max_length=20)
-
-
     reset = models.BooleanField(default=False)
     frequency = models.CharField(max_length=20, choices=TIME_UNIT_CHOICES)
     month = models.CharField(max_length=30, choices=MONTH_CHOICES, default='Dec')
     day = models.CharField(max_length=20, choices=DAY_CHOICES)
-
-
     carry_forward_choice=models.CharField(max_length=100,choices=CARRY_CHOICE)
     cf_value = models.PositiveIntegerField()
     cf_unit_or_percentage = models.CharField(max_length=50,choices=UNIT_CHOICES)
     cf_max_limit = models.PositiveIntegerField()
     cf_expires_in_value = models.PositiveIntegerField()
     cf_time_choice=models.CharField(max_length=20,choices=TIME_UNIT_CHOICES)
-
-
     encashment_value = models.PositiveIntegerField(default=50)
     encashment_unit_or_percentage = models.CharField(max_length=50,choices=UNIT_CHOICES)
     encashment_max_limit = models.PositiveIntegerField()
-
-
     prorate_accrual = models.BooleanField(default=False, help_text="Enable prorate accrual for this leave type.")
     prorate_type = models.CharField(max_length=30, choices=PRORATE_CHOICES, null=True, blank=True, help_text="Prorate accrual type.")
     def __str__(self):
         return f"{self.leave_type.name} Entitlement"
-
-
 # from django.db.models import Q
 
 class emp_leave_balance(models.Model):
@@ -352,6 +343,7 @@ class employee_leave_request(models.Model):
     reason = models.TextField()
     status = models.CharField(max_length=10, choices=LEAVE_STATUS_CHOICES, default='pending')
     applied_on = models.DateField(auto_now_add=True)
+    doc_number = models.CharField(max_length=120, unique=True, null=True, blank=True)
     # approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_leaves')
     # approved_on = models.DateField(null=True, blank=True)
     dis_half_day = models.BooleanField(default=False)  # True if it's a half-day leave
@@ -367,6 +359,7 @@ class employee_leave_request(models.Model):
         # If half-day leave is chosen, ensure the date range is correct
         if self.dis_half_day and self.start_date != self.end_date:
             raise ValidationError("Half-day leave should be on the same day.")
+
 
     def save(self, *args, **kwargs):
         if self.start_date and self.end_date:
@@ -388,49 +381,7 @@ class employee_leave_request(models.Model):
     def __str__(self):
         return f"{self.employee} - {self.leave_type} from {self.start_date} to {self.end_date}"
 
-    # def save(self, *args, **kwargs):
-    #     if self.start_date and self.end_date:
-    #         delta = (self.end_date - self.start_date).days + 1  # Add 1 to include both start and end date
-
-    #         # If it's a half-day leave, count it as 0.5 day
-    #         if self.dis_half_day:
-    #             self.number_of_days = 0.5
-    #         else:
-    #             self.number_of_days = delta
-        
-    #     if self.status == 'approved' and not self.pk:
-    #         # Calculate leave days based on whether it's a half-day or full-day leave
-    #         if self.dis_half_day:
-    #             leave_days = 0.5
-    #         else:
-    #             leave_balance = emp_leave_balance.objects.get(employee=self.employee, leave_type=self.leave_type)
-    #             leave_days = leave_balance.get_leave_days(self.start_date, self.end_date, include_weekends_holidays=self.leave_type.include_weekend_and_holiday)
-
-    #         # Deduct the calculated leave days from the employee's leave balance
-    #         leave_balance.deduct_leave(leave_days)
-
-        # # Perform proration calculation if necessary
-        # if self.leave_type.leave_entitlement.prorate_accrual:
-        #     accrual_transaction = leave_accrual_transaction.objects.create(
-        #         employee=self.employee,
-        #         leave_type=self.leave_type,
-        #         accrual_date=datetime.now(),
-        #         amount=self.leave_type.leave_entitlement.calculate_prorated_leave()
-        #     )
-        #     accrual_transaction.save()
-
-        # # Deduct the appropriate amount of leave based on half-day or full-day leave
-        # leave_balance = emp_leave_balance.objects.get(employee=self.employee, leave_type=self.leave_type)
-        
-        # if self.dis_half_day and self.leave_type.allow_half_day:
-        # # Deduct half a day if allowed and the request is for half-day leave
-        #     self.employee.leave_balance.deduct_leave(is_half_day=True)
-        # else:
-        #     # Deduct full day leave
-        #     self.employee.leave_balance.deduct_leave()
-
-        # super().save(*args, **kwargs)
-
+   
     def __str__(self):
         return f"{self.employee} - {self.leave_type} from {self.start_date} to {self.end_date}"
     
@@ -589,7 +540,23 @@ class LeaveApproval(models.Model):
             self.note = note
         self.save()
         self.leave_request.move_to_next_level()
-   
+        emp_calendar, created = EmployeeYearlyCalendar.objects.get_or_create(
+        emp=self.leave_request.employee,
+        year=self.leave_request.start_date.year
+        )
+        
+        # Iterate through the date range and update daily data
+        current_date = self.leave_request.start_date
+        while current_date <= self.leave_request.end_date:
+            emp_calendar.daily_data[str(current_date)] = {
+                "status": "Leave",
+                "leave_type": self.leave_request.leave_type.name,  # or code if needed
+                "remarks": note if note else "Approved leave"
+            }
+            current_date += timedelta(days=1)
+    
+        emp_calendar.save()
+    
     # def reject(self,note=None):
     #     self.status = self.REJECTED
     #     if note:
@@ -685,7 +652,6 @@ def create_initial_approval(sender, instance, created, **kwargs):
 class EmployeeMachineMapping(models.Model):
     employee = models.ForeignKey("EmpManagement.emp_master", on_delete=models.CASCADE)
     machine_code = models.CharField(max_length=100, unique=True)
-
     def __str__(self):
         return f'{self.employee.emp_code} - {self.machine_code}'
 
@@ -810,8 +776,67 @@ class lvBalanceReport(models.Model):
     
     
     
+class EmployeeYearlyCalendar(models.Model):
+    emp = models.ForeignKey('EmpManagement.emp_master', on_delete=models.CASCADE, related_name='yearly_calendar')
+    year = models.PositiveIntegerField()
+    # Store data for each day in a JSON format, for example: {"2024-01-01": {"status": "Holiday", "remarks": "New Year"}}
+    daily_data = models.JSONField(default=dict)  # Stores the daily status, leave type, etc.
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('emp', 'year')
+        ordering = ['year']
+
+    def __str__(self):
+        return f"Yearly Calendar for {self.emp} - {self.year}"
+
+    def populate_calendar(self, holidays, weekends, attendance, leave_requests):
+        """
+        Populate the calendar with holidays, weekends, attendance, and leave requests.
+        """
+        start_date = date(self.year, 1, 1)
+        end_date = date(self.year, 12, 31)
+
+        current_date = start_date
+        while current_date <= end_date:
+            # Set initial status
+            day_status = 'Work'
+            remarks = None
+            leave_type = None
+
+            # Check if it's a holiday
+            if current_date in holidays:
+                day_status = 'Holiday'
+                remarks = 'Holiday'
+
+            # Check if it's a weekend
+            elif any(weekend.is_weekend(current_date) for weekend in weekends):
+                day_status = 'Weekend'
+                remarks = 'Weekend'
+
+            # Check if leave is approved for the day
+            elif any(l.start_date <= current_date <= l.end_date and l.status == 'Approved' for l in leave_requests):
+                day_status = 'Leave'
+                leave_type = next((l.leave_type.name for l in leave_requests if l.start_date <= current_date <= l.end_date and l.status == 'Approved'), None)
+                remarks = f"Leave: {leave_type}"
+
+            # Check attendance
+            elif any(a.date == current_date for a in attendance):
+                day_status = 'Present'
+                remarks = 'Attended'
+
+            # Populate the daily data
+            self.daily_data[str(current_date)] = {
+                'status': day_status,
+                'remarks': remarks,
+                'leave_type': leave_type
+            }
+
+            current_date += timedelta(days=1)
+
+        self.save()
+    
     
 
-    
-    
-    

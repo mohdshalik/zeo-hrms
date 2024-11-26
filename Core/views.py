@@ -2,6 +2,7 @@ from django.shortcuts import render
 from .models import (state_mstr,crncy_mstr,cntry_mstr,document_type,LanguageMaster,Nationality)
 from .serializer import (CountrySerializer,StateSerializer,LanguageMasterSerializer,
                          CurrencySerializer,Document_type,CntryBulkUploadSerializer,NationalityBlkUpldSerializer)
+from . permissions import LanguageMasterPermission
 from rest_framework.decorators import action
 from rest_framework import viewsets
 from rest_framework.response import Response
@@ -130,6 +131,6 @@ class DocumentViewSet(viewsets.ModelViewSet):
 class LanguageViewSet(viewsets.ModelViewSet):
     queryset = LanguageMaster.objects.all()
     serializer_class = LanguageMasterSerializer
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [LanguageMasterPermission]
     def get_serializer_context(self):
         return {'request': self.request}

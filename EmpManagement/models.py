@@ -45,21 +45,21 @@ from django.apps import apps
 #EmpManagement
 class emp_master(models.Model):
        
-    GENDER = {
-        "Male": "Male",
-        "Female": "Female",
-        "Other": "Other",
-    }
-    MARITAL_STATUS = {
-        "Married":"Married",
-        "Single":"Single",
-        "Divorced":"Divorced",
-        "Widow":"Widow"
-    }
+    GENDER_CHOICES = [
+        ("M", "Male"),
+        ("F", "Female"),
+        ("O", "Other"),
+    ]
+    MARITAL_STATUS_CHOICES = [
+        ("M", "Married"),
+        ("S", "Single"),
+        ('divorced','divorced'),
+        ('widow','widow')
+    ]
     emp_code = models.CharField(max_length=50,unique=True,null=True,blank =True)
     emp_first_name = models.CharField(max_length=50,null=True,blank =True)
     emp_last_name = models.CharField(max_length=50,null=True,blank =True)
-    emp_gender = models.CharField(max_length=20,choices=GENDER,null=True,blank =True)
+    emp_gender = models.CharField(max_length=20,choices=GENDER_CHOICES,null=True,blank =True)
     emp_date_of_birth = models.DateField(null=True,blank =True)
     emp_personal_email =  models.EmailField(unique=True,null=True,blank =True)
     emp_company_email =  models.EmailField(unique=True,null=True,blank =True)
@@ -78,7 +78,7 @@ class emp_master(models.Model):
     emp_profile_pic = models.ImageField(null=True,blank =True )
     emp_blood_group = models.CharField(max_length=50,blank=True)
     emp_nationality = models.CharField(null=True,blank =True)
-    emp_marital_status = models.CharField(max_length=10,choices=MARITAL_STATUS,null=True,blank =True)
+    emp_marital_status = models.CharField(max_length=10,choices=MARITAL_STATUS_CHOICES,null=True,blank =True)
     emp_father_name = models.CharField(max_length=50,null=True,blank =True)
     emp_mother_name = models.CharField(max_length=50,null=True,blank =True)
     # emp_posting_location = models.ForeignKey('OrganisationManager.brnch_mstr',on_delete = models.CASCADE)
@@ -203,11 +203,13 @@ class Doc_Report(models.Model):
 class GeneralRequestReport(models.Model):
     file_name = models.CharField(max_length=100,null=True,unique=True)
     report_data = models.FileField(upload_to='general_report/', null=True, blank=True)
-    class Meta:
-        permissions = (
-            ('export_general_request_report', 'Can export general request report'),
-            # Add more custom permissions here
-        )
+    permissions = (
+        ('export_general_request_report', 'Can export general request report'),
+        ('view_generalrequestreport', 'Can view general request report'),
+        ('add_generalrequestreport', 'Can add general request report'),
+        ('change_generalrequestreport', 'Can change general request report'),
+        ('delete_generalrequestreport', 'Can delete general request report'),
+    )
     
     def __str__(self):
         return self.file_name
@@ -402,7 +404,6 @@ class EmpJobHistory_CustomField(models.Model):
     dropdown_values = models.JSONField(null=True, blank=True)
     radio_values = models.JSONField(null=True, blank=True)
     
-    
 
 #EMPLOYEE QUALIFICATION
 class EmpQualification(models.Model):
@@ -454,31 +455,6 @@ class Emp_Documents(models.Model):
    
     def __str__(self):
         return f"{self.document_type.type_name} - {self.emp_id}" 
-# @receiver(post_save, sender=Emp_Documents)
-# def create_expiry_notification(sender, instance, created, **kwargs):
-#     if created:
-#         today = timezone.now().date()
-#         print("today",today)
-#         expiry_date = instance.emp_doc_expiry_date
-#         print("exipiry",expiry_date)
-        
-#         # Check if emp_master exists and has a valid branch
-#         if instance.emp_id and instance.emp_id.emp_branch_id:
-#             branch_notification_days = instance.emp_id.emp_branch_id.notification_period_days
-#             if branch_notification_days is not None:
-#                 notification_delta = timedelta(days=branch_notification_days)  # Notify based on branch's notification period
-#                 print(notification_delta )
-#                 if expiry_date - today <= notification_delta:
-#                     notification_message = f"The document '{instance.document_type}' of '{instance.emp_id}' is expiring on {expiry_date}."
-#                     # Create notification for the newly created document
-#                     notification.objects.create(
-#                         message=notification_message,
-#                         document_id=instance
-#                     )
-#         else:
-#             # Handle cases where emp_id or emp_branch_id is not valid
-#             print("Warning: Invalid emp_id or emp_branch_id detected. Cannot create notification.")      
-
 
 #Document UDF
 class EmpDocuments_CustomField(models.Model):
@@ -492,7 +468,6 @@ class EmpDocuments_CustomField(models.Model):
     data_type = models.CharField(max_length=20, choices=FIELD_TYPES,null=True,blank =True)
     dropdown_values = models.JSONField(null=True, blank=True)
     radio_values = models.JSONField(null=True, blank=True)
-    
     
     
 # Display document type name and employee ID  
@@ -533,7 +508,6 @@ class ProgrammingLanguageSkill(models.Model):
         return f"{self.programming_language }"
 
 class EmployeeSkill(models.Model):
-
     emp_id =models.ForeignKey('emp_master',on_delete = models.CASCADE,related_name='emp_skills')
     language_skill = models.ForeignKey(LanguageSkill, on_delete=models.SET_NULL, null=True, blank=True)
     marketing_skill = models.ForeignKey(MarketingSkill, on_delete=models.SET_NULL, null=True, blank=True)
@@ -848,7 +822,6 @@ class GeneralRequest(models.Model):
                 status=Approval.PENDING,
                 note=last_approval.note if last_approval else None
             )
-
             # Notify next approver
             notification = RequestNotification.objects.create(
                 recipient_user=next_level.approver,
@@ -1047,81 +1020,3 @@ class DocExpEmailTemplate(models.Model):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-# class DocumentReminderSettings(models.Model):
-#     user = models.OneToOneField(emp_master, on_delete=models.CASCADE)
-#     first_reminder_days_before_expiry = models.IntegerField(default=7)  # Default to 7 days before expiry
-#     second_reminder_days_before_expiry = models.IntegerField(default=5)  # Default to 5 days before expiry
-#     final_reminder_days_after_expiry = models.IntegerField(default=0)  # Default to no days after expiry
-
-# @receiver(post_save, sender=GeneralRequest)
-# def create_initial_approval(sender, instance, created, **kwargs):
-#     if created:
-#         first_level = ApprovalLevel.objects.filter(request_type=instance.request_type).order_by('level').first()
-#         branch_email = instance.branch.br_branch_mail
-
-#         if first_level:
-#             Approval.objects.create(
-#                 general_request=instance,
-#                 approver=first_level.approver,
-#                 role=first_level.role,
-#                 level=first_level.level,
-#                 status=Approval.PENDING
-#             )
-           
-#             notification = RequestNotification.objects.create(
-#                 recipient_user=first_level.approver,
-#                 message=f"New request for approval: {instance.doc_number} employee: {instance.employee}"
-#             )
-#             notification.send_email_notification('request_created.html', {
-#                 'doc_number': instance.doc_number,
-#                 'request_type': instance.request_type.name,
-#                 'employee_name': instance.employee.emp_first_name,
-#                 'reason': instance.reason,
-                
-#             }, branch_email)
-
-#         notification = RequestNotification.objects.create(
-#             recipient_user=instance.created_by,
-#             message=f"Your request {instance.doc_number} has been created for employee: {instance.employee} and is pending approval."
-#         )
-#         notification.send_email_notification('request_created.html', {
-#             'doc_number': instance.doc_number,
-#             'request_type': instance.request_type.name,
-#             'employee_name': instance.employee.emp_first_name,
-#             'reason': instance.reason
-#         }, branch_email)
-
-#         if instance.employee:
-#             notification = RequestNotification.objects.create(
-#                 recipient_employee=instance.employee,
-#                 message=f"Request {instance.doc_number} has been created for you and is pending approval."
-#             )
-#             notification.send_email_notification('request_created.html', {
-#                 'doc_number': instance.doc_number,
-#                 'request_type': instance.request_type.name,
-#                 'employee_name': instance.employee.emp_first_name,
-#                 'reason': instance.reason
-#             },branch_email)
-
-
-# class FilteredReportData(models.Model):
-#     report = models.ForeignKey(Doc_Report, on_delete=models.CASCADE)
-#     filtered_data = models.TextField()  # Store JSON data
-#     created_at = models.DateTimeField(auto_now_add=True)
-
-# class FilteredGeneralReportData(models.Model):
-#     report = models.ForeignKey(GeneralRequestReport, on_delete=models.CASCADE)
-#     filtered_data = models.TextField()  # Store JSON data
-#     created_at = models.DateTimeField(auto_now_add=True)

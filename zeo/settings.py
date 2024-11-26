@@ -113,6 +113,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django_tenants.middleware.TenantMiddleware',
+    'UserManagement.middleware.TenantTimezoneMiddleware'
     # 'django_tenant_users.middleware.TenantUserMiddleware',
     
     # 'UserManagement.middleware.MultiTenantAuthenticationMiddleware',
@@ -163,7 +164,7 @@ WSGI_APPLICATION = 'zeo.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django_tenants.postgresql_backend',
-        'NAME': 'zeos', 
+        'NAME': 'zeo2', 
         'USER': 'postgres', 
         'PASSWORD': '1234',
         'HOST': '127.0.0.1', 
@@ -226,15 +227,7 @@ AUTHENTICATION_BACKENDS = [
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-        # Other authentication classes...
-        # 'rest_framework.authentication.SessionAuthentication',
-        # 'rest_framework.authentication.BasicAuthentication',
-        # 'rest_framework.permissions.IsAdminUser', 
     ],
-    # Other DRF settings...           
-    # 'DEFAULT_PERMISSION_CLASSES':[
-        # 'rest_framework.permissions.IsAdminUser'
-    # ]
 }
 REST_USE_JWT = True
 SIMPLE_JWT = {
@@ -265,15 +258,13 @@ CELERY_BEAT_SCHEDULE = {
         # 'schedule': timedelta(days=1),
 
     },
-    'leave-accruals':{
-        'task':'LeaveManagement.tasks.accrue_leaves',
-        'schedule': crontab(hour=13, minute=30)
-
+    'accrue-leaves-every-day': {
+        'task': 'LeaveManagement.tasks.accrue_leaves',  # Use the correct path to your task
+        'schedule': crontab(hour=18, minute=16),  
     },
-    'reset-leave-balances':{
+    'reset-leave-month':{
         'task':'LeaveManagement.tasks.reset_leave_balances',
-        'schedule': crontab(hour=13, minute=30)
-
+        'schedule':crontab(hour=12,minute=00)
     }
 }
 # CELERY_BEAT_SCHEDULE_FILENAME = 'celerybeat-schedule'  # Save Celery Beat schedule state
@@ -289,12 +280,3 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'approver312@gmail.com'
 EMAIL_HOST_PASSWORD = 'bzbj fbex wctf jmza'
 
-##DEFAULT_FROM_EMAIL = 'approver312@gmail.com' Approverrlm@123456- Save this code somewhere safe and accessible-5GKXRMQTK4AFT642U9DUF5CS,FQJ8C5H1XJ6Y9A2YJKMAAJ5M
-
-# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-# EMAIL_HOST = 'smtp.postmarkapp.com'
-# EMAIL_PORT = 587
-# EMAIL_USE_TLS = True
-# EMAIL_HOST_USER = 'a53b9577-5798-48b2-b892-b34cc275460f'  # Replace with your actual Postmark API token
-# EMAIL_HOST_PASSWORD = 'a53b9577-5798-48b2-b892-b34cc275460f'  # Leave this empty
-# DEFAULT_FROM_EMAIL = 'subina@zeosoftware.com'  # Replace with your verified email address

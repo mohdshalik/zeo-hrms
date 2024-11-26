@@ -1,6 +1,6 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from .models import applicablity_critirea, emp_leave_balance, leave_type
+from .models import applicablity_critirea, emp_leave_balance, leave_type,Attendance,employee_leave_request
 from EmpManagement.models import emp_master
 from django.db import models  # Ensure models import is included
 
@@ -72,3 +72,70 @@ def update_emp_leave_balance_on_employee_create(sender, instance, created, **kwa
             logger.info(f"Checked leave balance for employee {instance.emp_code} based on criteria: {criteria}")
 
         logger.info(f"Leave balance update completed for employee {instance.emp_code}")
+
+
+@receiver(post_save, sender=Attendance)
+def update_employee_yearly_calendar(sender, instance, **kwargs):
+    # Extract information from the attendance instance
+    employee = instance.employee
+    attendance_date = instance.date
+    year = attendance_date.year
+
+    # Determine the status based on check-in/check-out times
+    if instance.check_in_time and instance.check_out_time:
+        status = "Present"
+    else:
+        status = "Absent"
+
+    # Get or create the EmployeeYearlyCalendar for the given employee and year
+    employee_calendar, created = EmployeeYearlyCalendar.objects.get_or_create(
+        emp=employee,
+        year=year,
+        defaults={'daily_data': {}}
+    )
+
+    # Update the daily_data with the attendance status
+    date_str = attendance_date.strftime("%Y-%m-%d")
+    employee_calendar.daily_data[date_str] = {
+        "status": status,
+        "remarks": "Attended" if status == "Present" else "No attendance record"
+    }
+
+    # Save the updated employee calendar
+    employee_calendar.save()
+
+
+@receiver(post_save, sender=employee_leave_request)
+def update_employee_calendar_for_approved_leave(sender, instance, **kwargs):
+    # Check if the leave request is approved
+    if instance.status == 'approved':
+        employee = instance.employee
+        leave_type_name = instance.leave_type.name
+        start_date = instance.start_date
+        end_date = instance.end_date
+        year = start_date.year
+
+        # Get the EmployeeYearlyCalendar for the given employee and year if it exists
+        try:
+            employee_calendar = EmployeeYearlyCalendar.objects.get(emp=employee, year=year)
+            is_new = False
+        except EmployeeYearlyCalendar.DoesNotExist:
+            # Create a new EmployeeYearlyCalendar if not found
+            employee_calendar = EmployeeYearlyCalendar(emp=employee, year=year, daily_data={})
+            is_new = True
+
+        # Update the daily_data with the leave type for each day in the date range
+        date = start_date
+        while date <= end_date:
+            date_str = date.strftime("%Y-%m-%d")
+
+            # Update or add new information to the daily_data dictionary
+            employee_calendar.daily_data[date_str] = {
+                "status": "Leave",
+                "leave_type": leave_type_name,
+                "remarks": f"{leave_type_name} leave approved"
+            }
+            date += timedelta(days=1)
+
+        # Save the updated or newly created employee calendar
+        employee_calendar.save()

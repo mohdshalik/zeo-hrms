@@ -19,7 +19,10 @@ from .serializer import (Emp_qf_Serializer,EmpFamSerializer,EmpSerializer,Notifi
                          NotificationSettingsSerializer,DocExpEmailTemplateSerializer,CommonWorkflowSerializer,)
 
 from .resource import EmployeeResource,DocumentResource,EmpCustomFieldValueResource, MarketingSkillResource,ProLangSkillResource
-from .permissions import IsSuperUserOrHasGeneralRequestPermission,IsSuperUserOrInSameBranch
+from .permissions import (IsSuperUserOrHasGeneralRequestPermission,IsSuperUserOrInSameBranch,EmpCustomFieldPermission,EmpCustomFieldValuePermission,
+EmpFamilyCustomFieldPermission,EmpJobHistoryCustomFieldPermission,EmpQualificationCustomFieldPermission,ReportPermission,DocReportPermission,GeneralRequestReportPermission,
+EmployeeMarketingSkillPermission,EmployeeProgramSkillPermission,EmployeeLangSkillPermission,NotificationPermission,LanguageSkillPermission,MarketingSkillPermission,ProgrammingLanguageSkillPermission
+,EmployeeSkillPermission,EmployeeMarketingSkillPermission,RequestTypePermission)
 from django.core.exceptions import ValidationError
 from rest_framework.decorators import action
 from phonenumber_field.modelfields import PhoneNumberField
@@ -77,7 +80,7 @@ class EmpViewSet(viewsets.ModelViewSet):
     queryset = emp_master.objects.all()
     serializer_class = EmpSerializer
     
-    # permission_classes = [EmployeePermission]
+    permission_classes = [EmployeePermission]
     # permission_classes = [EmployeePermission]
 
     
@@ -383,6 +386,7 @@ class EmpViewSet(viewsets.ModelViewSet):
 class ReportViewset(viewsets.ModelViewSet):
     queryset = Report.objects.all()
     serializer_class = EmployeeReportSerializer
+    permission_classes = [ReportPermission]
     # permission_classes = [IsSuperUserOrInSameBranch]
 
      
@@ -843,7 +847,7 @@ class ReportViewset(viewsets.ModelViewSet):
 class CustomFieldViewset(viewsets.ModelViewSet):
     queryset = Emp_CustomField.objects.all()
     serializer_class = CustomFieldSerializer
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [EmpCustomFieldPermission]
 
     def handle_exception(self, exc):
         if isinstance(exc, ValidationError):
@@ -886,11 +890,14 @@ class CustomFieldViewset(viewsets.ModelViewSet):
 class Emp_CustomFieldValueViewSet(viewsets.ModelViewSet):
     queryset = Emp_CustomFieldValue.objects.all()
     serializer_class = Emp_CustomFieldValueSerializer
+    permission_classes = [EmpCustomFieldValuePermission]
+
+    
       
 class EmpFam_CustomFieldViewset(viewsets.ModelViewSet):
     queryset = EmpFamily_CustomField.objects.all()
     serializer_class = EmpFam_CustomFieldSerializer
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [EmpFamilyCustomFieldPermission]
 
     def handle_exception(self, exc):
         if isinstance(exc, ValidationError):
@@ -904,7 +911,7 @@ class EmpFam_CustomFieldViewset(viewsets.ModelViewSet):
 class EmpJobHistory_UdfViewset(viewsets.ModelViewSet):
     queryset = EmpJobHistory_CustomField.objects.all()
     serializer_class = EmpJobHistory_Udf_Serializer
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [EmpJobHistoryCustomFieldPermission]
 
     def handle_exception(self, exc):
         if isinstance(exc, ValidationError):
@@ -918,7 +925,7 @@ class EmpJobHistory_UdfViewset(viewsets.ModelViewSet):
 class EmpQf_UdfViewset(viewsets.ModelViewSet):
     queryset = EmpQualification_CustomField.objects.all()
     serializer_class = Emp_qf_udf_Serializer
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [EmpQualificationCustomFieldPermission]
 
     def handle_exception(self, exc):
         if isinstance(exc, ValidationError):
@@ -1071,7 +1078,7 @@ class EmpJobHistoryvSet(viewsets.ModelViewSet):
 class Emp_QualificationViewSet(viewsets.ModelViewSet):
     queryset = EmpQualification.objects.all()
     serializer_class = Emp_qf_Serializer
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [EmpQualificationCustomFieldPermission]
     def get_queryset(self):
         user = self.request.user
         if user.is_authenticated:
@@ -1126,7 +1133,7 @@ class Emp_DocumentViewSet(viewsets.ModelViewSet):
 class Doc_ReportViewset(viewsets.ModelViewSet):
     queryset = Doc_Report.objects.all()
     serializer_class = DocumentReportSerializer
-
+    permission_classes = [DocReportPermission]
     def __init__(self, *args, **kwargs):
         super(Doc_ReportViewset, self).__init__(*args, **kwargs)
         self.ensure_standard_report_exists()
@@ -1598,40 +1605,49 @@ class EmpLeaveRequestViewSet(viewsets.ModelViewSet):
 class NotificationViewset(viewsets.ModelViewSet):
     queryset = notification.objects.all()
     serializer_class = NotificationSerializer
+    permission_classes = [NotificationPermission]
 
 
 class LanguageSkillViewSet(viewsets.ModelViewSet):
     queryset = LanguageSkill.objects.all()
     serializer_class = LanguageSkillSerializer
+    permission_classes = [LanguageSkillPermission]
 
 class MarketingSkillViewSet(viewsets.ModelViewSet):
     queryset = MarketingSkill.objects.all()
     serializer_class = MarketingSkillSerializer
+    permission_classes = [MarketingSkillPermission]
 
 class ProgrammingLanguageSkillViewSet(viewsets.ModelViewSet):
     queryset = ProgrammingLanguageSkill.objects.all()
     serializer_class = ProgrammingLanguageSkillSerializer
+    permission_classes = [ProgrammingLanguageSkillPermission]
 
 class EmployeeSkillViewSet(viewsets.ModelViewSet):
     queryset = EmployeeSkill.objects.all()
     serializer_class = EmployeeSkillSerializer
-    
+    permission_classes = [EmployeeSkillPermission]
+
 class EmpMarketSkillViewSet(viewsets.ModelViewSet):
     queryset = EmployeeMarketingSkill.objects.all()
     serializer_class = EmpMarketSkillSerializer 
-   
+    permission_classes = [EmployeeMarketingSkillPermission]
+ 
 class EmpPrgrmSkillViewSet(viewsets.ModelViewSet):
     queryset = EmployeeProgramSkill.objects.all()
     serializer_class = EmpPrgrmSkillSerializer
+    permission_classes = [EmployeeProgramSkillPermission]
 
     
 class EmpLangSkillViewSet(viewsets.ModelViewSet):
     queryset = EmployeeLangSkill.objects.all()
     serializer_class = EmpLangSkillSerializer  
-    
+    permission_classes = [EmployeeLangSkillPermission]
+
 class LanguageBlkupldViewSet(viewsets.ModelViewSet):
     queryset = LanguageSkill.objects.all()
     serializer_class = LanguageBlkupldSerializer
+    permissio_classes = [LanguageSkillPermission]
     parser_classes = (MultiPartParser, FormParser)
 
     @action(detail=False, methods=['post'], parser_classes=[MultiPartParser, FormParser])
@@ -1663,6 +1679,7 @@ class LanguageBlkupldViewSet(viewsets.ModelViewSet):
 class MarketingBlkupldViewSet(viewsets.ModelViewSet):
     queryset = MarketingSkill.objects.all()
     serializer_class = MarketingBlkupldSerializer
+    permission_classes = [MarketingSkillPermission]
     parser_classes = (MultiPartParser, FormParser)
 
     @action(detail=False, methods=['post'], parser_classes=[MultiPartParser, FormParser])
@@ -1693,6 +1710,7 @@ class MarketingBlkupldViewSet(viewsets.ModelViewSet):
 class ProLangBlkupldViewSet(viewsets.ModelViewSet):
     queryset = ProgrammingLanguageSkill.objects.all()
     serializer_class = ProLangBlkupldSerializer
+    permission_classes = [ProgrammingLanguageSkillPermission]
     parser_classes = (MultiPartParser, FormParser)
 
     @action(detail=False, methods=['post'], parser_classes=[MultiPartParser, FormParser])
@@ -1723,6 +1741,7 @@ class ProLangBlkupldViewSet(viewsets.ModelViewSet):
 class RequestTypeViewset(viewsets.ModelViewSet):
     queryset = RequestType.objects.all()
     serializer_class = RequestTypeSerializer
+    permission_classes = [RequestTypePermission]
 
 class EmailTemplateViewset(viewsets.ModelViewSet):
     queryset = EmailTemplate.objects.all()
@@ -1776,6 +1795,7 @@ from django.db import transaction
 class GeneralRequestViewset(viewsets.ModelViewSet):
     queryset = GeneralRequest.objects.all()
     serializer_class = GeneralRequestSerializer
+    permission_classes = [GeneralRequestReportPermission]
     # permission_classes =[IsSuperUserOrHasGeneralRequestPermission]
     # def create(self, request, *args, **kwargs):
     #     data = request.data.copy()  # Make a mutable copy of request data
@@ -1909,6 +1929,7 @@ class EmailConfigurationViewSet(viewsets.ModelViewSet):
 class GeneralReportViewset(viewsets.ModelViewSet):
     queryset = GeneralRequestReport.objects.all()
     serializer_class = GeneralReportSerializer
+    permission_classes = [GeneralRequestReport]
     
     def __init__(self, *args, **kwargs):
         super(GeneralReportViewset, self).__init__(*args, **kwargs)
@@ -2205,10 +2226,4 @@ class DocExpEmailTemplateViewset(viewsets.ModelViewSet):
     queryset = DocExpEmailTemplate.objects.all()
     serializer_class = DocExpEmailTemplateSerializer
 
-    
-    
-   
 
-
-        
-    

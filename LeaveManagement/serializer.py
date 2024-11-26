@@ -2,7 +2,7 @@ from rest_framework import serializers
 from .models import (leave_type,leave_entitlement,emp_leave_balance,leave_accrual_transaction,employee_leave_request,
                      applicablity_critirea,leave_reset_transaction,Attendance,Shift,WeeklyShiftSchedule,EmployeeMachineMapping,LeaveReport,
                      LeaveApprovalLevels,LeaveApproval,LvApprovalNotify,LvEmailTemplate,LvCommonWorkflow,LvRejectionReason,LeaveApprovalReport,
-                    AttendanceReport,lvBalanceReport
+                    AttendanceReport,lvBalanceReport,EmployeeYearlyCalendar
 
                      )
 
@@ -180,4 +180,10 @@ class AttendanceReportSerializer(serializers.ModelSerializer):
 class lvBalanceReportSerializer(serializers.ModelSerializer):
     class Meta:
         model = lvBalanceReport
+        fields = '__all__'
+
+
+class EmployeeYearlyCalendarSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EmployeeYearlyCalendar
         fields = '__all__'

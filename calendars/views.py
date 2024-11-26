@@ -7,6 +7,7 @@ from rest_framework.decorators import action
 from OrganisationManager.models import brnch_mstr,dept_master,ctgry_master
 from OrganisationManager.serializer import BranchSerializer,DeptSerializer,CtgrySerializer
 from EmpManagement.models import emp_master
+from .permissions import WeekendCalendarPermission, WeekendDetailPermission, AssignWeekendPermission, HolidayPermission, HolidayCalendarPermission, AssignHolidayPermission
 
 
 
@@ -15,10 +16,12 @@ from EmpManagement.models import emp_master
 class WeekendDetailsViewset(viewsets.ModelViewSet):
     queryset = WeekendDetail.objects.all()
     serializer_class = WeekendDetailSerializer
-    
+    permission_classes = [WeekendCalendarPermission]
 class WeekendViewset(viewsets.ModelViewSet):
     queryset = weekend_calendar.objects.all()
     serializer_class = WeekendCalendarSerailizer
+    permission_classes = [WeekendDetailPermission]
+
     @action(detail=True, methods=['get'])
     def details(self, request, pk=None):
         weekend_calendar = self.get_object()
@@ -52,15 +55,20 @@ class WeekendViewset(viewsets.ModelViewSet):
 class AssignWeekendViewset(viewsets.ModelViewSet):
     queryset = assign_weekend.objects.all()
     serializer_class = WeekendAssignSerializer
+    permission_classes = [AssignWeekendPermission]
+
 
 class HolidayViewset(viewsets.ModelViewSet):
     queryset = holiday.objects.all()
     serializer_class = HolidaySerializer
+    permission_classes = [HolidayPermission]
 
 class HolidayCalendarViewset(viewsets.ModelViewSet):
     queryset = holiday_calendar.objects.all()
     serializer_class = HolidayCalandarSerializer
+    permission_classes = [HolidayCalendarPermission]
 
 class HolidayAssignViewset(viewsets.ModelViewSet):
     queryset = assign_holiday.objects.all()
     serializer_class = HolidayAssignSerializer
+    permission_classes = [AssignHolidayPermission]

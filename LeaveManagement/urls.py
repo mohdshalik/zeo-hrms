@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (Applicableviewset,LeaveTypeviewset,LeaveEntitlementviewset,LeaveRequestviewset,LeaveTypeViewSet,leave_balance_viewset,Acrualviewset,Resetviewset,
                     AttendanceViewSet,ShiftViewSet,WeeklyShiftScheduleViewSet,ImportAttendanceViewSet,EmployeeMachineMappingViewset,Leave_ReportViewset,LvApprovalLevelViewset,
                     LvApprovalViewset,LvEmailTemplateviewset,LvApprovalNotifyviewset,LvCommonWorkflowViewset,LvRejectionViewset,Lv_Approval_ReportViewset,
-                    AttendanceReportViewset,LvBalanceReportViewset
+                    AttendanceReportViewset,LvBalanceReportViewset,EmployeeYearlyCalendarViewset
 )
 
 router = DefaultRouter()
@@ -33,6 +33,7 @@ router.register(r'leave-rejection-reason', LvRejectionViewset, basename='leave-r
 router.register(r'Lv_Approval_Report', Lv_Approval_ReportViewset, basename='Lv_Approval_Report')
 router.register(r'AttendanceReport', AttendanceReportViewset, basename='AttendanceReport')
 router.register(r'lvBalanceReport', LvBalanceReportViewset, basename='lvBalanceReport')
+router.register(r'EmployeeYearlyCalendarViewset',EmployeeYearlyCalendarViewset , basename='EmployeeYearlyCalendarViewset')
 
 
 urlpatterns = [

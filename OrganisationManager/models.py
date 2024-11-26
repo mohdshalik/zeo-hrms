@@ -1,12 +1,14 @@
 from django.db import models
 from EmpManagement.models import emp_master
 from datetime import datetime, timedelta
+from django.utils import timezone
 
 
 #branch model
 class brnch_mstr(models.Model):
     branch_name = models.CharField(max_length=100)
     branch_code = models.CharField(max_length=50,unique=True,null=True,blank =True)
+    branch_logo = models.ImageField(null=True, blank=True)
     notification_period_days = models.IntegerField()
     br_start_date = models.DateField(null=True)
     branch_users = models.ManyToManyField("UserManagement.CustomUser",related_name='branches')
@@ -19,7 +21,7 @@ class brnch_mstr(models.Model):
     br_branch_nmbr_2 = models.CharField(max_length=20,blank=True, null=True)
     br_branch_mail = models.EmailField(unique=True)
     br_country = models.ForeignKey("Core.cntry_mstr",on_delete=models.SET_DEFAULT, default="1", null=True) 
-    br_created_at = models.DateTimeField(auto_now_add=True)
+    br_created_at = models.DateTimeField(default=timezone.now)
     br_created_by = models.ForeignKey('UserManagement.CustomUser', on_delete=models.CASCADE, null=True, related_name='%(class)s_created_by')
     br_updated_at = models.DateTimeField(auto_now=True)
     br_updated_by = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_updated_by')
@@ -91,8 +93,14 @@ class FiscalPeriod(models.Model):
 
 
 class document_numbering(models.Model):
+    DOCUMENT_TYPES = [
+        ('general_request', 'General Request'),
+        ('leave_request', 'Leave Request'),
+        # Add other types as needed
+    ]
     branch_id=models.ForeignKey('brnch_mstr',on_delete=models.CASCADE)
     category=models.ForeignKey('ctgry_master',on_delete=models.CASCADE)
+    type = models.CharField(max_length=50, choices=DOCUMENT_TYPES, default='general_request')
     user=models.ForeignKey('UserManagement.CustomUser',on_delete=models.CASCADE)
     automatic_numbering=models.BooleanField()
     preffix=models.CharField(unique=True,max_length=50)
@@ -101,6 +109,10 @@ class document_numbering(models.Model):
     start_number=models.IntegerField()
     current_number=models.IntegerField()
     end_number=models.IntegerField()
+    class Meta:
+        unique_together = ('branch_id', 'category', 'type')
+    def __str__(self):
+        return f"{self.branch_id.branch_name} - {self.category.ctgry_title} - {self.type}"
     # class Meta:
     #     unique_together = ('branch_id')  # Ensure unique constraint on branch and category
 
@@ -118,75 +130,3 @@ class CompanyPolicy(models.Model):
 
     def __str__(self):
         return self.title
-# class Shift(models.Model):
-#     name = models.CharField(max_length=50)
-#     start_time = models.TimeField()
-#     end_time = models.TimeField()
-#     break_duration = models.DurationField()
-
-# class Attendance(models.Model):
-#     employee = models.ForeignKey("EmpManagement.emp_master", on_delete=models.CASCADE)
-#     shift = models.ForeignKey(Shift, on_delete=models.SET_NULL, null=True)
-#     check_in_time = models.DateTimeField()
-#     check_out_time = models.DateTimeField(null=True, blank=True)
-#     date = models.DateField(auto_now_add=True)
-#     total_hours = models.DurationField(null=True, blank=True)
-
-#     def calculate_total_hours(self):
-#         if self.check_in_time and self.check_out_time:
-#             return self.check_out_time - self.check_in_time
-#         return None
-
-#     def save(self, *args, **kwargs):
-#         # Automatically calculate total hours on save
-#         self.total_hours = self.calculate_total_hours()
-#         super().save(*args, **kwargs)
-
-#     def __str__(self):
-#         return f"{self.employee.username} - {self.date}"
-
-
-
-# class Attendance(models.Model):
-#     employee = models.ForeignKey("EmpManagement.emp_master", on_delete=models.CASCADE)
-#     date = models.DateField()
-#     check_in = models.TimeField(null=True, blank=True)
-#     check_out = models.TimeField(null=True, blank=True)
-#     total_hours = models.DecimalField(max_digits=10, decimal_places=6, null=True, blank=True)
-
-#     class Meta:
-#         unique_together = ('employee', 'date')
-    
-#     def __str__(self):
-#         return f"{self.employee} - {self.date}"
-
-#     def calculate_total_hours(self):
-#         if self.check_in and self.check_out:
-#             # Ensure check_in and check_out are time fields
-#             if isinstance(self.check_in, datetime):
-#                 check_in_time = self.check_in.time()
-#             else:
-#                 check_in_time = self.check_in
-
-#             if isinstance(self.check_out, datetime):
-#                 check_out_time = self.check_out.time()
-#             else:
-#                 check_out_time = self.check_out
-
-#             # Combine the date with check_in and check_out times
-#             check_in_datetime = datetime.combine(self.date, check_in_time)
-#             check_out_datetime = datetime.combine(self.date, check_out_time)
-
-#             # Handle the case where check_out is after midnight
-#             if check_out_datetime < check_in_datetime:
-#                 check_out_datetime += timedelta(days=1)
-
-#             # Calculate the total seconds worked
-#             total_seconds = (check_out_datetime - check_in_datetime).total_seconds()
-
-#             # Convert seconds to hours (with full precision)
-#             self.total_hours = total_seconds / 3600
-#             self.save()
-
-#     def __str__(self):
-#         return f"{self.employee} - {self.date}"

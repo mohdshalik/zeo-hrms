@@ -462,3 +462,4 @@ class DocExpEmailTemplateSerializer(serializers.ModelSerializer):
         model = DocExpEmailTemplate
         fields = '__all__'
 
+
