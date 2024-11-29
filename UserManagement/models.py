@@ -9,7 +9,6 @@ from django.contrib.auth.models import User,Group
 from django.contrib.auth import get_user_model
 import uuid
 from tenant_users.tenants.models import TenantBase,UserProfile
-from tenant_users.tenants.tasks import provision_tenant
 from django_tenants.models import TenantMixin, DomainMixin
 from django_tenants.utils import schema_context
 
