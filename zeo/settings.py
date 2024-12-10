@@ -54,6 +54,7 @@ SHARED_APPS = [
     'rest_framework.authtoken',
     'import_export',
     'django_celery_beat',
+    'oauth2_provider',
 ]
 
 TENANT_APPS = [
@@ -165,7 +166,7 @@ WSGI_APPLICATION = 'zeo.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django_tenants.postgresql_backend',
-        'NAME': 'zeo', 
+        'NAME': 'zeos', 
         'USER': 'postgres', 
         'PASSWORD': '1234',
         'HOST': '127.0.0.1', 
@@ -219,16 +220,18 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = "UserManagement.CustomUser"
 
 AUTHENTICATION_BACKENDS = [
-    "tenant_users.permissions.backend.UserBackend",
-    # 'django_tenant_users.permissions.backend.UserBackend',
-    "django.contrib.auth.backends.ModelBackend",
+    'UserManagement.authentication.CustomAuthBackend',
+    'django.contrib.auth.backends.ModelBackend',
 ]
-#auth and permissions
-#auth and permissions
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        # 'oauth2_provider.contrib.rest_framework.OAuth2Authentication',
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ],
+        'rest_framework.authentication.SessionAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        # 'rest_framework.permissions.IsAuthenticated',
+    ),
 }
 REST_USE_JWT = True
 SIMPLE_JWT = {

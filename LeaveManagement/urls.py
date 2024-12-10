@@ -2,9 +2,10 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
 from .views import (Applicableviewset,LeaveTypeviewset,LeaveEntitlementviewset,LeaveRequestviewset,LeaveTypeViewSet,leave_balance_viewset,Acrualviewset,Resetviewset,
-                    AttendanceViewSet,ShiftViewSet,WeeklyShiftScheduleViewSet,ImportAttendanceViewSet,EmployeeMachineMappingViewset,Leave_ReportViewset,LvApprovalLevelViewset,
+                    AttendanceViewSet,ShiftViewSet,ImportAttendanceViewSet,EmployeeMachineMappingViewset,Leave_ReportViewset,LvApprovalLevelViewset,
                     LvApprovalViewset,LvEmailTemplateviewset,LvApprovalNotifyviewset,LvCommonWorkflowViewset,LvRejectionViewset,Lv_Approval_ReportViewset,
-                    AttendanceReportViewset,LvBalanceReportViewset,EmployeeYearlyCalendarViewset
+                    AttendanceReportViewset,LvBalanceReportViewset,EmployeeYearlyCalendarViewset,ShiftPatternViewSet,EmployeeShiftScheduleViewSet,WeekPatternAssignmentVSet,
+                    ShiftOverrideViewSet
 )
 
 router = DefaultRouter()
@@ -20,7 +21,11 @@ router.register(r'emp-leave-request', LeaveRequestviewset, basename='emp_leave-r
 router.register(r'emp-foreign', LeaveTypeViewSet, basename='emp_foreign')
 router.register(r'attendance', AttendanceViewSet, basename='attendance')
 router.register(r'shifts', ShiftViewSet,basename='shifts')
-router.register(r'schedule-weekly-shifts', WeeklyShiftScheduleViewSet,basename='schedule-weekly_shifts')
+router.register(r'shiftpattern', ShiftPatternViewSet, basename='shiftpattern')
+router.register(r'employee-shift', EmployeeShiftScheduleViewSet, basename='employee-shift')
+router.register(r'weekpattern-assignment', WeekPatternAssignmentVSet, basename='weekpattern-assignment')
+router.register(r'shift-overrides', ShiftOverrideViewSet, basename='shift-overrides')
+
 router.register(r'import-attendance', ImportAttendanceViewSet,basename='import-attendance')
 router.register(r'employee-mapping', EmployeeMachineMappingViewset, basename='employee-mapping')
 router.register(r'leave-report', Leave_ReportViewset, basename='leave-report')

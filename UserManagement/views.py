@@ -2,8 +2,8 @@ from django.shortcuts import render
 from django.contrib.auth.models import User,Group,Permission
 from .serializers import CustomUserSerializer,CustomTokenObtainPairSerializer,CompanySerializer,DomainSerializer,UserListSerializer
 from . models import CustomUser,company,Domain
-from . permissions import (IsSuperAdminUser,IsSelfOrSuperAdmin,IsOwnerOrReadOnly,
-                           IsOwnerOrHRAdminOrReadOnly,IsSuperUser,IsEssUserOrReadOnly,HasSchemaAccess)
+from . permissions import (IsOwnerOrReadOnly,
+                           IsSuperUser,IsEssUserOrReadOnly)
 from OrganisationManager.serializer import PermissionSerializer,GroupSerializer
 # from . custom_auth import GlobalJWTAuthentication
 from rest_framework.response import Response
