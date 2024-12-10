@@ -6,6 +6,7 @@ from collections import defaultdict
 from django.core.cache import cache
 import redis
 from rest_framework import viewsets,filters, status
+from django.views.decorators.csrf import csrf_exempt
 from datetime import datetime, timedelta
 from django.db.models import Field
 from . permissions import (LeaveTypePermission,LeaveEntitlementPermission,EmpLeaveBalancePermission,ApplicabilityCriteriaPermission,EmployeeLeaveRequestPermission,LvEmailTemplatePermission,
@@ -13,11 +14,13 @@ LvCommonWorkflowPermission,LvRejectionReasonPermission,LeaveApprovalLevelsPermis
 LeaveReportPermission,LeaveApprovalReportPermission,AttendanceReportPermission,LvBalanceReportPermission)
 
 from . serializer import(LeaveTypeSerializer,LeaveEntitlementSerializer,ApplicableSerializer,EmployeeLeaveBalanceSerializer,AccrualSerializer,ResetSerializer,LeaveRequestSerializer,
-                         AttendanceSerializer,ShiftSerializer,WeeklyShiftScheduleSerializer,ImportAttendanceSerializer,EmployeeMappingSerializer,LeaveReportSerializer,LvApprovalLevelSerializer,EmployeeYearlyCalendarSerializer,
-                         LvApprovalSerializer,LvEmailTemplateSerializer,LvApprovalNotifySerializer,LvCommonWorkflowSerializer,LvRejectionReasonSerializer,LvApprovalReportSerializer,AttendanceReportSerializer,lvBalanceReportSerializer)
+                         AttendanceSerializer,ShiftSerializer,ImportAttendanceSerializer,EmployeeMappingSerializer,LeaveReportSerializer,LvApprovalLevelSerializer,EmployeeYearlyCalendarSerializer,
+                         LvApprovalSerializer,LvEmailTemplateSerializer,LvApprovalNotifySerializer,LvCommonWorkflowSerializer,LvRejectionReasonSerializer,LvApprovalReportSerializer,AttendanceReportSerializer,lvBalanceReportSerializer,
+                         CompensatoryLeaveRequestSerializer,CompensatoryLeaveTransactionSerializer,CompensatoryLeaveBalanceSerializer,ShiftOverrideSerializer,ShiftPatternSerializer,EmployeeShiftScheduleSerializer,WeekPatternAssignmentSerializer)
+
 from .models import (leave_type,leave_entitlement,applicablity_critirea,emp_leave_balance,leave_accrual_transaction,leave_reset_transaction,employee_leave_request,Attendance,Shift,
-                     WeeklyShiftSchedule,EmployeeMachineMapping,LeaveReport,LeaveApprovalLevels,LeaveApproval,LvEmailTemplate,LvApprovalNotify,LvCommonWorkflow,LvRejectionReason,LeaveApprovalReport,
-                     AttendanceReport,lvBalanceReport,EmployeeYearlyCalendar
+                     EmployeeMachineMapping,LeaveReport,LeaveApprovalLevels,LeaveApproval,LvEmailTemplate,LvApprovalNotify,LvCommonWorkflow,LvRejectionReason,LeaveApprovalReport,
+                     AttendanceReport,lvBalanceReport,EmployeeYearlyCalendar,CompensatoryLeaveRequest,CompensatoryLeaveTransaction,CompensatoryLeaveBalance,ShiftPattern,EmployeeShiftSchedule,ShiftOverride,WeekPatternAssignment
                      )
 from rest_framework.parsers import MultiPartParser, FormParser
 from EmpManagement.models import emp_master
@@ -35,6 +38,8 @@ from rest_framework.decorators import action
 from rest_framework.views import APIView
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
+from EmpManagement .models import EmailConfiguration
+from django.utils.timezone import localtime,now
 # Create your views here.
 
 
@@ -49,6 +54,48 @@ class LvEmailTemplateviewset(viewsets.ModelViewSet):
     serializer_class = LvEmailTemplateSerializer
     permission_classes = [LvEmailTemplatePermission] 
     
+    @action(detail=False, methods=['get'], url_path='placeholders')
+    def placeholder_list(self, request):
+        placeholders = {
+            'request': [
+                '{{ doc_number }}',
+                '{{ request_type }}',
+                '{{ reason }}',
+                # Add other request-related placeholders here
+            ],
+            'employee': [
+                '{{ emp_first_name }}',
+                '{{ emp_last_name }}',
+                '{{ emp_gender }}',
+                '{{ emp_date_of_birth }}',
+                '{{ emp_personal_email }}',
+                '{{ emp_company_email }}',
+                '{{ emp_branch_name }}',
+                '{{ emp_department_name }}',
+                '{{ emp_designation_name }}'
+            ]
+        }
+        return Response(placeholders)
+    # Custom action to fetch the available From and To addresses
+    @action(detail=False, methods=['get'], url_path='from-to-addresses')
+    def from_to_list(self, request):
+        # Fetch active email configurations for "From" addresses
+        from_addresses = EmailConfiguration.objects.filter(is_active=True).values_list('email_host_user', flat=True)
+
+        # Fetch employee emails for "To" addresses
+        to_addresses = emp_master.objects.all().values_list('emp_personal_email', 'emp_company_email')
+
+        to_list = []
+        for emp_personal, emp_company in to_addresses:
+            if emp_personal:
+                to_list.append(emp_personal)
+            if emp_company:
+                to_list.append(emp_company)
+
+        return Response({
+            'from_addresses': from_addresses,
+            'to_addresses': to_list
+        })
 
 class LvApprovalNotifyviewset(viewsets.ModelViewSet):
     queryset = LvApprovalNotify.objects.all()
@@ -196,87 +243,138 @@ class ShiftViewSet(viewsets.ModelViewSet):
 
     
 
-class WeeklyShiftScheduleViewSet(viewsets.ModelViewSet):
-    queryset = WeeklyShiftSchedule.objects.all()
-    serializer_class = WeeklyShiftScheduleSerializer
-    permission_classes = [WeeklyShiftSchedulePermission] 
+class ShiftPatternViewSet(viewsets.ModelViewSet):
+    queryset = ShiftPattern.objects.all()
+    serializer_class = ShiftPatternSerializer
 
-    # POST method to assign a weekly shift schedule to an employee
-    @action(detail=False, methods=['post'])
-    def assign_weekly_shift(self, request):
-        employee_id = request.data.get("employee_id")
-        shift_data = request.data.get("shifts", {})
+class ShiftOverrideViewSet(viewsets.ModelViewSet):
+    queryset = ShiftOverride.objects.all()
+    serializer_class = ShiftOverrideSerializer
+
+class WeekPatternAssignmentVSet(viewsets.ModelViewSet):
+    queryset = WeekPatternAssignment.objects.all()
+    serializer_class = WeekPatternAssignmentSerializer
+    permission_classes = [WeeklyShiftSchedulePermission]
+
+class EmployeeShiftScheduleViewSet(viewsets.ModelViewSet):
+    queryset = EmployeeShiftSchedule.objects.all()
+    serializer_class = EmployeeShiftScheduleSerializer
+    
+    def get_shift_for_day(self, request, *args, **kwargs):
+        """
+        Get shift for a given employee and date.
+        URL parameters should include employee_id and date (format: YYYY-MM-DD).
+        """
+        employee_id = request.query_params.get('employee')
+        date_str = request.query_params.get('date')
         
-        try:
-            employee = emp_master.objects.get(id=employee_id)
-        except emp_master.DoesNotExist:
-            return Response({"detail": "Employee not found"}, status=status.HTTP_404_NOT_FOUND)
-
-        # Retrieve or create weekly shift schedule for the employee
-        schedule, created = WeeklyShiftSchedule.objects.get_or_create(employee=employee)
-
-        # Assign shifts for each day of the week
-        schedule.monday_shift = Shift.objects.get(id=shift_data.get("monday")) if shift_data.get("monday") else None
-        schedule.tuesday_shift = Shift.objects.get(id=shift_data.get("tuesday")) if shift_data.get("tuesday") else None
-        schedule.wednesday_shift = Shift.objects.get(id=shift_data.get("wednesday")) if shift_data.get("wednesday") else None
-        schedule.thursday_shift = Shift.objects.get(id=shift_data.get("thursday")) if shift_data.get("thursday") else None
-        schedule.friday_shift = Shift.objects.get(id=shift_data.get("friday")) if shift_data.get("friday") else None
-        schedule.saturday_shift = Shift.objects.get(id=shift_data.get("saturday")) if shift_data.get("saturday") else None
-        schedule.sunday_shift = Shift.objects.get(id=shift_data.get("sunday")) if shift_data.get("sunday") else None
-        schedule.save()
-        return Response({"status": "Weekly shift schedule assigned successfully"}, status=status.HTTP_200_OK)
-
-    # GET method to retrieve the shift schedule for a specific employee
+        if employee_id and date_str:
+            try:
+                employee = emp_master.objects.get(id=employee_id)
+                date = timezone.datetime.strptime(date_str, '%Y-%m-%d').date()
+                schedule = self.get_object()  # Assume the schedule is retrieved by URL ID
+                shift = schedule.get_shift_for_date(employee, date)
+                
+                if shift:
+                    return Response({"shift": str(shift)}, status=status.HTTP_200_OK)
+                else:
+                    return Response({"error": "No shift found for the specified date"}, status=status.HTTP_404_NOT_FOUND)
+            except emp_master.DoesNotExist:
+                return Response({"error": "Employee not found"}, status=status.HTTP_404_NOT_FOUND)
+        return Response({"error": "Invalid parameters"}, status=status.HTTP_400_BAD_REQUEST)
+    
     @action(detail=False, methods=['get'])
-    def get_employee_shift(self, request):
-        employee_id = request.query_params.get("employee_id")
-        
-        try:
-            employee = emp_master.objects.get(id=employee_id)
-            schedule = WeeklyShiftSchedule.objects.get(employee=employee)
-        except emp_master.DoesNotExist:
-            return Response({"detail": "Employee not found"}, status=status.HTTP_404_NOT_FOUND)
-        except WeeklyShiftSchedule.DoesNotExist:
-            return Response({"detail": "Shift schedule not found for this employee"}, status=status.HTTP_404_NOT_FOUND)
+    def get_shifts_for_year(self, request):
+        #get_shifts_for_year/?schedule_id=2&employee=1&year=2024
+        """
+        Get shifts for a given employee for every day in a specified year.
+        URL parameters should include schedule_id, employee_id, and year.
+        """
+        schedule_id = request.query_params.get('schedule_id')
+        employee_id = request.query_params.get('employee')
+        year = request.query_params.get('year')
 
-        serializer = WeeklyShiftScheduleSerializer(schedule)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        if schedule_id and employee_id and year:
+            try:
+                schedule = get_object_or_404(EmployeeShiftSchedule, id=schedule_id)
+                employee = emp_master.objects.get(id=employee_id)
+                year = int(year)
+
+                # Initialize the start and end dates for the year,all employees in the notepad
+                start_date = datetime(year, 1, 1).date()
+                end_date = datetime(year, 12, 31).date()
+
+                # Prepare a dictionary to store shifts with date keys
+                shifts_calendar = {}
+
+                # Iterate through each day of the year
+                current_date = start_date
+                while current_date <= end_date:
+                    shift = schedule.get_shift_for_date(employee, current_date)
+
+                    # Format date as "DD-MM-YYYY"
+                    date_str = current_date.strftime("%d-%m-%Y")
+
+                    # Store shift information for the date
+                    shifts_calendar[date_str] = str(shift) if shift else "No shift"
+
+                    # Move to the next day
+                    current_date += timedelta(days=1)
+
+                return Response({"year": year, "shifts": shifts_calendar}, status=status.HTTP_200_OK)
+                
+            except emp_master.DoesNotExist:
+                return Response({"error": "Employee not found"}, status=status.HTTP_404_NOT_FOUND)
+            except ValueError:
+                return Response({"error": "Invalid year"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": "Invalid parameters"}, status=status.HTTP_400_BAD_REQUEST)
+
 class AttendanceViewSet(viewsets.ModelViewSet):
     queryset = Attendance.objects.all()
     serializer_class = AttendanceSerializer
-    permission_classes = [AttendancePermission] 
+    permission_classes = [AttendancePermission]
     
+    @staticmethod
+    def parse_date(date_string):
+        try:
+            # Parse the date from string to a datetime.date object
+            return datetime.strptime(date_string, "%Y-%m-%d").date()
+        except (ValueError, TypeError):
+            return None
+
     @action(detail=False, methods=['post'])
     def check_in(self, request):
-        emp_id = request.data.get("employee_id")
-        date = timezone.now().date()
-        # check_in_time = request.data.get("check_in_time", timezone.now().time())
+        emp_id = request.data.get("employee")
+        date_str = request.data.get("date")
+        date = self.parse_date(date_str) if date_str else timezone.now().date()
 
         try:
             employee = emp_master.objects.get(id=emp_id)
         except emp_master.DoesNotExist:
             return Response({"detail": "Employee not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        today = timezone.now().date()
-        # attendance, created = Attendance.objects.get_or_create(employee=employee, date=today)
-        attendance, created = Attendance.objects.get_or_create(employee_id=emp_id, date=date)
+        attendance, created = Attendance.objects.get_or_create(employee=employee, date=date)
         if attendance.check_in_time:
             return Response({"detail": "Already checked in"}, status=status.HTTP_400_BAD_REQUEST)
+         # Determine the shift for the provided date
+        schedule = EmployeeShiftSchedule.objects.filter(employee=employee).first()
+        shift = schedule.get_shift_for_date(employee, date) if schedule else None
 
-        schedule = WeeklyShiftSchedule.objects.filter(employee=employee).first()
-        shift = schedule.get_shift_for_day(today) if  schedule else None
-
-        attendance.check_in_time = timezone.now()
+        # Get the current time in the tenant's timezone and store only the time
+        tenant_time = localtime(now()).time()  # Get the current time in the active timezone
+        attendance.check_in_time = tenant_time
         attendance.shift = shift
         attendance.save()
+        
 
-        return Response({"status": "Check-in recorded successfully", "shift": shift.name if shift else None}, status=status.HTTP_200_OK)
+        return Response({"status": "Check-in recorded successfully","shift": shift.name if shift else None}, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['post'])
     def check_out(self, request):
-        emp_id = request.data.get("employee_id")
-        date = timezone.now().date()
-        
+        emp_id = request.data.get("employee")
+        date_str = request.data.get("date")
+        date = self.parse_date(date_str) if date_str else timezone.now().date()
+
         try:
             attendance = Attendance.objects.get(employee_id=emp_id, date=date)
         except Attendance.DoesNotExist:
@@ -284,13 +382,13 @@ class AttendanceViewSet(viewsets.ModelViewSet):
 
         if attendance.check_out_time:
             return Response({"detail": "Already checked out"}, status=status.HTTP_400_BAD_REQUEST)
-        attendance.check_out_time = timezone.now()
-        attendance.calculate_total_hours()  # Ensure total hours are calculated
-        attendance.save()
 
-        return Response({
-            "status": "Check-out recorded successfully",
-        }, status=status.HTTP_200_OK)
+        # Get the current time in the tenant's timezone and store only the time
+        tenant_time = localtime(now()).time()  # Get the current time in the active timezone
+        attendance.check_out_time = tenant_time
+        attendance.calculate_total_hours()
+        attendance.save()
+        return Response({"status": "Check-out recorded successfully"}, status=status.HTTP_200_OK)
 
 class ImportAttendanceViewSet(viewsets.ModelViewSet):
     queryset = Attendance.objects.all()
@@ -670,7 +768,7 @@ class LvApprovalViewset(viewsets.ModelViewSet):
     def reject(self, request, pk=None):
         approval = self.get_object()
         note = request.data.get('note')
-        rejection_reason_id = request.data.get('rejection_reason_id')
+        rejection_reason_id = request.data.get('rejection_reason')
 
         if not rejection_reason_id:
             raise ValidationError("Rejection reason is required.")
@@ -682,15 +780,24 @@ class LvApprovalViewset(viewsets.ModelViewSet):
 
         approval.reject(rejection_reason=rejection_reason, note=note)
         return Response({'status': 'rejected', 'note': note, 'rejection_reason': rejection_reason.reason_text}, status=status.HTTP_200_OK)
+
     # Custom action to get grouped leave approvals
     @action(detail=False, methods=['get'])
     def grouped_approvals(self, request):
-        approvals = LeaveApproval.objects.select_related('leave_request', 'approver').order_by('leave_request', 'level')
-        
-        # Group approvals by leave_request
+        approvals = LeaveApproval.objects.select_related('leave_request', 'compensatory_request', 'approver').order_by('leave_request', 'level')
+
+        # Group approvals by leave_request or compensatory_request
         grouped_approvals = defaultdict(list)
         for approval in approvals:
-            grouped_approvals[approval.leave_request.id].append({
+            if approval.leave_request:
+                request_id = f"LeaveRequest-{approval.leave_request.id}"
+            elif approval.compensatory_request:
+                request_id = f"CompensatoryRequest-{approval.compensatory_request.id}"
+            else:
+                # Skip approvals without any associated request
+                continue
+
+            grouped_approvals[request_id].append({
                 'id': approval.id,
                 'role': approval.role,
                 'level': approval.level,
@@ -701,14 +808,14 @@ class LvApprovalViewset(viewsets.ModelViewSet):
                 'approver': approval.approver.username,
                 'rejection_reason': approval.rejection_reason.reason_text if approval.rejection_reason else None,
             })
-        
+
         # Format data to a list of dictionaries
         response_data = [
             {
-                'leave_request': leave_request_id,
+                'request_id': request_id,
                 'approvals': levels
             }
-            for leave_request_id, levels in grouped_approvals.items()
+            for request_id, levels in grouped_approvals.items()
         ]
 
         return Response(response_data, status=status.HTTP_200_OK)
@@ -828,69 +935,68 @@ class Lv_Approval_ReportViewset(viewsets.ModelViewSet):
         report_data = defaultdict(list)
 
         for document in generalreport:
-            leave_request_id = document.leave_request.id if document.leave_request else 'N/A'
+            # Determine if the document is for a leave_request or compensatory_request
+            leave_request = document.leave_request
+            compensatory_request = document.compensatory_request
+            leave_request_id = leave_request.id if leave_request else (compensatory_request.id if compensatory_request else 'N/A')
             approval_data = {}
 
-            leave_request = document.leave_request
-            employee = leave_request.employee if leave_request else None
+            # Fetch related employee
+            employee = leave_request.employee if leave_request else (compensatory_request.employee if compensatory_request else None)
+            approver = document.approver if document.approver else None
 
             for field in fields_to_include:
+                # Employee-specific fields
                 if field in emp_master_fields and employee:
                     value = getattr(employee, field, 'N/A')
+                
+                # Leave approval fields
                 elif field in leave_approval_fields:
                     value = getattr(document, field, 'N/A')
-                elif field == 'leave_type' and leave_request:
-                    value = leave_request.leave_type.name if leave_request.leave_type else 'N/A'
-                elif field == 'reason' and leave_request:
-                    value = leave_request.reason
-                elif field == 'applied_on' and leave_request:
-                    value = leave_request.applied_on.isoformat() if leave_request.applied_on else 'N/A'
+                
+                # Fields specific to leave_request
+                elif leave_request:
+                    if field == 'leave_type':
+                        value = leave_request.leave_type.name if leave_request.leave_type else 'N/A'
+                    elif field == 'reason':
+                        value = leave_request.reason
+                    elif field == 'applied_on':
+                        value = leave_request.applied_on.isoformat() if leave_request.applied_on else 'N/A'
+                    else:
+                        value = 'N/A'
+                
+                # Fields specific to compensatory_request
+                elif compensatory_request:
+                    if field == 'compensatory_date':
+                        value = compensatory_request.compensatory_date.isoformat() if compensatory_request.compensatory_date else 'N/A'
+                    elif field == 'compensatory_reason':
+                        value = compensatory_request.reason
+                    elif field == 'requested_on':
+                        value = compensatory_request.requested_on.isoformat() if compensatory_request.requested_on else 'N/A'
+                    else:
+                        value = 'N/A'
+                
+                # Approver-specific fields
+                elif field == 'approver_name' and approver:
+                    value = approver.username
+                elif field == 'rejection_reason' and document.rejection_reason:
+                    value = document.rejection_reason.reason_text
+                
+                # Default value for unmatched fields
                 else:
                     value = 'N/A'
-                
+
+                # Format dates
                 if isinstance(value, date):
                     value = value.isoformat()
                 approval_data[field] = value
 
+            # Add to report data grouped by leave_request_id
             report_data[leave_request_id].append(approval_data)
 
-        return [{'leave_request': lr_id, 'approvals': details} for lr_id, details in report_data.items()]
-    # def generate_report_data(self, fields_to_include, generalreport):
-    #     # Fetch fields from emp_master and leave_approval models
-    #     emp_master_fields = [field.name for field in emp_master._meta.get_fields() if isinstance(field, Field) and field.name != 'id']
-    #     leave_approval_fields = [field.name for field in LeaveApproval._meta.get_fields() if isinstance(field, Field) and field.name != 'id']
-
-    #     report_data = []
-
-    #     for document in generalreport:
-    #         general_data = {}
-
-    #         # Access the related leave_request object and employee object
-    #         leave_request = document.leave_request
-    #         employee = leave_request.employee if leave_request else None
-
-    #         for field in fields_to_include:
-    #             if field in emp_master_fields and employee:
-    #                 # Get field value from employee
-    #                 value = getattr(employee, field, 'N/A')
-    #             elif field in leave_approval_fields:
-    #                 # Get field value from leave_approval
-    #                 value = getattr(document, field, 'N/A')
-    #             elif field == 'leave_type' and leave_request:
-    #                 # Access leave_type through leave_request
-    #                 value = leave_request.leave_type.name if leave_request.leave_type else 'N/A'
-    #             elif field == 'reason' and leave_request:
-    #                 value = leave_request.reason
-    #             elif field == 'applied_on' and leave_request:
-    #                 value = leave_request.applied_on.isoformat() if leave_request.applied_on else 'N/A'
-    #             else:
-    #                 value = 'N/A'
-    #             # Format date fields
-    #             if isinstance(value, date):
-    #                 value = value.isoformat()
-    #             general_data[field] = value
-    #         report_data.append(general_data)
-    #     return report_data
+        # Format data for the report
+        return [{'request_id': req_id, 'approvals': details} for req_id, details in report_data.items()]
+    
     
     @action(detail=False, methods=['get'])
     def select_filter_fields(self, request, *args, **kwargs):
@@ -1300,6 +1406,7 @@ class AttendanceReportViewset(viewsets.ModelViewSet):
             'filtered_data': filtered_data,
             'report_id': report_id,
         })
+
 class LvBalanceReportViewset(viewsets.ModelViewSet):
     queryset = lvBalanceReport.objects.all()
     serializer_class = lvBalanceReportSerializer
@@ -1429,6 +1536,120 @@ class LvBalanceReportViewset(viewsets.ModelViewSet):
             report_data.append(general_data)
         return report_data
     
+    @action(detail=False, methods=['get'])
+    def select_filter_fields(self, request, *args, **kwargs):
+       
+        available_fields = self.get_available_fields()
+        selected_fields = request.session.get('selected_fields', [])
+        report_id = request.GET.get('report_id')
+
+        return Response({
+            'available_fields': available_fields,
+            'selected_fields': selected_fields,
+            'report_id': report_id
+        })
+
+    @csrf_exempt
+    @action(detail=False, methods=['post'])
+    def generate_balance_filter_table(self, request, *args, **kwargs):
+        
+        selected_fields = request.POST.getlist('selected_fields')
+        report_id = request.POST.get('report_id')
+
+        try:
+            report = lvBalanceReport.objects.get(id=report_id)
+            report_file_path = os.path.join(settings.MEDIA_ROOT, report.report_data.name)
+            with open(report_file_path, 'r') as file:
+                report_content = json.load(file)
+        except lvBalanceReport.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': 'Report not found'})
+
+        if not selected_fields:
+            selected_fields = list(report_content[0].keys()) if report_content else []
+
+        balances = emp_leave_balance.objects.all()
+        unique_values = self.get_unique_values_for_fields(balances, selected_fields, report_content)
+
+        processed_unique_values = {
+            field: {'values': values} for field, values in unique_values.items()
+        }
+
+        return JsonResponse({
+            'selected_fields': selected_fields,
+            'report_id': report_id,
+            'report_content': report_content,
+            'unique_values': processed_unique_values,
+        })
+
+    def get_unique_values_for_fields(self, balances, selected_fields, report_content):
+        """
+        Extract unique values for the selected fields.
+        """
+        unique_values = {field: set() for field in selected_fields}
+
+        for record in report_content:
+            for field in selected_fields:
+                if field in record:
+                    unique_values[field].add(record[field])
+
+        for balance in balances:
+            for field in selected_fields:
+                if hasattr(balance, field):
+                    value = getattr(balance, field, None)
+                    if value is not None:
+                        unique_values[field].add(value)
+
+        return {field: list(values) for field, values in unique_values.items()}
+
+    @csrf_exempt
+    @action(detail=False, methods=['post'])
+    def filter_existing_report(self, request, *args, **kwargs):
+        
+        report_id = request.data.get('report_id')
+        if not report_id:
+            return HttpResponse('Report ID is missing', status=400)
+
+        try:
+            report_instance = lvBalanceReport.objects.get(id=report_id)
+            report_data = json.loads(report_instance.report_data.read().decode('utf-8'))
+        except (lvBalanceReport.DoesNotExist, json.JSONDecodeError) as e:
+            return HttpResponse(f'Report not found or invalid JSON: {str(e)}', status=404)
+
+        selected_fields = [key for key in request.data.keys() if key != 'report_id']
+        filter_criteria = {field: request.data.getlist(field) for field in selected_fields if request.data.getlist(field)}
+
+        filtered_data = [
+            row for row in report_data
+            if self.match_filter_criteria(row, filter_criteria)
+        ]
+
+        request.session['filtered_data'] = filtered_data
+        request.session.modified = True
+
+        return JsonResponse({
+            'filtered_data': filtered_data,
+            'report_id': report_id,
+        })
+
+    def match_filter_criteria(self, row_data, filter_criteria):
+        
+        for field, values in filter_criteria.items():
+            row_value = row_data.get(field)
+            if row_value is None or str(row_value).strip() not in values:
+                return False
+        return True
+
+class CompensatoryLeaveRequestviewset(viewsets.ModelViewSet):
+    queryset = CompensatoryLeaveRequest.objects.all()
+    serializer_class = CompensatoryLeaveRequestSerializer
+
+class CompensatoryLeaveBalancetviewset(viewsets.ModelViewSet):
+    queryset = CompensatoryLeaveBalance.objects.all()
+    serializer_class = CompensatoryLeaveBalanceSerializer
+
+class CompensatoryLeaveTransactionviewset(viewsets.ModelViewSet):
+    queryset = CompensatoryLeaveTransaction.objects.all()
+    serializer_class = CompensatoryLeaveTransactionSerializer 
 
 class EmployeeYearlyCalendarViewset(viewsets.ModelViewSet):
     queryset = EmployeeYearlyCalendar.objects.all()

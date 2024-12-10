@@ -230,12 +230,7 @@ class EmpViewSet(viewsets.ModelViewSet):
             skills_count = skills.count()
             skills.delete()
             return Response({"detail": f"{skills_count} skills deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
-    # @action(detail=True, methods=['get'])
-    # def approvals(self, request, pk=None):
-    #     user = self.get_object()
-    #     approvals = user.get_approvals()
-    #     serializer = ApprovalSerializer(approvals, many=True)
-    #     return Response(serializer.data, status=status.HTTP_200_OK)
+    
     
     @action(detail=True, methods=['get'])
     def attendance(self, request, pk=None):
@@ -244,20 +239,15 @@ class EmpViewSet(viewsets.ModelViewSet):
         serializer = AttendanceSerializer(attendance, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
-    # @action(detail=True, methods=['get'])
-    # def lvapprovals(self, request, pk=None):
-    #     user = self.get_object()
-    #     attendance = user.get_attendance()
-    #     serializer = AttendanceSerializer(attendance, many=True)
-    #     return Response(serializer.data, status=status.HTTP_200_OK)
-    # def get_queryset(self):
-    #     user = self.request.user
-    #     if user.is_authenticated:
-    #         if hasattr(user, 'is_ess') and user.is_ess:  # If user is an ESS, they can only access their own employee information
-    #             return emp_master.objects.filter(emp_code=user.username)
-    #         else:
-    #             return emp_master.objects.all()  # Other users can access all employee information
-    #     return emp_master.objects.none() 
+    
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_authenticated:
+            if hasattr(user, 'is_ess') and user.is_ess:  # If user is an ESS, they can only access their own employee information
+                return emp_master.objects.filter(emp_code=user.username)
+            else:
+                return emp_master.objects.all()  # Other users can access all employee information
+        return emp_master.objects.none() 
     
     
     @action(detail=True, methods=['POST', 'GET'])
@@ -536,27 +526,7 @@ class ReportViewset(viewsets.ModelViewSet):
         except Report.DoesNotExist:
             return Response({"error": "Standard report not found."}, status=status.HTTP_404_NOT_FOUND)
     
-    # def generate_report_data(self, fields_to_include, employees):
-    #     emp_master_fields = [field.name for field in emp_master._meta.get_fields() if isinstance(field, Field) and field.name != 'id']
-    #     custom_fields = list(Emp_CustomField.objects.values_list('emp_custom_field', flat=True).distinct())
-
-    #     report_data = []
-    #     for employee in employees:
-    #         employee_data = {}
-    #         for field in fields_to_include:
-    #             if field in emp_master_fields:
-    #                 value = getattr(employee, field, 'N/A')
-    #                 if isinstance(value, date):
-    #                     value = value.isoformat()  # Convert date to ISO format string
-    #             elif field in custom_fields:
-    #                 custom_field_value = Emp_CustomFieldValue.objects.filter(emp_master=employee, emp_custom_field__emp_custom_field=field).first()
-    #                 value = custom_field_value.field_value if custom_field_value else 'N/A'
-    #             else:
-    #                 value = 'N/A'
-    #             employee_data[field] = value
-    #         report_data.append(employee_data)
-
-    #     return report_data
+    
 
     def generate_report_data(self, fields_to_include, employees):
         emp_master_fields = [field.name for field in emp_master._meta.get_fields() if isinstance(field, Field) and field.name != 'id']
@@ -1495,62 +1465,6 @@ class Doc_ReportViewset(viewsets.ModelViewSet):
         response['Content-Disposition'] = f'attachment; filename=filtered_report_{report_id}.xlsx'
         return response
      
-# class Bulkupload_DocumentViewSet(viewsets.ModelViewSet):
-#     queryset = Emp_Documents.objects.all()
-#     serializer_class = DocBulkuploadSerializer
-#     # permission_classes = [IsAuthenticated]
-#     parser_classes = (MultiPartParser, FormParser)
-    
-#     @action(detail=False, methods=['post'], parser_classes=[MultiPartParser, FormParser])
-#     def bulk_upload(self, request):
-#         if request.method == 'POST' and request.FILES.get('file'):
-#             excel_file = request.FILES['file']
-#             if excel_file.name.endswith('.xlsx'):
-#                 try:
-#                     # Load data from the Excel file into a Dataset
-#                     dataset = Dataset()
-#                     dataset.load(excel_file.read(), format='xlsx')
-
-#                     # Create a resource instance
-#                     resource = DocumentResource()
-
-#                     # Analyze the entire dataset to collect errors
-#                     all_errors = []
-#                     valid_rows = []
-#                     with transaction.atomic():
-#                         for row_idx, row in enumerate(dataset.dict, start=2):  # Start from row 2 (1-based index)
-#                             row_errors = []
-#                             try:
-#                                 resource.before_import_row(row, row_idx=row_idx)
-#                             except ValidationError as e:
-#                                 row_errors.extend([f"Row {row_idx}: {error}" for error in e.messages])
-#                             if row_errors:
-#                                 all_errors.extend(row_errors)
-#                             else:
-#                                 valid_rows.append(row)
-
-#                         # After analyzing all rows, check for duplicate values
-#                         # duplicate_errors = resource.check_duplicate_values(dataset)
-
-#                         # # If there are any duplicate errors, add them to the list of all errors
-#                         # if duplicate_errors:
-#                         #     all_errors.extend(duplicate_errors)
-
-#                     # If there are any errors, return them
-#                     if all_errors:
-#                         return Response({"errors": all_errors}, status=400)
-
-#                     # If no errors, import valid data into the model
-#                     with transaction.atomic():
-#                         result = resource.import_data(dataset, dry_run=False, raise_errors=True)
-
-#                     return Response({"message": f"{result.total_rows} records created successfully"})
-#                 except Exception as e:
-#                     return Response({"error": str(e)}, status=400)
-#             else:
-#                 return Response({"error": "Invalid file format. Only Excel files (.xlsx) are supported."}, status=400)
-#         else:
-#             return Response({"error": "Please provide an Excel file."}, status=400)
 class Bulkupload_DocumentViewSet(viewsets.ModelViewSet):
     queryset = Emp_Documents.objects.all()
     serializer_class = DocBulkuploadSerializer
@@ -1647,7 +1561,7 @@ class EmpLangSkillViewSet(viewsets.ModelViewSet):
 class LanguageBlkupldViewSet(viewsets.ModelViewSet):
     queryset = LanguageSkill.objects.all()
     serializer_class = LanguageBlkupldSerializer
-    permissio_classes = [LanguageSkillPermission]
+    permission_classes = [LanguageSkillPermission]
     parser_classes = (MultiPartParser, FormParser)
 
     @action(detail=False, methods=['post'], parser_classes=[MultiPartParser, FormParser])
@@ -1797,44 +1711,44 @@ class GeneralRequestViewset(viewsets.ModelViewSet):
     serializer_class = GeneralRequestSerializer
     permission_classes = [GeneralRequestReportPermission]
     # permission_classes =[IsSuperUserOrHasGeneralRequestPermission]
-    # def create(self, request, *args, **kwargs):
-    #     data = request.data.copy()  # Make a mutable copy of request data
+    def create(self, request, *args, **kwargs):
+        data = request.data.copy()  # Make a mutable copy of request data
 
-    #     branch = data.get('branch')
-    #     try:
-    #         doc_numbering = document_numbering.objects.get(branch_id=branch)
-    #     except document_numbering.DoesNotExist:
-    #         return Response({"error": "Document numbering not found for this branch"}, status=status.HTTP_400_BAD_REQUEST)
+        branch = data.get('branch')
+        try:
+            doc_numbering = document_numbering.objects.get(branch_id=branch)
+        except document_numbering.DoesNotExist:
+            return Response({"error": "Document numbering not found for this branch"}, status=status.HTTP_400_BAD_REQUEST)
 
-    #     if doc_numbering.automatic_numbering:
-    #         # Generate the document number if automatic numbering is enabled
-    #         doc_number = f"{doc_numbering.preffix}{doc_numbering.suffix}{doc_numbering.year.year}{doc_numbering.start_number}{doc_numbering.current_number}"
+        if doc_numbering.automatic_numbering:
+            # Generate the document number if automatic numbering is enabled
+            doc_number = f"{doc_numbering.preffix}{doc_numbering.suffix}{doc_numbering.year.year}{doc_numbering.start_number}{doc_numbering.current_number}"
 
-    #         # Update current_number
-    #         with transaction.atomic():
-    #             doc_numbering.current_number += 1
-    #             doc_numbering.save()
+            # Update current_number
+            with transaction.atomic():
+                doc_numbering.current_number += 1
+                doc_numbering.save()
 
-    #         # Add the generated document number to the data
-    #         data['doc_number'] = doc_number
-    #     else:
-    #         # If automatic numbering is disabled, check if 'doc_number' is provided in the request data
-    #         if 'doc_number' not in data or not data['doc_number']:
-    #             # Generate the document number automatically if 'doc_number' is not provided or empty
-    #             doc_number = f"{doc_numbering.preffix}{doc_numbering.year.year}{doc_numbering.start_number}{doc_numbering.current_number}{doc_numbering.suffix}"
-    #             # Update current_number
-    #             with transaction.atomic():
-    #                 doc_numbering.current_number += 1
-    #                 doc_numbering.save()
-    #             # Add the generated document number to the data
-    #             data['doc_number'] = doc_number
+            # Add the generated document number to the data
+            data['doc_number'] = doc_number
+        else:
+            # If automatic numbering is disabled, check if 'doc_number' is provided in the request data
+            if 'doc_number' not in data or not data['doc_number']:
+                # Generate the document number automatically if 'doc_number' is not provided or empty
+                doc_number = f"{doc_numbering.preffix}{doc_numbering.year.year}{doc_numbering.start_number}{doc_numbering.current_number}{doc_numbering.suffix}"
+                # Update current_number
+                with transaction.atomic():
+                    doc_numbering.current_number += 1
+                    doc_numbering.save()
+                # Add the generated document number to the data
+                data['doc_number'] = doc_number
 
-    #     # Proceed to create the GeneralRequest
-    #     serializer = self.get_serializer(data=data)
-    #     serializer.is_valid(raise_exception=True)
-    #     self.perform_create(serializer)
-    #     headers = self.get_success_headers(serializer.data)
-    #     return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        # Proceed to create the GeneralRequest
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
     @action(detail=False, methods=['get'])
     def document_numbering_by_branch(self, request):
         branch_id = request.query_params.get('branch_id')

@@ -62,7 +62,7 @@ class EmployeeResource(resources.ModelResource):
     emp_permenent_address = fields.Field(attribute='emp_permenent_address', column_name='Employee Permanent Address')
     emp_present_address = fields.Field(attribute='emp_present_address', column_name='Employee Current Address')
     emp_status = fields.Field(attribute='emp_status', column_name='Employee Status(True/False)')
-    emp_hired_date = fields.Field(attribute='emp_hired_date', column_name='Employee Joining Date(DD/MM/YYYY)')
+    emp_joined_date = fields.Field(attribute='emp_joined_date', column_name='Employee Joining Date(DD/MM/YYYY)')
     emp_active_date = fields.Field(attribute='emp_active_date', column_name='Employee Confirmaton Date(DD/MM/YYYY)')
     emp_relegion = fields.Field(attribute='emp_relegion', column_name='Employee Religion')
     emp_blood_group = fields.Field(attribute='emp_blood_group', column_name='Employee Blood Group')
@@ -97,7 +97,7 @@ class EmployeeResource(resources.ModelResource):
             'emp_permenent_address',
             'emp_present_address',
             'emp_status',
-            'emp_hired_date',
+            'emp_joined_date',
             'emp_active_date',
             'emp_relegion',
             'emp_blood_group',
@@ -189,45 +189,13 @@ class EmployeeResource(resources.ModelResource):
 
 class EmpCustomFieldValueResource(resources.ModelResource):
     emp_master = fields.Field(attribute='emp_master',column_name='Employee Code',widget=ForeignKeyWidget(emp_master, 'emp_code'))
-    emp_custom_field = fields.Field(column_name='Field Name',attribute='emp_custom_field',widget=ForeignKeyWidget(Emp_CustomField, 'emp_custom_field'))
+    emp_custom_field = fields.Field(attribute='emp_custom_field',column_name='Field Name',widget=ForeignKeyWidget(Emp_CustomField, 'emp_custom_field'))
     field_value = fields.Field(attribute='field_value',column_name='Field Value',widget=MultiTypeWidget())
 
     class Meta:
         model = Emp_CustomFieldValue
         fields = ('emp_master', 'emp_custom_field', 'field_value')
         import_id_fields = ()
-
-    # def before_import_row(self, row, row_idx=None, **kwargs):
-    #     emp_code = row.get('Employee Code')
-    #     field_name = row.get('Field Name')
-    #     field_value = row.get('Field Value')
-
-    #     print(f"Row {row_idx}: field_value='{field_value}'")  # Debug print statement
-
-    #     if not emp_master.objects.filter(emp_code=emp_code).exists():
-    #         raise ValidationError(f"emp_master with emp_code {emp_code} does not exist.")
-
-    #     if not Emp_CustomField.objects.filter(emp_custom_field=field_name).exists():
-    #         raise ValidationError(f"Emp_CustomField with field_name {field_name} does not exist.")
-
-    #     custom_field = Emp_CustomField.objects.get(emp_custom_field=field_name)
-        
-    #     if custom_field.data_type == 'date':
-    #         if isinstance(field_value, str):
-    #             field_value = field_value.strip()  # Remove leading and trailing spaces
-                
-    #             try:
-    #                 # Handle both datetime and date formats
-    #                 if ' ' in field_value:  # Check if it's a datetime string
-    #                     # Extract the date part (YYYY-MM-DD) and reformat it
-    #                     field_value = field_value.split(' ')[0]
-    #                     date_object = datetime.strptime(field_value, '%Y-%m-%d').date()
-    #                     field_value = date_object.strftime('%d-%m-%Y')  # Reformat to DD-MM-YYYY
-                        
-    #                 # Validate date format
-    #                 datetime.strptime(field_value, '%d-%m-%Y')
-    #             except ValueError:
-    #                 raise ValidationError(f"Invalid date format for field {field_name}. Date should be in DD-MM-YYYY format.")
 
     def before_import_row(self, row, row_idx=None, **kwargs):
         emp_code = row.get('Employee Code')
@@ -261,74 +229,6 @@ class EmpCustomFieldValueResource(resources.ModelResource):
 
             # Replace the original row value with the correctly formatted date
             row['Field Value'] = field_value
-
-
-
-
-
-
-
-# class DocumentResource(resources.ModelResource):
-#     emp_id = fields.Field(attribute='emp_id', column_name='Employee ID',widget=ForeignKeyWidget(emp_master, 'emp_code'))
-#     emp_sl_no = fields.Field(attribute='emp_sl_no', column_name='SerialNo')
-#     document_type = fields.Field(attribute='document_type', column_name='Document Type', widget=ForeignKeyWidget(document_type, 'type_name'))
-#     emp_doc_number = fields.Field(attribute='emp_doc_number', column_name='Document Number')
-#     emp_doc_issued_date = fields.Field(attribute='emp_doc_issued_date', column_name='Document Issued Date')
-#     emp_doc_expiry_date = fields.Field(attribute='emp_doc_expiry_date', column_name='Document Expiry Date')
-
-    
-#     class Meta:
-#         model = Emp_Documents
-#         # skip_unchanged = True
-#         # report_skipped = False
-       
-#         fields = (
-#                   'emp_id',
-#                   'emp_sl_no',
-#                   'document_type',
-#                   'emp_doc_number',
-#                   'emp_doc_issued_date',
-#                   'emp_doc_expiry_date',
-#         )
-#         import_id_fields = ('emp_sl_no',)
-
-#     def before_import_row(self, row, **kwargs):
-#         errors = []  
-#         emp_sl_no = row.get('SerialNo')
-#         emp_code = row.get('Employee ID')
-#         doc_type = row.get('Document Type')
-#         print(doc_type)
-        
-#         # Validate emp_id and emp_doc_type
-#         if Emp_Documents.objects.filter(emp_sl_no=emp_sl_no).exists():
-#             errors.append(f"Duplicate value found for Employee Code: {emp_sl_no}")
-
-
-#         if not emp_master.objects.filter(emp_code=emp_code).exists():
-#             errors.append(f"emp_master matching query does not exist for ID: {emp_code}")
-#             # row_errors['emp_id'] = f"emp_master matching query does not exist for ID: {employee_id}"
-#         if not document_type.objects.filter(type_name=doc_type).exists():
-#             errors.append(f"Document_type matching query does not exist for ID: {doc_type}")
-            
-        
-#         # Validate date fields format
-#         date_fields = ['Document Issued Date', 'Document Expiry Date']
-#         date_format = '%d-%m-%y'  # Format: dd-mm-yy
-
-#         for field in date_fields:
-#             date_value = row.get(field)
-#             if date_value:
-#                 try:
-#                     if isinstance(date_value, datetime):  # Check if value is already a datetime object
-#                         date_value = date_value.strftime('%d-%m-%y')  # Convert datetime object to string
-#                     datetime.strptime(date_value, date_format)
-#                 except ValueError:
-#                     errors.append(f"Invalid date format for {field}. Date should be in format dd-mm-yy")
-                    
-#             else:
-#                 errors.append(f"Date value for {field} is empty")       
-#         if errors:
-#             raise ValidationError(errors)
 
 class DocumentResource(resources.ModelResource):
     emp_id = fields.Field(attribute='emp_id', column_name='Employee ID', widget=ForeignKeyWidget(emp_master, 'emp_code'))

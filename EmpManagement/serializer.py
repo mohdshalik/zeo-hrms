@@ -286,15 +286,19 @@ class ApprovalSerializer(serializers.ModelSerializer):
         if instance.general_request:  
             rep['general_request'] = instance.general_request.doc_number
         if instance.approver:  
-            rep['approver'] = instance.approver.username
-        
+            rep['approver'] = instance.approver.username       
         return rep       
+
 class LvRqstApprovalSerializer(serializers.ModelSerializer):
     approvals = LvApprovalSerializer(many=True, read_only=True)  # Include approval details
+    leave_type = serializers.SerializerMethodField()
 
     class Meta:
         model = employee_leave_request
-        fields = ['id', 'approvals']
+        fields = ['id', 'approvals','start_date','end_date','leave_type']
+    def get_leave_type(self, obj):
+        # Safely return the leave type name if it exists
+        return getattr(obj.leave_type, 'name', None)
         
 class GeneralRequestApprovalSerializer(serializers.ModelSerializer):
     approvals = ApprovalSerializer(many=True, read_only=True)  # Include approval details

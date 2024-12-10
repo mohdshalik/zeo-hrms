@@ -68,13 +68,7 @@ employee_router.register(r'notification', NotificationViewset, basename='employe
 urlpatterns = [
     path('api/', include(router.urls)),
     path('api/Employee/<int:pk>/', include(employee_router.urls)),  # Nested routes for individual employees
-    # path('api/Employee/<int:pk>/emp_market_skills/', EmpViewSet.as_view({'delete': 'emp_market_skills'})),
-    # path('emp-documents/check-expiry-alert/', Emp_DocumentViewSet.as_view({'get': 'check_expiry_alert'}), name='check-expiry-alert'),
-    # path('api/emp-BulkUpload/download_default_excel_file/', EmpbulkuploadViewSet.as_view({'get': 'download_default_excel_file'}), name='download_default_excel_file'),   
-    # path('api/request-approvals/<int:pk>/approve/', ApprovalViewset.as_view({'post': 'approve'}), name='approval-approve'),
-    # path('api/request-approvals/<int:pk>/reject/', ApprovalViewset.as_view({'post': 'reject'}), name='approval-reject'),
-    # path('approvals/<int:pk>/approve/', approve_request, name='approve_request'),
-    # path('approvals/<int:pk>/reject/', reject_request, name='reject_request'),
+    # path('link-user-to-employee/', LinkUserToEmployee.as_view(), name='link-user-to-employee'),
     path('api/ess-users/', ESSUserListView.as_view(), name='ess-user-list'),
     path('api/update-ess-user/', UpdateESSUserView.as_view(), name='update-ess-user'),
 
@@ -82,4 +76,3 @@ urlpatterns = [
     
 
 ]
-#198765432198,

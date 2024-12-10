@@ -1,10 +1,11 @@
 # resources.py
 from import_export import resources, fields
 from import_export.widgets import ForeignKeyWidget, DateWidget, TimeWidget
-from .models import Attendance, Shift, WeeklyShiftSchedule,EmployeeMachineMapping
+from .models import Attendance, Shift, EmployeeMachineMapping,EmployeeShiftSchedule
 from EmpManagement.models import emp_master
 from django.core.exceptions import ValidationError
 from datetime import datetime,time 
+import datetime
 
 
 class CustomEmployeeWidget(ForeignKeyWidget):
@@ -76,26 +77,25 @@ class AttendanceResource(resources.ModelResource):
         # Raise errors if any exist
         if errors:
             raise ValidationError(errors)
-
     def after_import_row(self, row, row_result, **kwargs):
         print("After import row called for:", row)
         employee = row.get('employee')
-        date = row.get('Date')
-        
+        date = row.get('Date')  # Ensure this is passed as a datetime object
+
         if employee and date:
             try:
                 attendance = Attendance.objects.get(employee=employee, date=date)
-                
+
                 # Assign shift
-                schedule = WeeklyShiftSchedule.objects.filter(employee=employee).first()
-                shift = schedule.get_shift_for_day(attendance.date) if schedule else None
-                attendance.shift = shift
-                
+                schedule = EmployeeShiftSchedule.objects.filter(employee=employee).first()
+                if schedule:
+                    shift = schedule.get_shift_for_date(employee, date)  # Pass both employee and date
+                    attendance.shift = shift
+
                 # Calculate total hours
                 attendance.calculate_total_hours()
-                
+
                 attendance.save()
             except Attendance.DoesNotExist:
                 print(f"Attendance record not found for {employee} on {date}")
-
     

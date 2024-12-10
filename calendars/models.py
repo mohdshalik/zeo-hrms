@@ -1,5 +1,6 @@
 import logging
 from django.db import models
+from LeaveManagement .models import EmployeeYearlyCalendar
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)

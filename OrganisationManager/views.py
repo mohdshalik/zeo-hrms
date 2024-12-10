@@ -7,13 +7,15 @@ from rest_framework.decorators import api_view
 from django.http import FileResponse
 from openpyxl import load_workbook
 from docx import Document
+from django_tenants.utils import schema_context
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from .models import (brnch_mstr,dept_master,document_numbering,
-                     desgntn_master,ctgry_master,FiscalPeriod,FiscalYear,CompanyPolicy)
+                     desgntn_master,ctgry_master,FiscalPeriod,FiscalYear,CompanyPolicy,AssetMaster, AssetTransaction,Asset_CustomFieldValue)
+
 from . serializer import (BranchSerializer,PermissionSerializer,GroupSerializer,permserializer,DocumentNumberingSerializer,
                           CtgrySerializer,DeptSerializer,DesgSerializer,FiscalYearSerializer,PeriodSerializer,DeptUploadSerializer,
-                          DesgUploadSerializer,CompanyPolicySerializer)
+                          DesgUploadSerializer,CompanyPolicySerializer,AssetMasterSerializer,AssetTransactionSerializer,Asset_CustomFieldValueSerializer)
 from rest_framework.permissions import IsAuthenticated,AllowAny,IsAuthenticatedOrReadOnly,IsAdminUser
 from .resource import (DepartmentResource,DesignationResource,DesgtnReportResource,DeptReportResource)
 from EmpManagement.models import emp_master
@@ -35,59 +37,30 @@ from rest_framework.decorators import action
 import subprocess
 import os
 from django.utils import timezone
-#COMPNY 
-# class CompanyViewSet(viewsets.ModelViewSet):
-#     queryset = cmpny_mastr.objects.all()
-#     serializer_class = CompanySerializer
-#     # authentication_classes = [SessionAuthentication]
-#     # permission_classes = [CompanyPermission]
+from django.db.models import Q
+from django.contrib.contenttypes.models import ContentType
 
-#     def perform_create(self, serializer):
-#         try:
-#             company_instance = serializer.save(cmpny_created_by=self.request.user)
-
-#             # Use get_or_create to check and create a branch if it doesn't exist
-#             branch_instance, created = brnch_mstr.objects.get_or_create(
-#                 br_company_id=company_instance,
-#                 defaults={
-#                     'branch_name': company_instance.cmpny_name,
-#                     'br_state_id': company_instance.cmpny_state_id,
-#                     'br_country': company_instance.cmpny_country,
-#                     'br_city': company_instance.cmpny_city,
-#                     'br_created_by': company_instance.cmpny_created_by,
-#                     'br_updated_by': company_instance.cmpny_updated_by,
-#                     'br_branch_mail': company_instance.cmpny_mail,
-#                     'br_branch_nmbr_1': company_instance.cmpny_nmbr_1,
-#                     # Add other fields as needed
-#                 }
-#             )
-
-#             if not created:
-#                 # Branch already existed, you can handle this case if needed
-#                 pass
-
-#         except Exception as e:
-#             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-#         return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-    # def get_queryset(self):
-    #     # Filter companies based on the currently authenticated user
-    #     return cmpny_mastr.objects.filter(cmpny_created_by=self.request.user)
+def get_model_permissions(model):
+    content_type = ContentType.objects.get_for_model(model)
+    permissions = Permission.objects.filter(
+        Q(content_type=content_type)
+    )
+    return permissions
 class BranchViewSet(viewsets.ModelViewSet):
     queryset = brnch_mstr.objects.all()
     serializer_class = BranchSerializer
-    # authentication_classes = [SessionAuthentication]
-    # permission_classes = [BranchPermission]
-
-    # def get_queryset(self):
-    #     # Filter branches based on the currently authenticated user
-    #     return brnch_mstr.objects.filter(br_created_by=self.request.user)
-
-    def perform_create(self, serializer):
-        # Set the user field to the currently authenticated user during creation
-        serializer.save(br_created_by=self.request.user)     
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['tenant_id'] = self.request.query_params.get('tenant_id')
+        return context  
     
+    @action(detail=True, methods=['POST', 'GET'])
+    def policies(self, request, pk=None):
+        employee = self.get_object()
+        if request.method == 'GET':
+            family_members = employee.policies.all()
+            serializer = CompanyPolicySerializer(family_members, many=True)
+            return Response(serializer.data)
 #DEPARTMENT 
 class DepartmentViewSet(viewsets.ModelViewSet):
     queryset = dept_master.objects.all()
@@ -177,7 +150,13 @@ class DepartmentViewSet(viewsets.ModelViewSet):
             response = HttpResponse(buffer.getvalue(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
             response['Content-Disposition'] = 'attachment; filename="deparment_Report.xlsx"'
             return response
-
+    @action(detail=True, methods=['POST', 'GET'])
+    def policies(self, request, pk=None):
+        employee = self.get_object()
+        if request.method == 'GET':
+            family_members = employee.policies.all()
+            serializer = CompanyPolicySerializer(family_members, many=True)
+            return Response(serializer.data)
 @api_view(['POST'])
 def save_notification_settings(request):
     selected_departments = request.data.get('departments', [])
@@ -249,7 +228,13 @@ class DesignationViewSet(viewsets.ModelViewSet):
         print(data)
         return JsonResponse(data, safe=False)
 
-        
+    @action(detail=True, methods=['POST', 'GET'])
+    def policies(self, request, pk=None):
+        employee = self.get_object()
+        if request.method == 'GET':
+            family_members = employee.policies.all()
+            serializer = CompanyPolicySerializer(family_members, many=True)
+            return Response(serializer.data)   
     
     @action(detail=False, methods=['get'])
     def designation_excel_report(self,request):
@@ -485,22 +470,47 @@ class FiscalPeriodDatesView(APIView):
 class CompanyPolicyViewSet(viewsets.ModelViewSet):
     queryset = CompanyPolicy.objects.all()
     serializer_class = CompanyPolicySerializer
-
     def get_queryset(self):
         user = self.request.user
         if user.is_authenticated:
-            # Get the employee's branch, department, and category
-            emp_branch = user.emp_master.emp_branch_id
-            emp_dept = user.emp_master.emp_dept_id
-            emp_category = user.emp_master.emp_ctgry_id
+            if user.is_superuser:
+                return self.queryset
 
-            # Filter policies by matching the branch, department, and category
-            return self.queryset.filter(
-                branch=emp_branch,
-                department=emp_dept,
-                category=emp_category
-            )
+            # Check if user is listed in `specific_users`
+            if self.queryset.filter(specific_users=user).exists():
+                return self.queryset.filter(specific_users=user)
+
+            # Get the employee's branch, department, and category if the user is an ESS user
+            if user.is_ess:
+                emp_branch = user.emp_master.emp_branch_id
+                emp_dept = user.emp_master.emp_dept_id
+                emp_category = user.emp_master.emp_ctgry_id
+
+                # Filter policies by matching the branch, department, and category
+                return self.queryset.filter(
+                    branch=emp_branch,
+                    department=emp_dept,
+                    category=emp_category
+                )
+        
         return CompanyPolicy.objects.none()
+    # def get_queryset(self):
+    #     user = self.request.user
+    #     if user.is_authenticated:
+    #         if user.is_superuser:
+    #             return self.queryset
+    #         # Get the employee's branch, department, and category
+    #         emp_branch = user.emp_master.emp_branch_id
+    #         emp_dept = user.emp_master.emp_dept_id
+    #         emp_category = user.emp_master.emp_ctgry_id
+
+    #         # Filter policies by matching the branch, department, and category
+    #         return self.queryset.filter(
+    #             branch=emp_branch,
+    #             department=emp_dept,
+    #             category=emp_category
+    #         )
+    #     return CompanyPolicy.objects.none()
     
     @action(detail=True, methods=['get'], url_path='download', url_name='download_policy')
     def download_policy(self, request, pk=None):
@@ -608,57 +618,44 @@ class CompanyPolicyViewSet(viewsets.ModelViewSet):
         buffer.seek(0)
         return FileResponse(buffer, as_attachment=True, filename=f'{policy.title}.pdf')
     
+def list_data_in_schema(request):
+    schema_name = request.tenant.schema_name  # This gets the current tenant's schema name
 
-# class AttendanceViewSet(viewsets.ModelViewSet):
-#     queryset = Attendance.objects.all()
-#     serializer_class = AttendanceSerializer
+    # Use schema_context to switch to the tenant's schema
+    with schema_context(schema_name):
+        # Fetch branches, departments, and designations within the schema
+        branches = brnch_mstr.objects.all()
+        departments = dept_master.objects.all()
+        designations = desgntn_master.objects.all()
+        categories=ctgry_master.objects.all()
 
-#     @action(detail=False, methods=['post'])
-#     def check_in(self, request):
-#         # Accept employee_id in request for testing purposes
-#         emp_id = request.data.get("employee_id")
-#         if not emp_id:
-#             return Response({"detail": "Employee ID is required"}, status=status.HTTP_400_BAD_REQUEST)
+        # Structure the data to send in the response
+        data = {
+            'branches': [
+                {'id': branch.id, 'name': branch.branch_name} for branch in branches
+            ],
+            'departments': [
+                {'id': dept.id, 'name': dept.dept_name} for dept in departments
+            ],
+            'designations': [
+                {'id': desig.id, 'name': desig.desgntn_job_title} for desig in designations
+            ],
+            'categories': [
+                {'id': cat.id, 'name': cat.ctgry_title} for cat in categories
+            ]
+        }
 
-#         try:
-#             employee = emp_master.objects.get(id=emp_id)
-#         except emp_master.DoesNotExist:
-#             return Response({"detail": "Employee not found"}, status=status.HTTP_404_NOT_FOUND)
+        # Return the data as a JSON response
+        return JsonResponse(data)
 
-#         date = timezone.now().date()
+class AssetMasterViewSet(viewsets.ModelViewSet):
+    queryset = AssetMaster.objects.all()
+    serializer_class = AssetMasterSerializer
 
-#         attendance, created = Attendance.objects.get_or_create(employee=employee, date=date)
-
-#         if attendance.check_in:
-#             return Response({"detail": "Already checked in"}, status=status.HTTP_400_BAD_REQUEST)
-
-#         attendance.check_in = timezone.now()
-#         attendance.save()
-
-#         return Response({"detail": "Checked in successfully"}, status=status.HTTP_200_OK)
-
-#     @action(detail=False, methods=['post'])
-#     def check_out(self, request):
-#         emp_id = request.data.get("employee_id")
-#         if not emp_id:
-#             return Response({"detail": "Employee ID is required"}, status=status.HTTP_400_BAD_REQUEST)
-
-#         try:
-#             employee = emp_master.objects.get(id=emp_id)
-#         except emp_master.DoesNotExist:
-#             return Response({"detail": "Employee not found"}, status=status.HTTP_404_NOT_FOUND)
-
-#         date = timezone.now().date()
-
-#         try:
-#             attendance = Attendance.objects.get(employee=employee, date=date)
-#         except Attendance.DoesNotExist:
-#             return Response({"detail": "No check-in record found"}, status=status.HTTP_400_BAD_REQUEST)
-
-#         if attendance.check_out:
-#             return Response({"detail": "Already checked out"}, status=status.HTTP_400_BAD_REQUEST)
-
-#         attendance.check_out = timezone.now()
-#         attendance.calculate_total_hours()
-
-#         return Response({"detail": "Checked out successfully"}, status=status.HTTP_200_OK)
+class AssetTransactionViewSet(viewsets.ModelViewSet):
+    queryset = AssetTransaction.objects.all()
+    serializer_class = AssetTransactionSerializer
+    
+class Asset_CustomFieldValueViewSet(viewsets.ModelViewSet):
+    queryset = Asset_CustomFieldValue.objects.all()
+    serializer_class = Asset_CustomFieldValueSerializer

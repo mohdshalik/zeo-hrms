@@ -1,4 +1,5 @@
 from rest_framework import permissions
+from tenant_users.tenants.models import UserTenantPermissions
 
 
 class LanguageMasterPermission(permissions.BasePermission):

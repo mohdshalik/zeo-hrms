@@ -79,7 +79,7 @@ DATABASE_ROUTERS = (
     'django_tenants.routers.TenantSyncRouter',
 )
 PG_EXTRA_SEARCH_PATHS = ['extensions']
-SESSION_COOKIE_DOMAIN = '.zeo.com'
+# SESSION_COOKIE_DOMAIN = '.zeo.com'
 SESSION_COOKIE_SECURE = True
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media/')
@@ -114,6 +114,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django_tenants.middleware.TenantMiddleware',
     'UserManagement.middleware.TenantTimezoneMiddleware'
+    
     # 'django_tenant_users.middleware.TenantUserMiddleware',
     
     # 'UserManagement.middleware.MultiTenantAuthenticationMiddleware',

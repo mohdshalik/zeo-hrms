@@ -3,6 +3,8 @@ from django.dispatch import receiver
 from .models import applicablity_critirea, emp_leave_balance, leave_type,Attendance,employee_leave_request
 from EmpManagement.models import emp_master
 from django.db import models  # Ensure models import is included
+from .models import EmployeeYearlyCalendar
+from datetime import timedelta
 
 import logging
 

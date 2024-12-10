@@ -1,22 +1,29 @@
 from .models import (brnch_mstr,dept_master,desgntn_master,document_numbering,
-                     ctgry_master,FiscalPeriod,FiscalYear,CompanyPolicy)
+                     ctgry_master,FiscalPeriod,FiscalYear,CompanyPolicy,AssetMaster,AssetMaster, AssetTransaction,Asset_CustomFieldValue)
 from rest_framework import serializers
 from tenant_users.tenants.models import UserTenantPermissions
 from django.contrib.auth.models import Permission,Group
+from calendars .models import assign_holiday,holiday,holiday_calendar
+
 
 class BranchSerializer(serializers.ModelSerializer):
-    # br_created_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
-    # br_updated_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
+    holidays = serializers.SerializerMethodField()
     class Meta:
         model = brnch_mstr
         fields = '__all__'
+    def get_holidays(self, obj):
+        from calendars .serializer import HolidaySerializer
+        # Fetch holidays assigned to this branch
+        assigned_holidays = assign_holiday.objects.filter(branch=obj).values_list('holiday_model__holiday', flat=True)
+        holidays = holiday.objects.filter(id__in=assigned_holidays)
+        return HolidaySerializer(holidays, many=True).data
+    
     # def to_representation(self, instance):
     #     rep = super(BranchSerializer, self).to_representation(instance)
     #     rep['br_state_id'] = instance.br_state_id.state_name
     #     rep['br_country'] = instance.br_country.country_name
     #     rep['br_company_id'] = instance.br_company_id.cmpny_name
     #     return rep
-
 # class CompanySerializer(serializers.ModelSerializer):
 #     cmpny_created_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
 #     cmpny_updated_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
@@ -130,7 +137,27 @@ class CompanyPolicySerializer(serializers.ModelSerializer):
         model = CompanyPolicy
         fields = '__all__'
 
-# class AttendanceSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = Attendance
-#         fields ='__all__'
+class AssetMasterSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AssetMaster
+        fields = '__all__'
+
+class AssetTransactionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AssetTransaction
+        fields = '__all__'
+
+    def validate(self, data):
+        asset = data.get('asset')
+        transaction_type = data.get('transaction_type')
+        quantity = data.get('quantity')
+
+        if transaction_type == AssetTransaction.ISSUE and asset.available_quantity < quantity:
+            raise serializers.ValidationError("Insufficient quantity available for issuance.")
+        
+        return data
+
+class Asset_CustomFieldValueSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Asset_CustomFieldValue
+        fields = '__all__'   
