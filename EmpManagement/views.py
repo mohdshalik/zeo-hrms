@@ -7,7 +7,8 @@ from .models import (emp_family,Emp_Documents,EmpJobHistory,EmpLeaveRequest,EmpQ
                      EmpQualification_CustomField,EmpDocuments_CustomField,LanguageSkill,MarketingSkill,ProgrammingLanguageSkill,
                      EmployeeSkill,Emp_CustomField,Report,Doc_Report,GeneralRequest,RequestType,GeneralRequestReport,EmployeeLangSkill,EmployeeProgramSkill,
                      EmployeeMarketingSkill,Approval,ApprovalLevel,RequestNotification,Emp_CustomFieldValue,
-                     EmailTemplate,EmailConfiguration,SelectedEmpNotify,NotificationSettings,DocExpEmailTemplate,CommonWorkflow,)
+                     EmailTemplate,EmailConfiguration,SelectedEmpNotify,NotificationSettings,DocExpEmailTemplate,CommonWorkflow,
+                     )
 from .serializer import (Emp_qf_Serializer,EmpFamSerializer,EmpSerializer,NotificationSerializer,RequestTypeSerializer,
                          EmpJobHistorySerializer,EmpLeaveRequestSerializer,DocumentSerializer,EmployeeSkillSerializer,
                          ProgrammingLanguageSkillSerializer,MarketingSkillSerializer,LanguageSkillSerializer,
@@ -58,7 +59,7 @@ from .tasks import send_document_expiry_notifications_for_all_tenants
 from django.core.cache import cache
 import redis
 import json
-from LeaveManagement .serializer import AttendanceSerializer
+from calendars .serializer import AttendanceSerializer
 
 r = redis.StrictRedis(host='localhost', port=6379, db=0)
 
@@ -1843,7 +1844,7 @@ class EmailConfigurationViewSet(viewsets.ModelViewSet):
 class GeneralReportViewset(viewsets.ModelViewSet):
     queryset = GeneralRequestReport.objects.all()
     serializer_class = GeneralReportSerializer
-    # permission_classes = [GeneralRequestReport]
+    permission_classes = [GeneralRequestReport]
     
     def __init__(self, *args, **kwargs):
         super(GeneralReportViewset, self).__init__(*args, **kwargs)

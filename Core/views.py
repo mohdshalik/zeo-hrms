@@ -65,6 +65,7 @@ class CountryBulkuploadViewSet(viewsets.ModelViewSet):
             for row_number, row in enumerate(reader, start=1):
                 country_code = row.get('country_code', '')[:50]  # Get country_code, truncate if too long
                 country_name = row.get('country_name', '')[:50]  # Get country_name, truncate if too long
+                timezone=row.get('timezone','')[:50]
 
                 if not country_code or not country_name:
                     errors.append(f"Missing required fields in row {row_number}")
@@ -74,7 +75,8 @@ class CountryBulkuploadViewSet(viewsets.ModelViewSet):
                 try:
                     cntry_mstr.objects.create(
                         country_code=country_code,
-                        country_name=country_name
+                        country_name=country_name,
+                        timezone=timezone
                     )
                     success_count += 1
                 except Exception as e:

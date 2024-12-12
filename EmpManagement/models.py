@@ -22,18 +22,11 @@ from email.utils import formataddr
 from django.conf import settings
 from django.contrib.postgres.fields import JSONField
 from django.contrib.sites.models import Site
-from django.urls import reverse
-from django.contrib.contenttypes.fields import GenericForeignKey
-from django.contrib.contenttypes.models import ContentType
 from django.template import Context, Template
-import uuid
-import random
-import string
-import json
 from django.utils import timezone
 from django.core.mail import EmailMultiAlternatives,get_connection, send_mail
-from django.core.serializers.json import DjangoJSONEncoder
-from django.apps import apps
+
+
 
 #EmpManagement
 class emp_master(models.Model):    
@@ -120,7 +113,7 @@ class emp_master(models.Model):
         return self.custom_fields.all()
     
     def get_attendance(self):
-        from LeaveManagement.models import Attendance
+        from calendars .models import Attendance
         # Fetch approvals assigned to this user
         return Attendance.objects.filter(employee=self)
 

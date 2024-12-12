@@ -62,7 +62,6 @@ TENANT_APPS = [
     'OrganisationManager',
     'EmpManagement',
     'calendars',
-    'LeaveManagement',
     'django.contrib.admin',
 ]
 
@@ -243,6 +242,8 @@ SIMPLE_JWT = {
 SHOW_PUBLIC_IF_NO_TENANT_FOUND = True
 #https://github.com/microsoftarchive/redis/releases
 # Celery settings
+#celery -A zeo beat --loglevel=info, celery -A zeo worker -l info -P eventlet 
+#or in linux celery -A zeo worker -l info -P gevent
 CELERY_BROKER_URL = 'redis://localhost:6379/0'  # Or your Redis server URL
 CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
 # Set this to ensure retries during startup

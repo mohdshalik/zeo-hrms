@@ -16,3 +16,6 @@ openpyxl
 pandas
 python-docx
 reportlab
+django-celery-beat
+django-oauth-toolkit
+django-redis

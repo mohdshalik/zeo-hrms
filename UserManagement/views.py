@@ -12,8 +12,8 @@ from rest_framework.permissions import IsAuthenticated,AllowAny,IsAuthenticatedO
 
 from rest_framework.decorators import action
 from EmpManagement .serializer import ApprovalSerializer,ReqNotifySerializer
-from LeaveManagement.serializer import LvApprovalSerializer,LvApprovalNotifySerializer
-from LeaveManagement.models import LeaveApproval,LvApprovalNotify
+from calendars.serializer import LvApprovalSerializer,LvApprovalNotifySerializer
+from calendars.models import LeaveApproval,LvApprovalNotify
 from EmpManagement.models import Approval,RequestNotification
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.views import APIView

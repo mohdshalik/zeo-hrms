@@ -42,7 +42,7 @@ class LanguageMaster(models.Model):
     
 #Nationality
 class Nationality(models.Model):
-    N_name=models.CharField(max_length=200,null=True)
+    N_name = models.CharField(max_length=200,null=True)
 
     def str(self):
         return self.N_name

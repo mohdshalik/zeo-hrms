@@ -21,8 +21,8 @@ from .models import (emp_family,EmpJobHistory,EmpQualification,Emp_Documents,Emp
                      )
 
 from OrganisationManager.serializer import CompanyPolicySerializer
-from LeaveManagement.models import employee_leave_request
-from LeaveManagement.serializer import LvApprovalSerializer
+from calendars.models import employee_leave_request
+
 
 '''employee set'''
 #EMPLOYEE FAMILY
@@ -290,6 +290,7 @@ class ApprovalSerializer(serializers.ModelSerializer):
         return rep       
 
 class LvRqstApprovalSerializer(serializers.ModelSerializer):
+    from calendars.serializer import LvApprovalSerializer
     approvals = LvApprovalSerializer(many=True, read_only=True)  # Include approval details
     leave_type = serializers.SerializerMethodField()
 
