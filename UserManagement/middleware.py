@@ -4,6 +4,8 @@ from django_tenants.utils import schema_context
 from oauth2_provider.models import AccessToken
 from django.utils import timezone
 import logging
+from django.http import JsonResponse
+from django_tenants.utils import schema_context
 
 logger = logging.getLogger(__name__)
 
@@ -74,3 +76,20 @@ class TenantTimezoneMiddleware:
         # Deactivate timezone after the request is processed
         timezone.deactivate()
         return response
+
+class SchemaMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        schema_name = request.GET.get('schema')
+        if not schema_name:
+            return JsonResponse({"error": "Schema name is required"}, status=400)
+
+        try:
+            # Activate the schema context
+            with schema_context(schema_name):
+                response = self.get_response(request)
+            return response
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=400)

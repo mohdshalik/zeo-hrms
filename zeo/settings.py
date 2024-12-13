@@ -112,7 +112,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'django_tenants.middleware.TenantMiddleware',
+    # 'django_tenants.middleware.TenantMiddleware',
+    'UserManagement.middleware.SchemaMiddleware',
     'UserManagement.middleware.TenantTimezoneMiddleware'
     
     # 'django_tenant_users.middleware.TenantUserMiddleware',
