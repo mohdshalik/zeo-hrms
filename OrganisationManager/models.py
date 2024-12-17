@@ -8,7 +8,7 @@ from EmpManagement .models import Emp_CustomField
 class brnch_mstr(models.Model):
     branch_name               = models.CharField(max_length=100)
     branch_code               = models.CharField(max_length=50,unique=True,null=True,blank =True)
-    branc_logo                = models.ImageField(null=True)
+    branch_logo               = models.ImageField(null=True)
     notification_period_days  = models.IntegerField()
     br_start_date             = models.DateField(null=True)
     branch_users              = models.ManyToManyField("UserManagement.CustomUser",related_name='branches')

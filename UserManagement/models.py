@@ -39,7 +39,7 @@ class company(TenantBase):
             # Create the branch within the company's schema
             brnch_mstr.objects.create(
         branch_name=self.name,
-        branc_logo=self.logo,
+        branch_logo=self.logo,
         branch_code='BR001',  # Provide a default or unique branch code
         notification_period_days=30,  # Provide a value for non-nullable field
         # branc_logo=None,  # This can be optional
