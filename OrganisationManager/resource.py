@@ -10,7 +10,7 @@ class BranchResource(resources.ModelResource):
        
         fields = ('id',
                   'branch_name',
-                  'branch_code',
+                  'branc_code',
                   'br_notification_period_days',
                   'br_start_date',
                   'br_is_active',

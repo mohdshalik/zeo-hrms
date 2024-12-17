@@ -6,6 +6,9 @@ from django.utils import timezone
 import logging
 from django.http import JsonResponse
 from django_tenants.utils import schema_context
+from django.http import JsonResponse
+from django.utils.deprecation import MiddlewareMixin
+
 
 logger = logging.getLogger(__name__)
 
@@ -77,17 +80,29 @@ class TenantTimezoneMiddleware:
         timezone.deactivate()
         return response
 
-class SchemaMiddleware:
+
+class SchemaMiddleware(MiddlewareMixin):
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
+        # List of public schema apps that don't require schema activation
+        public_schema_apps = ["users","core"]  # Replace with the apps in your public schema
+
+        # Extract the app name from the request path
+        app_name = request.path.split('/')[1]  # Assuming URL structure is /app_name/...
+
+        # If the app belongs to the public schema, proceed without schema activation
+        if app_name in public_schema_apps:
+            return self.get_response(request)
+
+        # For tenant apps, require schema name
         schema_name = request.GET.get('schema')
         if not schema_name:
             return JsonResponse({"error": "Schema name is required"}, status=400)
 
         try:
-            # Activate the schema context
+            # Activate the schema context for tenant apps
             with schema_context(schema_name):
                 response = self.get_response(request)
             return response
