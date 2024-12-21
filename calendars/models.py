@@ -206,7 +206,7 @@ class holiday(models.Model):
     description = models.CharField(max_length=50,unique=True)
     start_date  = models.DateField()
     end_date    = models.DateField()
-    calendar = models.ForeignKey(holiday_calendar,on_delete=models.CASCADE)
+    calendar = models.ForeignKey(holiday_calendar,on_delete=models.CASCADE,null=True)
     restricted  = models.BooleanField(default=False)
 
 
