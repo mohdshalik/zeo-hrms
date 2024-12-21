@@ -3,9 +3,8 @@ from rest_framework.routers import DefaultRouter
 from .views import (EmpFamViewSet, EmpJobHistoryvSet, EmpViewSet,NotificationViewset,
                     Emp_QualificationViewSet, Emp_DocumentViewSet, EmpLeaveRequestViewSet,EmpbulkuploadViewSet,
                     CustomFieldViewset,EmpFam_CustomFieldViewset,EmpJobHistory_UdfViewset,EmpQf_UdfViewset,EmpDoc_UdfViewset,
-                    Bulkupload_DocumentViewSet,LanguageSkillViewSet,ReportViewset,Doc_ReportViewset,GeneralReportViewset,
-                    MarketingSkillViewSet,ProgrammingLanguageSkillViewSet,EmployeeSkillViewSet,LanguageBlkupldViewSet,MarketingBlkupldViewSet,
-                    ProLangBlkupldViewSet,RequestTypeViewset,GeneralRequestViewset,EmpMarketSkillViewSet,EmpPrgrmSkillViewSet,
+                    Bulkupload_DocumentViewSet,ReportViewset,Doc_ReportViewset,GeneralReportViewset,
+                    RequestTypeViewset,GeneralRequestViewset,EmpMarketSkillViewSet,EmpPrgrmSkillViewSet,
                     EmpLangSkillViewSet,ApprovalViewset,ApprovalLevelViewset,UserNotificationsViewSet,Emp_CustomFieldValueViewSet,EmailTemplateViewset,
                     EmailConfigurationViewSet,UpdateESSUserView,ESSUserListView,NotificationSettingsViewSet,DocExpEmailTemplateViewset,CommonWorkflowViewSet,)
 
@@ -30,16 +29,11 @@ router.register(r'Bulkupload-Documents', Bulkupload_DocumentViewSet, basename='b
 router.register(r'emp-Documents-UDF', EmpDoc_UdfViewset, basename='emp_document_udf')
 router.register(r'emp-leave-request', EmpLeaveRequestViewSet)
 router.register(r'notification', NotificationViewset, basename='employee-document-notification')
-router.register(r'language_skill', LanguageSkillViewSet, basename='employee-language_skill')
-router.register(r'marketing-skill', MarketingSkillViewSet, basename='employee-marketing_skill')
-router.register(r'programming-skill', ProgrammingLanguageSkillViewSet, basename='employee-programming_skill')
-router.register(r'employee-skill', EmployeeSkillViewSet, basename='employee_skill')
+
 router.register(r'emp-market-skill',EmpMarketSkillViewSet, basename='emp_market_skill')
 router.register(r'emp-program-skill',EmpPrgrmSkillViewSet, basename='emp_prgrm_skill')
 router.register(r'emp-language-skill',EmpLangSkillViewSet, basename='emp_lang_skill')
-router.register(r'language_bulkupload', LanguageBlkupldViewSet, basename='employee-language_bulkupload')
-router.register(r'marketing_bulkupload', MarketingBlkupldViewSet, basename='employee-marketing_bulkupload')
-router.register(r'programming_bulkupload', ProLangBlkupldViewSet, basename='employee-programming_bulkupload')
+
 router.register(r'request-type', RequestTypeViewset, basename='request-type')
 router.register(r'email-template', EmailTemplateViewset, basename='email-template')
 router.register(r'general-request', GeneralRequestViewset, basename='general-request')

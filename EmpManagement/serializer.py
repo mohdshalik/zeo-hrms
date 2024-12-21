@@ -14,7 +14,7 @@ import datetime
 
 from .models import (emp_family,EmpJobHistory,EmpQualification,Emp_Documents,EmpLeaveRequest,emp_master,Emp_CustomField,
                     EmpFamily_CustomField,EmpJobHistory_CustomField,EmpQualification_CustomField,EmpDocuments_CustomField,
-                    LanguageSkill,MarketingSkill,ProgrammingLanguageSkill,EmployeeSkill,notification,Report,Doc_Report,RequestType,
+                    notification,Report,Doc_Report,RequestType,
                     GeneralRequest,GeneralRequestReport,EmployeeMarketingSkill,EmployeeProgramSkill,EmployeeLangSkill,Approval,
                     ApprovalLevel,RequestNotification,Emp_CustomFieldValue,EmailTemplate,EmailConfiguration,SelectedEmpNotify,NotificationSettings,
                     DocExpEmailTemplate,CommonWorkflow,
@@ -168,39 +168,6 @@ class CustomFieldSerializer(serializers.ModelSerializer):
     
 
 #Employee Skills
-class LanguageBlkupldSerializer(serializers.ModelSerializer):
-    file = serializers.FileField(write_only=True) 
-    class Meta:
-        model = LanguageSkill
-        fields = '__all__'
-
-class MarketingBlkupldSerializer(serializers.ModelSerializer):
-    file = serializers.FileField(write_only=True) 
-    class Meta:
-        model = MarketingSkill
-        fields = '__all__'
-
-class ProLangBlkupldSerializer(serializers.ModelSerializer):
-    file = serializers.FileField(write_only=True) 
-    class Meta:
-        model = ProgrammingLanguageSkill
-        fields = '__all__'
-
-class LanguageSkillSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = LanguageSkill
-        fields = '__all__'
-
-class MarketingSkillSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = MarketingSkill
-        fields = '__all__'
-
-class ProgrammingLanguageSkillSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ProgrammingLanguageSkill
-        fields = '__all__'
-
 class EmpMarketSkillSerializer(serializers.ModelSerializer):
     class Meta:
         model = EmployeeMarketingSkill
@@ -225,36 +192,6 @@ class EmpLangSkillSerializer(serializers.ModelSerializer):
         representation = super().to_representation(instance)
         representation['language_skill'] = instance.language_skill.language if instance.language_skill else None
         return representation
-
-class EmployeeSkillSerializer(serializers.ModelSerializer):   
-    class Meta:
-        model = EmployeeSkill
-        fields = '__all__'
-    
-    def to_representation(self, instance):
-        representation = super().to_representation(instance)
-        representation['language_skill'] = instance.language_skill.language if instance.language_skill else None
-        representation['marketing_skill'] = instance.marketing_skill.marketing if instance.marketing_skill else None
-        representation['programming_language_skill'] = instance.programming_language_skill.programming_language if instance.programming_language_skill else None
-        return representation
-    def create(self, validated_data):
-        # Ensure percentage is handled correctly during creation
-        percentage = validated_data.pop('percentage', None)
-        instance = super().create(validated_data)
-        if percentage is not None:
-            instance.percentage = percentage
-            instance.save()
-        return instance
-
-    def update(self, instance, validated_data):
-        # Ensure percentage is handled correctly during update
-        percentage = validated_data.pop('percentage', None)
-        instance = super().update(instance, validated_data)
-        if percentage is not None:
-            instance.percentage = percentage
-            instance.save()
-        return instance
-
 
 class EmployeeReportSerializer(serializers.ModelSerializer):
     class Meta:

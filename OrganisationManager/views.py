@@ -55,7 +55,7 @@ class BranchViewSet(viewsets.ModelViewSet):
         return context  
     
     @action(detail=True, methods=['POST', 'GET'])
-    def policies(self, request, pk=None):
+    def companypolicies(self, request, pk=None):
         employee = self.get_object()
         if request.method == 'GET':
             family_members = employee.policies.all()
@@ -619,34 +619,27 @@ class CompanyPolicyViewSet(viewsets.ModelViewSet):
         return FileResponse(buffer, as_attachment=True, filename=f'{policy.title}.pdf')
     
 def list_data_in_schema(request):
-    schema_name = request.tenant.schema_name  # This gets the current tenant's schema name
+    schema_name = request.GET.get('schema')  # Use explicit schema name if tenant is unavailable
+    if not schema_name:
+        return JsonResponse({"error": "Schema name is required"}, status=400)
 
-    # Use schema_context to switch to the tenant's schema
-    with schema_context(schema_name):
-        # Fetch branches, departments, and designations within the schema
-        branches = brnch_mstr.objects.all()
-        departments = dept_master.objects.all()
-        designations = desgntn_master.objects.all()
-        categories=ctgry_master.objects.all()
+    try:
+        with schema_context(schema_name):
+            branches = brnch_mstr.objects.all()
+            departments = dept_master.objects.all()
+            designations = desgntn_master.objects.all()
+            categories = ctgry_master.objects.all()
 
-        # Structure the data to send in the response
-        data = {
-            'branches': [
-                {'id': branch.id, 'name': branch.branch_name} for branch in branches
-            ],
-            'departments': [
-                {'id': dept.id, 'name': dept.dept_name} for dept in departments
-            ],
-            'designations': [
-                {'id': desig.id, 'name': desig.desgntn_job_title} for desig in designations
-            ],
-            'categories': [
-                {'id': cat.id, 'name': cat.ctgry_title} for cat in categories
-            ]
-        }
+            data = {
+                'branches': [{'id': branch.id, 'name': branch.branch_name} for branch in branches],
+                'departments': [{'id': dept.id, 'name': dept.dept_name} for dept in departments],
+                'designations': [{'id': desig.id, 'name': desig.desgntn_job_title} for desig in designations],
+                'categories': [{'id': cat.id, 'name': cat.ctgry_title} for cat in categories],
+            }
 
-        # Return the data as a JSON response
-        return JsonResponse(data)
+            return JsonResponse(data)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
 
 class AssetMasterViewSet(viewsets.ModelViewSet):
     queryset = AssetMaster.objects.all()

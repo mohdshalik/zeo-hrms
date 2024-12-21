@@ -191,17 +191,24 @@ def update_employee_yearly_calendar(employee, weekend_model):
     yearly_calendar.save()
     logger.debug(f"Updated EmployeeYearlyCalendar for employee ID {employee.id} with new weekend data")
 
+class holiday_calendar(models.Model):
+    calendar_title  = models.CharField(max_length=50)
+    year            = models.IntegerField()
+    
+    def __str__(self):
+        return f"{self.calendar_title} - {self.year}"
+    def is_holiday(self, date):
+        # Logic to determine if 'date' is a holiday
+        return self.holidays.filter(holiday_date=date).exists()
+    # holiday         = models.ManyToManyField(holiday)
 
 class holiday(models.Model):
     description = models.CharField(max_length=50,unique=True)
     start_date  = models.DateField()
     end_date    = models.DateField()
+    calendar = models.ForeignKey(holiday_calendar,on_delete=models.CASCADE)
     restricted  = models.BooleanField(default=False)
 
-class holiday_calendar(models.Model):
-    calendar_title  = models.CharField(max_length=50)
-    year            = models.IntegerField()
-    holiday         = models.ManyToManyField(holiday)
 
 class assign_holiday(models.Model):
     EMP_CHOICES = [

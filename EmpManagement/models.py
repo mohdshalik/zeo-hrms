@@ -25,6 +25,7 @@ from django.contrib.sites.models import Site
 from django.template import Context, Template
 from django.utils import timezone
 from django.core.mail import EmailMultiAlternatives,get_connection, send_mail
+from Core .models import LanguageSkill,MarketingSkill,ProgrammingLanguageSkill
 
 
 
@@ -443,53 +444,6 @@ class notification(models.Model):
     message      = models.CharField(max_length=200)
     created_at   = models.DateTimeField(auto_now_add=True)
     document_id  = models.ForeignKey('Emp_Documents',on_delete = models.CASCADE,null=True)
-    
-
-
-class LanguageSkill(models.Model):
-    language = models.CharField(max_length=100,null=True,blank =True,default=None)
-    
-    def __str__(self):
-        return f"{self.language }"
-
-class MarketingSkill(models.Model):
-    marketing = models.CharField(max_length=100,null=True,blank =True,default=None)
-
-    def __str__(self):
-        return f"{self.marketing }"
-
-class ProgrammingLanguageSkill(models.Model):
-    programming_language = models.CharField(max_length=100,null=True,blank =True,default=None)
-
-    def __str__(self):
-        return f"{self.programming_language }"
-
-class EmployeeSkill(models.Model):
-
-    emp_id =models.ForeignKey('emp_master',on_delete = models.CASCADE,related_name='emp_skills')
-    language_skill               = models.ForeignKey(LanguageSkill, on_delete=models.SET_NULL, null=True, blank=True)
-    marketing_skill              = models.ForeignKey(MarketingSkill, on_delete=models.SET_NULL, null=True, blank=True)
-    programming_language_skill   = models.ForeignKey(ProgrammingLanguageSkill, on_delete=models.SET_NULL, null=True, blank=True)
-    percentage                   = models.DecimalField(max_digits=5, decimal_places=2, default=None, null=True, blank=True)
-    value_choices = (
-        ('Language Skill', 'Language Skill'),
-        ('Marketing Skill', 'Marketing Skill'),
-        ('Programming Language Skill', 'Programming Language Skill'),
-    )
-    value = models.CharField(max_length=100, choices=value_choices , null=True, blank=True)
-    
-
-    def __str__(self):
-        return f"{self.emp_id} - {self.value}"
-
-@receiver(pre_save, sender=EmployeeSkill)
-def update_value_field(sender, instance, **kwargs):
-    if instance.language_skill:
-        instance.value = instance.language_skill.language
-    elif instance.marketing_skill:
-        instance.value = instance.marketing_skill.marketing
-    elif instance.programming_language_skill:
-        instance.value = instance.programming_language_skill.programming_language
     
 class EmployeeMarketingSkill(models.Model):
     emp_id           = models.ForeignKey('emp_master',on_delete = models.CASCADE,related_name='emp_market_skills')

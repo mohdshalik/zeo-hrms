@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import(state_mstr,cntry_mstr,crncy_mstr,document_type,LanguageMaster,Nationality)
+from .models import(state_mstr,cntry_mstr,crncy_mstr,document_type,LanguageMaster,Nationality,LanguageSkill,MarketingSkill,ProgrammingLanguageSkill)
 #STATE SERIALIZER
 class StateSerializer(serializers.ModelSerializer):
     class Meta:
@@ -54,4 +54,36 @@ class LanguageMasterSerializer(serializers.ModelSerializer):
     # br_updated_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
     class Meta:
         model= LanguageMaster
+        fields = '__all__'
+
+class LanguageSkillSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LanguageSkill
+        fields = '__all__'
+
+class MarketingSkillSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MarketingSkill
+        fields = '__all__'
+
+class ProgrammingLanguageSkillSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProgrammingLanguageSkill
+        fields = '__all__'
+class LanguageBlkupldSerializer(serializers.ModelSerializer):
+    file = serializers.FileField(write_only=True) 
+    class Meta:
+        model = LanguageSkill
+        fields = '__all__'
+
+class MarketingBlkupldSerializer(serializers.ModelSerializer):
+    file = serializers.FileField(write_only=True) 
+    class Meta:
+        model = MarketingSkill
+        fields = '__all__'
+
+class ProLangBlkupldSerializer(serializers.ModelSerializer):
+    file = serializers.FileField(write_only=True) 
+    class Meta:
+        model = ProgrammingLanguageSkill
         fields = '__all__'

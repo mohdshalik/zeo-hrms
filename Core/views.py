@@ -1,7 +1,9 @@
 from django.shortcuts import render
-from .models import (state_mstr,crncy_mstr,cntry_mstr,document_type,LanguageMaster,Nationality)
+from .models import (state_mstr,crncy_mstr,cntry_mstr,document_type,LanguageMaster,Nationality,LanguageSkill,ProgrammingLanguageSkill,MarketingSkill)
 from .serializer import (CountrySerializer,StateSerializer,LanguageMasterSerializer,
-                         CurrencySerializer,Document_type,CntryBulkUploadSerializer,NationalityBlkUpldSerializer)
+                         CurrencySerializer,Document_type,CntryBulkUploadSerializer,NationalityBlkUpldSerializer,LanguageBlkupldSerializer,
+                         MarketingBlkupldSerializer,LanguageSkillSerializer,MarketingSkillSerializer,ProgrammingLanguageSkillSerializer,
+                         ProLangBlkupldSerializer,MarketingBlkupldSerializer,LanguageBlkupldSerializer)
 from . permissions import LanguageMasterPermission
 from rest_framework.decorators import action
 from rest_framework import viewsets
@@ -12,7 +14,7 @@ from rest_framework.permissions import IsAuthenticated,AllowAny,IsAuthenticatedO
 from rest_framework.parsers import MultiPartParser, FormParser
 import csv
 from UserManagement.permissions import CountryPermission,StatePermission,DocTypePermission
-
+import pandas as pd,openpyxl
 # Create your views here.
 
 #STATE CRUD
@@ -136,3 +138,110 @@ class LanguageViewSet(viewsets.ModelViewSet):
     permission_classes = [LanguageMasterPermission]
     def get_serializer_context(self):
         return {'request': self.request}
+
+class LanguageSkillViewSet(viewsets.ModelViewSet):
+    queryset = LanguageSkill.objects.all()
+    serializer_class = LanguageSkillSerializer
+    # permission_classes = [LanguageSkillPermission]
+
+class MarketingSkillViewSet(viewsets.ModelViewSet):
+    queryset = MarketingSkill.objects.all()
+    serializer_class = MarketingSkillSerializer
+    # permission_classes = [MarketingSkillPermission]
+
+class ProgrammingLanguageSkillViewSet(viewsets.ModelViewSet):
+    queryset = ProgrammingLanguageSkill.objects.all()
+    serializer_class = ProgrammingLanguageSkillSerializer
+    # permission_classes = [ProgrammingLanguageSkillPermission]
+class LanguageBlkupldViewSet(viewsets.ModelViewSet):
+    queryset = LanguageSkill.objects.all()
+    serializer_class = LanguageBlkupldSerializer
+    # permissio_classes = [LanguageSkillPermission]
+    parser_classes = (MultiPartParser, FormParser)
+
+    @action(detail=False, methods=['post'], parser_classes=[MultiPartParser, FormParser])
+    def bulk_upload(self, request):
+        if request.method == 'POST' and request.FILES.get('file'):
+            excel_file = request.FILES['file']     
+            # Check if the uploaded file is an Excel file
+            if not excel_file.name.endswith('.xlsx'):
+                return Response({'error': 'Only Excel files (.xlsx) are supported'}, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                # Read the Excel file using pandas
+                df = pd.read_excel(excel_file)
+                
+                # Iterate through each row in the DataFrame
+                for index, row in df.iterrows():
+                    # Get the emp_master instance corresponding to the emp_id
+                                   
+                    # Create a Skills_Master object with the emp_instance
+                    LanguageSkill.objects.create(
+                        
+                        language=row['Language'],                     
+                    )
+            except Exception as e:
+                return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'message': 'Bulk upload successful'}, status=status.HTTP_201_CREATED)
+        else:
+            return Response({'error': 'No file found'}, status=status.HTTP_400_BAD_REQUEST)
+
+class MarketingBlkupldViewSet(viewsets.ModelViewSet):
+    queryset = MarketingSkill.objects.all()
+    serializer_class = MarketingBlkupldSerializer
+    # permission_classes = [MarketingSkillPermission]
+    parser_classes = (MultiPartParser, FormParser)
+
+    @action(detail=False, methods=['post'], parser_classes=[MultiPartParser, FormParser])
+    def bulk_upload(self, request):
+        if request.method == 'POST' and request.FILES.get('file'):
+            excel_file = request.FILES['file']  
+            # Check if the uploaded file is an Excel file
+            if not excel_file.name.endswith('.xlsx'):
+                return Response({'error': 'Only Excel files (.xlsx) are supported'}, status=status.HTTP_400_BAD_REQUEST)      
+            try:
+                # Read the Excel file using pandas
+                df = pd.read_excel(excel_file)
+                # Iterate through each row in the DataFrame
+                for index, row in df.iterrows():
+                    # Get the emp_master instance corresponding to the emp_id                   
+                    # Create a Skills_Master object with the emp_instance
+                    MarketingSkill.objects.create(
+                        
+                        marketing=row['Marketing'],                       
+                    )
+            except Exception as e:
+                return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'message': 'Bulk upload successful'}, status=status.HTTP_201_CREATED)
+        else:
+            return Response({'error': 'No file found'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ProLangBlkupldViewSet(viewsets.ModelViewSet):
+    queryset = ProgrammingLanguageSkill.objects.all()
+    serializer_class = ProLangBlkupldSerializer
+    # permission_classes = [ProgrammingLanguageSkillPermission]
+    parser_classes = (MultiPartParser, FormParser)
+
+    @action(detail=False, methods=['post'], parser_classes=[MultiPartParser, FormParser])
+    def bulk_upload(self, request):
+        if request.method == 'POST' and request.FILES.get('file'):
+            excel_file = request.FILES['file']
+            # Check if the uploaded file is an Excel file
+            if not excel_file.name.endswith('.xlsx'):
+                return Response({'error': 'Only Excel files (.xlsx) are supported'}, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                # Read the Excel file using pandas
+                df = pd.read_excel(excel_file) 
+                # Iterate through each row in the DataFrame
+                for index, row in df.iterrows():
+                    # Get the emp_master instance corresponding to the emp_id
+                    # Create a Skills_Master object with the emp_instance
+                    ProgrammingLanguageSkill.objects.create(
+                        
+                        programming_language=row['Programming Language'],    
+                    )
+            except Exception as e:
+                return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'message': 'Bulk upload successful'}, status=status.HTTP_201_CREATED)
+        else:
+            return Response({'error': 'No file found'}, status=status.HTTP_400_BAD_REQUEST)

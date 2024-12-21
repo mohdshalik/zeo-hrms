@@ -1,6 +1,7 @@
 from django.urls import path, include
 from .  views import (CountryViewSet,StateViewSet,CurrencyViewSet,LanguageViewSet,
-                      DocumentViewSet,CountryBulkuploadViewSet,NationalityBlkupldViewSet)
+                      DocumentViewSet,CountryBulkuploadViewSet,NationalityBlkupldViewSet,LanguageSkillViewSet,MarketingSkillViewSet,ProgrammingLanguageSkillViewSet,LanguageBlkupldViewSet,MarketingBlkupldViewSet,
+                    ProLangBlkupldViewSet,)
 
 from rest_framework.routers import DefaultRouter
 router = DefaultRouter()
@@ -12,6 +13,12 @@ router.register(r'Nationality-Bulkupload', NationalityBlkupldViewSet,basename="n
 router.register(r'Currency', CurrencyViewSet)
 router.register(r'Documents', DocumentViewSet)
 router.register(r'language', LanguageViewSet)
+router.register(r'language_skill', LanguageSkillViewSet, basename='employee-language_skill')
+router.register(r'marketing-skill', MarketingSkillViewSet, basename='employee-marketing_skill')
+router.register(r'programming-skill', ProgrammingLanguageSkillViewSet, basename='employee-programming_skill')
+router.register(r'language_bulkupload', LanguageBlkupldViewSet, basename='employee-language_bulkupload')
+router.register(r'marketing_bulkupload', MarketingBlkupldViewSet, basename='employee-marketing_bulkupload')
+router.register(r'programming_bulkupload', ProLangBlkupldViewSet, basename='employee-programming_bulkupload')
 
 urlpatterns = [
     # Other paths

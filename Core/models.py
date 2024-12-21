@@ -46,3 +46,21 @@ class Nationality(models.Model):
 
     def str(self):
         return self.N_name
+
+class LanguageSkill(models.Model):
+    language = models.CharField(max_length=100,null=True,blank =True,default=None)
+    
+    def __str__(self):
+        return f"{self.language }"
+
+class MarketingSkill(models.Model):
+    marketing = models.CharField(max_length=100,null=True,blank =True,default=None)
+
+    def __str__(self):
+        return f"{self.marketing }"
+
+class ProgrammingLanguageSkill(models.Model):
+    programming_language = models.CharField(max_length=100,null=True,blank =True,default=None)
+
+    def __str__(self):
+        return f"{self.programming_language }"
