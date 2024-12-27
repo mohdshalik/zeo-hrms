@@ -65,7 +65,51 @@ class WeekendAssignSerializer(serializers.ModelSerializer):
         model = assign_weekend
         fields = '__all__'
     
+    def validate(self, data):
+        related_to = data.get('related_to')
+        weekend_model = data.get('weekend_model')
+        
+        if related_to == 'branch':
+            existing_branches = data.get('branch')
+            if existing_branches:
+                existing = assign_weekend.objects.filter(
+                    weekend_model=weekend_model,
+                    branch__in=existing_branches
+                ).exists()
+                if existing:
+                    raise serializers.ValidationError("The branch is already assigned to a weekend calendar.")
+        
+        elif related_to == 'department':
+            existing_departments = data.get('department')
+            if existing_departments:
+                existing = assign_weekend.objects.filter(
+                    weekend_model=weekend_model,
+                    department__in=existing_departments
+                ).exists()
+                if existing:
+                    raise serializers.ValidationError("The department is already assigned to a weekend calendar.")
+        
+        elif related_to == 'category':
+            existing_categories = data.get('category')
+            if existing_categories:
+                existing = assign_weekend.objects.filter(
+                    weekend_model=weekend_model,
+                    category__in=existing_categories
+                ).exists()
+                if existing:
+                    raise serializers.ValidationError("The category is already assigned to a weekend calendar.")
+        
+        elif related_to == 'employee':
+            existing_employees = data.get('employee')
+            if existing_employees:
+                existing = assign_weekend.objects.filter(
+                    weekend_model=weekend_model,
+                    employee__in=existing_employees
+                ).exists()
+                if existing:
+                    raise serializers.ValidationError("The employee is already assigned to a weekend calendar.")
 
+        return data
 
 class HolidaySerializer(serializers.ModelSerializer):
     class Meta:

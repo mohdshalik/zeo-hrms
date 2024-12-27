@@ -399,9 +399,9 @@ class ReportViewset(viewsets.ModelViewSet):
     #     return Report.objects.none()
    
 
-    # def __init__(self, *args, **kwargs):
-    #     super(ReportViewset, self).__init__(*args, **kwargs)
-    #     self.ensure_standard_report_exists()
+    def __init__(self, *args, **kwargs):
+        super(ReportViewset, self).__init__(*args, **kwargs)
+        self.ensure_standard_report_exists()
 
     def get_available_fields(self):
         excluded_fields = {'id', 'is_ess','created_at', 'created_by', 'updated_at', 'updated_by', 'emp_profile_pic'}
@@ -1727,7 +1727,7 @@ class EmailConfigurationViewSet(viewsets.ModelViewSet):
 class GeneralReportViewset(viewsets.ModelViewSet):
     queryset = GeneralRequestReport.objects.all()
     serializer_class = GeneralReportSerializer
-    permission_classes = [GeneralRequestReport]
+    permission_classes = [GeneralRequestReportPermission]
     
     def __init__(self, *args, **kwargs):
         super(GeneralReportViewset, self).__init__(*args, **kwargs)

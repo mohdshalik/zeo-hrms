@@ -86,23 +86,25 @@ class SchemaMiddleware(MiddlewareMixin):
         self.get_response = get_response
 
     def __call__(self, request):
-        # List of public schema apps that don't require schema activation
-        public_schema_apps = ["users","core"]  # Replace with the apps in your public schema
+        # Skip schema activation for public apps
+        public_schema_apps = ["users", "core"]
+        app_name = request.path.split('/')[1]
 
-        # Extract the app name from the request path
-        app_name = request.path.split('/')[1]  # Assuming URL structure is /app_name/...
-
-        # If the app belongs to the public schema, proceed without schema activation
         if app_name in public_schema_apps:
             return self.get_response(request)
 
-        # For tenant apps, require schema name
+        # Handle media file requests
+        if request.path.startswith(settings.MEDIA_URL):
+            schema_name = connection.schema_name
+            request.path = request.path.replace(settings.MEDIA_URL, f"{settings.MEDIA_URL}{schema_name}/")
+            return self.get_response(request)
+        
+        # Activate schema for tenant apps
         schema_name = request.GET.get('schema')
         if not schema_name:
             return JsonResponse({"error": "Schema name is required"}, status=400)
 
         try:
-            # Activate the schema context for tenant apps
             with schema_context(schema_name):
                 response = self.get_response(request)
             return response

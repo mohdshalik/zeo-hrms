@@ -9,6 +9,8 @@ from OrganisationManager.models import document_numbering
 from OrganisationManager.serializer import DocumentNumberingSerializer
 from django.contrib.contenttypes.models import ContentType
 import datetime
+from calendars.serializer import WeekendCalendarSerailizer,HolidayCalandarSerializer,HolidaySerializer
+from calendars .models import holiday
 # from UserManagement.serializers import CustomUserSerializer
 
 
@@ -260,6 +262,8 @@ class EmpSerializer(serializers.ModelSerializer):
     emp_prgrm_skills = EmpPrgrmSkillSerializer(many=True, read_only=True)
     emp_lang_skills= EmpLangSkillSerializer(many=True, read_only=True)
     policy_file = CompanyPolicySerializer(many=True, read_only=True)
+    emp_weekend_calendar = WeekendCalendarSerailizer(required=False, read_only=True)
+    holiday_calendar = HolidayCalandarSerializer(required=False, read_only=True)
     
     
     # created_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
@@ -282,7 +286,9 @@ class EmpSerializer(serializers.ModelSerializer):
         if instance.emp_branch_id:
             rep['emp_branch_id'] =instance.emp_branch_id.branch_name
         return rep
-    
+    def get_holidays(self, obj):
+        holidays = holiday.objects.filter(holiday_calendar=obj.holiday_calendar)
+        return HolidaySerializer(holidays, many=True).data
 class EmpBulkUploadSerializer(serializers.ModelSerializer):
     emp_custom_fields = CustomFieldSerializer(many=True, required=False)
     file = serializers.FileField(write_only=True) 
@@ -379,15 +385,6 @@ class ApprovalLevelSerializer(serializers.ModelSerializer):
         
         return rep
     
-    class NotificationSerializer(serializers.Serializer):
-        recipient_email = serializers.EmailField()
-        branch_email = serializers.EmailField()
-        recipient_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
-        doc_number = serializers.CharField(max_length=255)
-        request_type = serializers.CharField(max_length=255)
-        employee_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
-        reason = serializers.CharField(max_length=1000, required=False, allow_blank=True)
-        rejection_reason = serializers.CharField(max_length=1000, required=False, allow_blank=True)
 
 class SelectedEmpNotifySerializer(serializers.ModelSerializer):
     class Meta:
