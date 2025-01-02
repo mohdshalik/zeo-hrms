@@ -553,31 +553,33 @@ class EmployeeLangSkillPermission(permissions.BasePermission):
 
 class RequestTypePermission(permissions.BasePermission):
     """
-    Custom permission to only allow users with specific permissions to access the RequestType model.
+    Custom permission to only allow users with specific permissions to access RequestType API.
     """
+
     def has_permission(self, request, view):
+        # Check if the user is authenticated
         if not request.user.is_authenticated:
             return False
 
-        # Check if the user has permissions in the UserTenantPermissions model
+        # Grant access if the user is a superuser in the user model
+        if request.user.is_superuser:
+            return True
+
+        # Grant access if the user has is_ess=True in the user model
+        if hasattr(request.user, 'is_ess') and request.user.is_ess:
+            return True
+
+        # Retrieve UserTenantPermissions efficiently using get (if unique) or filter
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
         except UserTenantPermissions.DoesNotExist:
             return False
 
-        # Allow superusers
-        if user_permissions.is_superuser:
-            return True
+        # Check if the user's group has any of the necessary permissions for RequestType
+        required_permissions = ['view_requesttype', 'delete_requesttype', 'add_requesttype', 'change_requesttype']
+        for group in user_permissions.groups.all():  # Access all related groups
+            for permission in group.permissions.all():  # Access permissions of each group
+                if permission.codename in required_permissions:
+                    return True
 
-        # Define required permissions for RequestType
-        required_permissions = [
-            'view_requesttype', 'add_requesttype', 'change_requesttype', 'delete_requesttype'
-        ]
-
-        # Get user's group permissions
-        user_group_permissions = [
-            p.codename for group in user_permissions.groups.all() for p in group.permissions.all()
-        ]
-
-        # Check if the user has any of the required permissions
-        return any(permission in user_group_permissions for permission in required_permissions)
+        return False

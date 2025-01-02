@@ -1593,8 +1593,7 @@ from django.db import transaction
 class GeneralRequestViewset(viewsets.ModelViewSet):
     queryset = GeneralRequest.objects.all()
     serializer_class = GeneralRequestSerializer
-    permission_classes = [GeneralRequestReportPermission]
-    # permission_classes =[IsSuperUserOrHasGeneralRequestPermission]
+    permission_classes =[IsSuperUserOrHasGeneralRequestPermission]
     def create(self, request, *args, **kwargs):
         data = request.data.copy()  # Make a mutable copy of request data
 

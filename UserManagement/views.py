@@ -22,6 +22,12 @@ from .signals import add_company_to_superusers
 from tenant_users.tenants.models import UserTenantPermissions
 from OrganisationManager .models import CompanyPolicy
 from OrganisationManager .serializer import CompanyPolicySerializer
+from rest_framework import generics
+from rest_framework.permissions import IsAuthenticated
+from django_tenants.utils import schema_context
+from .models import CustomUser
+from .serializers import UserListSerializer
+from django.core.exceptions import ValidationError
 
 # from .permissions import CompanyPermission
 from django.http import Http404
@@ -81,14 +87,21 @@ class RegisterUserAPIView(viewsets.ModelViewSet):
         approvals = CompanyPolicy.objects.filter(specific_users=user.id).order_by('-created_at')
         serializer = CompanyPolicySerializer(approvals, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
-class TenantUserListView(generics.ListAPIView):
-    # permission_classes = [IsAuthenticated]
 
+
+class TenantUserListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
     serializer_class = UserListSerializer
 
     def get_queryset(self):
-        schema_name = self.request.user.tenants.schema_name  # Assuming you have multi-tenancy setup
-        return CustomUser.objects.filter(tenants__schema_name=schema_name)
+        # Get the schema name from the middleware-processed request
+        schema_name = self.request.GET.get('schema')
+        if not schema_name:
+            raise ValidationError({"error": "Schema name is required"})
+
+        # Use schema_context to access the correct tenant's users
+        with schema_context(schema_name):
+            return CustomUser.objects.filter(tenants__schema_name=schema_name)
 from django.contrib.auth import login
 
 # from .authentication import CentralizedJWTAuthentication

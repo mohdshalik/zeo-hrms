@@ -401,7 +401,7 @@ class Groupviewset(viewsets.ModelViewSet):
     serializer_class = GroupSerializer
 
 class permviewset(viewsets.ModelViewSet):
-    queryset = Permission.objects.all()
+    queryset = Permission.objects.all().order_by('id')
     serializer_class=permserializer
 
 class DocNumberingviewset(viewsets.ModelViewSet):
