@@ -14,10 +14,10 @@ from .models import (brnch_mstr,dept_master,document_numbering,
                      desgntn_master,ctgry_master,FiscalPeriod,FiscalYear,CompanyPolicy,AssetMaster, AssetTransaction,Asset_CustomFieldValue)
 
 from . serializer import (BranchSerializer,PermissionSerializer,GroupSerializer,permserializer,DocumentNumberingSerializer,
-                          CtgrySerializer,DeptSerializer,DesgSerializer,FiscalYearSerializer,PeriodSerializer,DeptUploadSerializer,
+                          CtgrySerializer,DeptSerializer,DesgSerializer,FiscalYearSerializer,PeriodSerializer,DeptUploadSerializer,CtgryUploadSerializer,
                           DesgUploadSerializer,CompanyPolicySerializer,AssetMasterSerializer,AssetTransactionSerializer,Asset_CustomFieldValueSerializer)
 from rest_framework.permissions import IsAuthenticated,AllowAny,IsAuthenticatedOrReadOnly,IsAdminUser
-from .resource import (DepartmentResource,DesignationResource,DesgtnReportResource,DeptReportResource)
+from .resource import (DepartmentResource,DesignationResource,DesgtnReportResource,DeptReportResource,CategoryResource)
 from EmpManagement.models import emp_master
 from UserManagement.permissions import IsAdminUser,IsSuperUser
 from datetime import timedelta
@@ -28,7 +28,8 @@ from tablib import Dataset
 from openpyxl.styles import PatternFill,Alignment,Font
 from django.http import HttpResponse
 from io import BytesIO
-from UserManagement.permissions import BranchPermission,DepartmentPermission,DesignationPermission,CategoryPermission
+from .permissions import (BranchPermission,DepartmentPermission,DesignationPermission,CategoryPermission,FiscalYearPermission,DocumentNumberingPermission,
+                          CompanyPolicyPermission,AssetMasterPermission,Asset_CustomFieldValuePermission,AssetTransactionPermission)
 # Create your views here.
 from django.contrib.auth.models import Permission,Group
 from django.core.exceptions import PermissionDenied
@@ -49,6 +50,8 @@ def get_model_permissions(model):
 class BranchViewSet(viewsets.ModelViewSet):
     queryset = brnch_mstr.objects.all()
     serializer_class = BranchSerializer
+    permission_classes = [BranchPermission]
+    
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context['tenant_id'] = self.request.query_params.get('tenant_id')
@@ -66,7 +69,7 @@ class DepartmentViewSet(viewsets.ModelViewSet):
     queryset = dept_master.objects.all()
     serializer_class = DeptSerializer
     # authentication_classes = [SessionAuthentication,]
-    # permission_classes = [DepartmentPermission]
+    permission_classes = [DepartmentPermission]
     def get_queryset(self):
         queryset = super().get_queryset()
 
@@ -208,7 +211,7 @@ class DesignationViewSet(viewsets.ModelViewSet):
     queryset = desgntn_master.objects.all()
     serializer_class = DesgSerializer
     # authentication_classes = [SessionAuthentication,]
-    # permission_classes = [DesignationPermission,] 
+    permission_classes = [DesignationPermission,] 
     
     @action(detail=False, methods=['get'])
     def designation_report(self, request):
@@ -326,11 +329,41 @@ class CatogoryViewSet(viewsets.ModelViewSet):
     serializer_class = CtgrySerializer
     # authentication_classes = [SessionAuthentication,]
     permission_classes = [CategoryPermission,] 
+
+class CategoryBulkUploadViewSet(viewsets.ModelViewSet):
+    queryset = ctgry_master.objects.all()
+    serializer_class = CtgryUploadSerializer
     
+
+    @action(detail=False, methods=['post'])
+    def bulk_upload(self, request):
+        if request.method == 'POST' and request.FILES.get('file'):
+            excel_file = request.FILES['file']
+            if excel_file.name.endswith('.xlsx'):
+                try:
+                    # Load data from the Excel file into a Dataset
+                    dataset = Dataset()
+                    dataset.load(excel_file.read(), format='xlsx')
+
+                    # Create a resource instance
+                    resource = CategoryResource()
+
+                    # Import data into the model using the resource
+                    result = resource.import_data(dataset, dry_run=False, raise_errors=True)
+
+                    return Response({"message": f"{result.total_rows} records created successfully"})
+                except Exception as e:
+                    return Response({"error": str(e)}, status=400)
+            else:
+                return Response({"error": "Invalid file format. Only Excel files (.xlsx) are supported."}, status=400)
+        else:
+            return Response({"error": "Please provide an Excel file."}, status=400)
+
 
 class FiscalYearViewSet(viewsets.ModelViewSet):
     queryset = FiscalYear.objects.all()
     serializer_class = FiscalYearSerializer
+    permission_classes = [FiscalYearPermission] 
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -359,6 +392,7 @@ class FiscalYearViewSet(viewsets.ModelViewSet):
 class PeriodViewSet(viewsets.ModelViewSet):
     queryset = FiscalPeriod.objects.all()
     serializer_class = PeriodSerializer
+    permission_classes = [FiscalYearPermission] 
 
 class CompanyFiscalData(APIView):
     def get(self, request, company_id):
@@ -407,6 +441,7 @@ class permviewset(viewsets.ModelViewSet):
 class DocNumberingviewset(viewsets.ModelViewSet):
     queryset = document_numbering.objects.all()
     serializer_class = DocumentNumberingSerializer
+    permission_classes = [DocumentNumberingPermission]
     def create(self, request, *args, **kwargs):
         branch_id = request.data.get('branch_id')
         category = request.data.get('category')
@@ -470,6 +505,8 @@ class FiscalPeriodDatesView(APIView):
 class CompanyPolicyViewSet(viewsets.ModelViewSet):
     queryset = CompanyPolicy.objects.all()
     serializer_class = CompanyPolicySerializer
+    permission_classes = [CompanyPolicyPermission]
+    
     def get_queryset(self):
         user = self.request.user
         if user.is_authenticated:
@@ -644,11 +681,15 @@ def list_data_in_schema(request):
 class AssetMasterViewSet(viewsets.ModelViewSet):
     queryset = AssetMaster.objects.all()
     serializer_class = AssetMasterSerializer
+    permission_classes = [AssetMasterPermission]
+    
 
 class AssetTransactionViewSet(viewsets.ModelViewSet):
     queryset = AssetTransaction.objects.all()
     serializer_class = AssetTransactionSerializer
+    permission_classes = [AssetTransactionPermission]
     
 class Asset_CustomFieldValueViewSet(viewsets.ModelViewSet):
     queryset = Asset_CustomFieldValue.objects.all()
     serializer_class = Asset_CustomFieldValueSerializer
+    permission_classes = [Asset_CustomFieldValuePermission]

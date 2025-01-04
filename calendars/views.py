@@ -14,8 +14,8 @@ from rest_framework.decorators import action
 
 from EmpManagement.models import emp_master
 from .permissions import( WeekendCalendarPermission, WeekendDetailPermission, AssignWeekendPermission, HolidayPermission, HolidayCalendarPermission, AssignHolidayPermission,LeaveTypePermission,LeaveEntitlementPermission,EmpLeaveBalancePermission,ApplicabilityCriteriaPermission,EmployeeLeaveRequestPermission,LvEmailTemplatePermission,
-                            LvCommonWorkflowPermission,LvRejectionReasonPermission,LeaveApprovalLevelsPermission,EmployeeMachineMappingPermission,ShiftPermission,WeeklyShiftSchedulePermission,AttendancePermission,
-                            LeaveReportPermission,LeaveApprovalReportPermission,AttendanceReportPermission,LvBalanceReportPermission
+                            LvCommonWorkflowPermission,LvRejectionReasonPermission,LeaveApprovalLevelsPermission,EmployeeMachineMappingPermission,ShiftPermission,ShiftPatternPermission,AttendancePermission,CompensatoryLeaveRequestPermission,CompensatoryLeaveTransactionPermission,CompensatoryLeaveBalancePermission,CompensatoryLeaveRequestPermission,
+                            LeaveReportPermission,LeaveApprovalReportPermission,AttendanceReportPermission,LvBalanceReportPermission,LeaveAccrualTransactionPermission,LeaveResetTransactionPermission,ShiftOverridePermission,WeekPatternAssignmentPermission,EmployeeShiftSchedulePermission,EmployeeYearlyCalendarPermission,
                         )
 from rest_framework.parsers import MultiPartParser, FormParser
 from EmpManagement.models import emp_master
@@ -121,7 +121,7 @@ class HolidayAssignViewset(viewsets.ModelViewSet):
 class LeaveTypeviewset(viewsets.ModelViewSet):
     queryset = leave_type.objects.all()
     serializer_class = LeaveTypeSerializer
-    # permission_classes = [LeaveTypePermission] 
+    permission_classes = [LeaveTypePermission] 
     
 class LvEmailTemplateviewset(viewsets.ModelViewSet):
     queryset = LvEmailTemplate.objects.all()
@@ -215,11 +215,12 @@ class leave_balance_viewset(viewsets.ModelViewSet):
 class Acrualviewset(viewsets.ModelViewSet):
     queryset = leave_accrual_transaction.objects.all()
     serializer_class = AccrualSerializer
-
+    permission_classes = [LeaveAccrualTransactionPermission] 
 
 class Resetviewset(viewsets.ModelViewSet):
     queryset = leave_reset_transaction.objects.all()
     serializer_class = ResetSerializer
+    permission_classes = [LeaveResetTransactionPermission] 
 
 # class Enchashviewset(viewsets.ModelViewSet):
 #     queryset = leave_encashment.objects.all()
@@ -317,19 +318,22 @@ class ShiftViewSet(viewsets.ModelViewSet):
 class ShiftPatternViewSet(viewsets.ModelViewSet):
     queryset = ShiftPattern.objects.all()
     serializer_class = ShiftPatternSerializer
+    permission_classes = [ShiftPatternPermission]
 
 class ShiftOverrideViewSet(viewsets.ModelViewSet):
     queryset = ShiftOverride.objects.all()
     serializer_class = ShiftOverrideSerializer
+    permission_classes = [ShiftOverridePermission]
 
 class WeekPatternAssignmentVSet(viewsets.ModelViewSet):
     queryset = WeekPatternAssignment.objects.all()
     serializer_class = WeekPatternAssignmentSerializer
-    permission_classes = [WeeklyShiftSchedulePermission]
+    permission_classes = [WeekPatternAssignmentPermission]
 
 class EmployeeShiftScheduleViewSet(viewsets.ModelViewSet):
     queryset = EmployeeShiftSchedule.objects.all()
     serializer_class = EmployeeShiftScheduleSerializer
+    permission_classes = [EmployeeShiftSchedulePermission]
     
     def get_shift_for_day(self, request, *args, **kwargs):
         """
@@ -464,6 +468,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
 class ImportAttendanceViewSet(viewsets.ModelViewSet):
     queryset = Attendance.objects.all()
     serializer_class= ImportAttendanceSerializer
+    permission_classes = [AttendancePermission]
     resource_class = AttendanceResource
     parser_classes = (MultiPartParser, FormParser)
 
@@ -1713,15 +1718,19 @@ class LvBalanceReportViewset(viewsets.ModelViewSet):
 class CompensatoryLeaveRequestviewset(viewsets.ModelViewSet):
     queryset = CompensatoryLeaveRequest.objects.all()
     serializer_class = CompensatoryLeaveRequestSerializer
+    permission_classes = [CompensatoryLeaveRequestPermission]
 
 class CompensatoryLeaveBalancetviewset(viewsets.ModelViewSet):
     queryset = CompensatoryLeaveBalance.objects.all()
     serializer_class = CompensatoryLeaveBalanceSerializer
+    permission_classes = [CompensatoryLeaveBalancePermission]
 
 class CompensatoryLeaveTransactionviewset(viewsets.ModelViewSet):
     queryset = CompensatoryLeaveTransaction.objects.all()
     serializer_class = CompensatoryLeaveTransactionSerializer 
+    permission_classes = [CompensatoryLeaveTransactionPermission]
 
 class EmployeeYearlyCalendarViewset(viewsets.ModelViewSet):
     queryset = EmployeeYearlyCalendar.objects.all()
     serializer_class = EmployeeYearlyCalendarSerializer
+    permission_classes = [EmployeeYearlyCalendarPermission]

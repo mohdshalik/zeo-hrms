@@ -3,6 +3,7 @@ from import_export.admin import ImportMixin
 from import_export.signals import post_import
 from import_export.fields import Field
 from .models import brnch_mstr,dept_master,desgntn_master,ctgry_master
+from import_export.widgets import ForeignKeyWidget
 
 class BranchResource(resources.ModelResource):
     class Meta:
@@ -45,6 +46,7 @@ class DeptReportResource(resources.ModelResource):
     dept_code = fields.Field(attribute='dept_code', column_name='Department Code')
     dept_description = fields.Field(attribute='dept_description', column_name='Description')
     dept_is_active = fields.Field(attribute='dept_is_active', column_name='Active')
+    branch_id = fields.Field(attribute='branch_id', column_name='Branch Code',widget=ForeignKeyWidget(brnch_mstr, 'branch_name'))
     class Meta:
         model = dept_master
        
@@ -53,6 +55,7 @@ class DeptReportResource(resources.ModelResource):
                   'dept_code',
                   'dept_description',
                   'dept_is_active',
+                  'branch_id'
         ) 
 class DesignationResource(resources.ModelResource):
     desgntn_job_title = fields.Field(attribute='desgntn_job_title', column_name='Designation')
@@ -91,16 +94,21 @@ class DesgtnReportResource(resources.ModelResource):
 
 
 class CategoryResource(resources.ModelResource):
+    ctgry_title = fields.Field(attribute='ctgry_title', column_name='Category')
+    ctgry_code = fields.Field(attribute='ctgry_code', column_name='Category Code')
+    ctgry_description = fields.Field(attribute='ctgry_description', column_name='Description')
+    ctgry_is_active = fields.Field(attribute='ctgry_is_active', column_name='Active') 
     class Meta:
         model = ctgry_master
        
-        fields = ('id',
+        fields = (
                   'ctgry_title',
                   'ctgry_code',
                   'ctgry_description',
                   'ctgry_is_active',
                   
         )       
+        import_id_fields = ()      
 
 
         

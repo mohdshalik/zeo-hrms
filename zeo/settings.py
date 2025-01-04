@@ -265,11 +265,11 @@ CELERY_BEAT_SCHEDULE = {
 
     },
     'accrue-leaves-every-day': {
-        'task': 'LeaveManagement.tasks.accrue_leaves',  # Use the correct path to your task
+        'task': 'calendars.tasks.accrue_leaves',  # Use the correct path to your task
         'schedule': crontab(hour=18, minute=16),  
     },
     'reset-leave-month':{
-        'task':'LeaveManagement.tasks.reset_leave_balances',
+        'task':'calendars.tasks.reset_leave_balances',
         'schedule':crontab(hour=12,minute=00)
     }
 }

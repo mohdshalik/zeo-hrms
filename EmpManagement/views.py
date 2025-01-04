@@ -18,9 +18,8 @@ from .serializer import (Emp_qf_Serializer,EmpFamSerializer,EmpSerializer,Notifi
 
 from .resource import EmployeeResource,DocumentResource,EmpCustomFieldValueResource, MarketingSkillResource,ProLangSkillResource
 from .permissions import (IsSuperUserOrHasGeneralRequestPermission,IsSuperUserOrInSameBranch,EmpCustomFieldPermission,EmpCustomFieldValuePermission,
-EmpFamilyCustomFieldPermission,EmpJobHistoryCustomFieldPermission,EmpQualificationCustomFieldPermission,ReportPermission,DocReportPermission,GeneralRequestReportPermission,
-EmployeeMarketingSkillPermission,EmployeeProgramSkillPermission,EmployeeLangSkillPermission,NotificationPermission,LanguageSkillPermission,MarketingSkillPermission,ProgrammingLanguageSkillPermission
-,EmployeeSkillPermission,EmployeeMarketingSkillPermission,RequestTypePermission)
+                        EmpFamilyCustomFieldPermission,EmpJobHistoryCustomFieldPermission,EmpQualificationCustomFieldPermission,ReportPermission,DocReportPermission,GeneralRequestReportPermission,
+                        EmployeeMarketingSkillPermission,EmployeeProgramSkillPermission,EmployeeLangSkillPermission,NotificationPermission,ApprovalLevelPermission,EmployeeMarketingSkillPermission,RequestTypePermission)
 from django.core.exceptions import ValidationError
 from rest_framework.decorators import action
 from phonenumber_field.modelfields import PhoneNumberField
@@ -36,7 +35,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill,Alignment,Font,NamedStyle
 from rest_framework import status,generics,viewsets,permissions
-from UserManagement.permissions import EmployeePermission
+from .permissions import EmployeePermission
 from datetime import datetime, timedelta
 from OrganisationManager.models import document_numbering
 from OrganisationManager.serializer import DocumentNumberingSerializer
@@ -77,9 +76,7 @@ class CustomAuthentication(BaseAuthentication):
 class EmpViewSet(viewsets.ModelViewSet):
     queryset = emp_master.objects.all()
     serializer_class = EmpSerializer
-    
     permission_classes = [EmployeePermission]
-    # permission_classes = [EmployeePermission]
 
     
     @action(detail=True, methods=['POST', 'GET'])
@@ -246,26 +243,6 @@ class EmpViewSet(viewsets.ModelViewSet):
             else:
                 return emp_master.objects.all()  # Other users can access all employee information
         return emp_master.objects.none() 
-    
-    
-    @action(detail=True, methods=['POST', 'GET'])
-    def custom_fields(self, request, pk=None):
-        employee = self.get_object()
-
-        if request.method == 'POST':
-    # Add the employee.pk to the request data
-            request.data['emp_id'] = employee.pk
-
-            serializer = Emp_CustomFieldValueSerializer(data=request.data, context={'request': request})
-            serializer.is_valid(raise_exception=True)  # Raise exception for invalid data
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-        elif request.method == 'GET':
-            family_members = employee.custom_field_values.all()
-            serializer = Emp_CustomFieldValueSerializer(family_members, many=True)
-            return Response(serializer.data)
-    
 
     @action(detail=False, methods=['get'])
     def filter_empty_user_non_ess(self, request):
@@ -1672,6 +1649,7 @@ class GeneralRequestViewset(viewsets.ModelViewSet):
 class ApprovalLevelViewset(viewsets.ModelViewSet):
     queryset = ApprovalLevel.objects.all()
     serializer_class = ApprovalLevelSerializer
+    permission_classes = [ApprovalLevelPermission]
 
 class CommonWorkflowViewSet(viewsets.ModelViewSet):
         queryset = CommonWorkflow.objects.all()
@@ -1681,6 +1659,14 @@ class ApprovalViewset(viewsets.ModelViewSet):
     queryset = Approval.objects.all()
     serializer_class = ApprovalSerializer
     lookup_field = 'pk'
+    def get_queryset(self):
+        """
+        Filter approvals based on the authenticated user.
+        """
+        user = self.request.user  # Get the logged-in user
+        if user.is_superuser:
+            return Approval.objects.all()
+        return Approval.objects.filter(approver=user)  # Filter approvals assigned to the user
 
     @action(detail=True, methods=['post'])
     def approve(self, request, pk=None):

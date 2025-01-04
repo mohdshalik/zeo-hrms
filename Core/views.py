@@ -13,7 +13,7 @@ from rest_framework.authentication import SessionAuthentication,TokenAuthenticat
 from rest_framework.permissions import IsAuthenticated,AllowAny,IsAuthenticatedOrReadOnly,IsAdminUser
 from rest_framework.parsers import MultiPartParser, FormParser
 import csv
-from UserManagement.permissions import CountryPermission,StatePermission,DocTypePermission
+from .permissions import CountryPermission,StatePermission,DocTypePermission,LanguageSkillPermission,MarketingSkillPermission,ProgrammingLanguageSkillPermission
 import pandas as pd,openpyxl
 # Create your views here.
 
@@ -22,7 +22,7 @@ class StateViewSet(viewsets.ModelViewSet):
     queryset = state_mstr.objects.all()
     serializer_class = StateSerializer
     # authentication_classes = [SessionAuthentication,]
-    # permission_classes = [StatePermission,] 
+    permission_classes = [StatePermission,] 
 
     # def list(self, request):
     #     country_id = request.query_params.get('country_id')
@@ -37,7 +37,7 @@ class CountryViewSet(viewsets.ModelViewSet):
     queryset = cntry_mstr.objects.all()
     serializer_class = CountrySerializer
     # authentication_classes = [SessionAuthentication,]
-    # permission_classes = [CountryPermission,]
+    permission_classes = [CountryPermission,]
 
     # Custom action to get states for a specific country
     @action(detail=True, methods=['get'])
@@ -130,7 +130,7 @@ class CurrencyViewSet(viewsets.ModelViewSet):
 class DocumentViewSet(viewsets.ModelViewSet):
     queryset = document_type.objects.all()
     serializer_class = Document_type
-    # permission_classes = [DocTypePermission,] 
+    permission_classes = [DocTypePermission,] 
 
 class LanguageViewSet(viewsets.ModelViewSet):
     queryset = LanguageMaster.objects.all()

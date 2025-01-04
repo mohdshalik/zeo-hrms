@@ -1,7 +1,7 @@
 from django.urls import path, include
 from . views import (FiscalYearViewSet,PeriodViewSet,BranchViewSet,DepartmentViewSet,DocNumberingviewset,FiscalPeriodDatesView,
                      DesignationViewSet,CatogoryViewSet,CompanyFiscalData,permissionviewset,Groupviewset,permviewset,FiscalYearDatesView,DeptBulkUploadViewSet,DesignationBulkUploadViewSet,
-                   save_notification_settings,CompanyPolicyViewSet,list_data_in_schema,AssetMasterViewSet,AssetTransactionViewSet,Asset_CustomFieldValueViewSet)
+                   save_notification_settings,CompanyPolicyViewSet,list_data_in_schema,AssetMasterViewSet,AssetTransactionViewSet,Asset_CustomFieldValueViewSet,CategoryBulkUploadViewSet)
 from rest_framework.routers import DefaultRouter
 
 router = DefaultRouter()
@@ -14,6 +14,7 @@ router.register(r'Dept-bulkupload', DeptBulkUploadViewSet,basename='dept_bulkupl
 router.register(r'Designation', DesignationViewSet)
 router.register(r'Desigtn-bulkupload', DesignationBulkUploadViewSet,basename='Desigtn_bulkupload')
 router.register(r'Catogory', CatogoryViewSet)
+router.register(r'Category-bulkupload', CategoryBulkUploadViewSet,basename='Category_bulkupload')
 router.register(r'fiscal-years', FiscalYearViewSet)
 router.register(r'periods', PeriodViewSet)
 router.register(r'permissions', permissionviewset)

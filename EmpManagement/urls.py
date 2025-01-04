@@ -11,11 +11,11 @@ from .views import (EmpFamViewSet, EmpJobHistoryvSet, EmpViewSet,NotificationVie
 # Define the main router for top-level routes
 router = DefaultRouter()
 router.register(r'Employee', EmpViewSet, basename='employee')
-router.register(r'emp-BulkUpload', EmpbulkuploadViewSet, basename='emp_bulk_upload')
+router.register(r'emp-bulkupload', EmpbulkuploadViewSet, basename='emp_bulk_upload')
 router.register(r'emp-report', ReportViewset, basename='emp_report')
 router.register(r'doc-report',Doc_ReportViewset, basename='doc_report')
 router.register(r'report-general-request', GeneralReportViewset, basename='report-general-request')
-router.register(r'custom-field', CustomFieldViewset, basename='custom-field')
+router.register(r'emp-custom-field', CustomFieldViewset, basename='custom-field')
 router.register(r'custom-field-value', Emp_CustomFieldValueViewSet, basename='custom-field-value')
 
 router.register(r'emp-Family', EmpFamViewSet, basename='emp_family')

@@ -91,21 +91,28 @@ class FiscalPeriod(models.Model):
     class Meta:
         unique_together = ('fiscal_year', 'period_number')
 
-
 class document_numbering(models.Model):
-    branch_id            = models.ForeignKey('brnch_mstr',on_delete=models.CASCADE)
-    category             = models.ForeignKey('ctgry_master',on_delete=models.CASCADE)
-    user                 = models.ForeignKey('UserManagement.CustomUser',on_delete=models.CASCADE)
-    automatic_numbering  = models.BooleanField()
-    preffix              = models.CharField(unique=True,max_length=50)
-    suffix               = models.CharField(max_length=50)
-    year                 = models.DateField()
-    start_number         = models.IntegerField()
-    current_number       = models.IntegerField()
-    end_number           = models.IntegerField()
-    # class Meta:
-    #     unique_together = ('branch_id')  # Ensure unique constraint on branch and category
-
+    DOCUMENT_TYPES = [
+        ('general_request', 'General Request'),
+        ('leave_request', 'Leave Request'),
+        # Add other types as needed
+    ]
+    branch_id              = models.ForeignKey('brnch_mstr',on_delete=models.CASCADE)
+    category               = models.ForeignKey('ctgry_master',on_delete=models.CASCADE)
+    type                   = models.CharField(max_length=50, choices=DOCUMENT_TYPES)
+    user                   = models.ForeignKey('UserManagement.CustomUser',on_delete=models.CASCADE)
+    automatic_numbering    = models.BooleanField()
+    preffix                = models.CharField(unique=True,max_length=50)
+    suffix                 = models.CharField(max_length=50)
+    year                   = models.DateField()
+    start_number           = models.IntegerField()
+    current_number         = models.IntegerField()
+    end_number             = models.IntegerField()
+    class Meta:
+        unique_together = ('branch_id', 'category', 'type')
+    def str(self):
+        return f"{self.branch_id.branch_name} - {self.category.ctgry_title} - {self.type}"
+    
 
 class CompanyPolicy(models.Model):
     title           = models.CharField(max_length=200)

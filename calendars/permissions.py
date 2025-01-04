@@ -10,7 +10,8 @@ class WeekendCalendarPermission(permissions.BasePermission):
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
         except UserTenantPermissions.DoesNotExist:
@@ -39,7 +40,8 @@ class WeekendDetailPermission(permissions.BasePermission):
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
         except UserTenantPermissions.DoesNotExist:
@@ -67,7 +69,8 @@ class AssignWeekendPermission(permissions.BasePermission):
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
         except UserTenantPermissions.DoesNotExist:
@@ -95,7 +98,8 @@ class HolidayPermission(permissions.BasePermission):
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
         except UserTenantPermissions.DoesNotExist:
@@ -123,7 +127,8 @@ class HolidayCalendarPermission(permissions.BasePermission):
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
         except UserTenantPermissions.DoesNotExist:
@@ -150,7 +155,8 @@ class AssignHolidayPermission(permissions.BasePermission):
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
         except UserTenantPermissions.DoesNotExist:
@@ -184,7 +190,8 @@ class LeaveTypePermission(permissions.BasePermission):
         # Check if the user is authenticated
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         # Attempt to retrieve user permissions
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
@@ -210,7 +217,8 @@ class LeaveEntitlementPermission(permissions.BasePermission):
         # Check if the user is authenticated
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         # Attempt to retrieve user permissions
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
@@ -245,7 +253,8 @@ class EmpLeaveBalancePermission(permissions.BasePermission):
         # Check if the user is authenticated
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         # Attempt to retrieve user permissions
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
@@ -281,7 +290,8 @@ class ApplicabilityCriteriaPermission(permissions.BasePermission):
         # Check if the user is authenticated
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         # Attempt to retrieve user permissions
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
@@ -319,7 +329,7 @@ class EmployeeLeaveRequestPermission(permissions.BasePermission):
         # Check if the user is authenticated
         if not request.user.is_authenticated:
             return False
-
+        
         # Grant access if the user is a superuser
         if request.user.is_superuser:
             return True
@@ -361,7 +371,8 @@ class LvEmailTemplatePermission(permissions.BasePermission):
         # Check if the user is authenticated
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         # Attempt to retrieve user permissions
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
@@ -387,7 +398,78 @@ class LvEmailTemplatePermission(permissions.BasePermission):
 
         return False
 
+class LeaveResetTransactionPermission(permissions.BasePermission):
+    """
+    Custom permission to allow users with specific permissions for LvEmailTemplate.
+    """
 
+    def has_permission(self, request, view):
+        # Check if the user is authenticated
+        if not request.user.is_authenticated:
+            return False
+        if request.user.is_superuser:
+            return True
+        # Attempt to retrieve user permissions
+        try:
+            user_permissions = UserTenantPermissions.objects.get(profile=request.user)
+        except UserTenantPermissions.DoesNotExist:
+            return False
+
+        # Define required permissions for LvEmailTemplate model actions
+        required_permissions = [
+            'view_leave_reset_transaction',
+            'add_leave_reset_transaction',
+            'change_leave_reset_transaction',
+            'delete_leave_reset_transaction'
+        ]
+
+        # Check if any group the user belongs to has the required permissions
+        user_group_permissions = [
+            p.codename for group in user_permissions.groups.all() for p in group.permissions.all()
+        ]
+
+        # Check if user has at least one of the required permissions
+        if any(permission in user_group_permissions for permission in required_permissions):
+            return True
+
+        return False
+
+class LeaveAccrualTransactionPermission(permissions.BasePermission):
+    """
+    Custom permission to allow users with specific permissions for LvEmailTemplate.
+    """
+
+    def has_permission(self, request, view):
+        # Check if the user is authenticated
+        if not request.user.is_authenticated:
+            return False
+        if request.user.is_superuser:
+            return True
+        # Attempt to retrieve user permissions
+        try:
+            user_permissions = UserTenantPermissions.objects.get(profile=request.user)
+        except UserTenantPermissions.DoesNotExist:
+            return False
+
+        # Define required permissions for LvEmailTemplate model actions
+        required_permissions = [
+            'view_leave_accrual_transaction',
+            'add_leave_accrual_transaction',
+            'change_leave_accrual_transaction',
+            'delete_leave_accrual_transaction'
+        ]
+
+        # Check if any group the user belongs to has the required permissions
+        user_group_permissions = [
+            p.codename for group in user_permissions.groups.all() for p in group.permissions.all()
+        ]
+
+        # Check if user has at least one of the required permissions
+        if any(permission in user_group_permissions for permission in required_permissions):
+            return True
+
+        return False
+    
 class LvCommonWorkflowPermission(permissions.BasePermission):
     """
     Custom permission to allow users with specific permissions for LvCommonWorkflow.
@@ -397,7 +479,8 @@ class LvCommonWorkflowPermission(permissions.BasePermission):
         # Check if the user is authenticated
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         # Attempt to retrieve user permissions
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
@@ -433,7 +516,8 @@ class LvRejectionReasonPermission(permissions.BasePermission):
         # Check if the user is authenticated
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         # Attempt to retrieve user permissions
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
@@ -468,7 +552,8 @@ class LeaveApprovalLevelsPermission(permissions.BasePermission):
         # Check if the user is authenticated
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         # Attempt to retrieve user permissions
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
@@ -504,7 +589,8 @@ class EmployeeMachineMappingPermission(permissions.BasePermission):
         # Check if the user is authenticated
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         # Attempt to retrieve user permissions
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
@@ -539,7 +625,8 @@ class ShiftPermission(permissions.BasePermission):
         # Check if the user is authenticated
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         # Attempt to retrieve user permissions
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
@@ -566,7 +653,115 @@ class ShiftPermission(permissions.BasePermission):
         return False
 
 
-class WeeklyShiftSchedulePermission(permissions.BasePermission):
+class ShiftPatternPermission(permissions.BasePermission):
+    """
+    Custom permission to allow users with specific permissions for Shift.
+    """
+
+    def has_permission(self, request, view):
+        # Check if the user is authenticated
+        if not request.user.is_authenticated:
+            return False
+        if request.user.is_superuser:
+            return True
+        # Attempt to retrieve user permissions
+        try:
+            user_permissions = UserTenantPermissions.objects.get(profile=request.user)
+        except UserTenantPermissions.DoesNotExist:
+            return False
+
+        # Define required permissions for Shift model actions
+        required_permissions = [
+            'view_shiftpattern',
+            'add_shiftpattern',
+            'change_shiftpattern',
+            'delete_shiftpattern'
+        ]
+
+        # Check if any group the user belongs to has the required permissions
+        user_group_permissions = [
+            p.codename for group in user_permissions.groups.all() for p in group.permissions.all()
+        ]
+
+        # Check if user has at least one of the required permissions
+        if any(permission in user_group_permissions for permission in required_permissions):
+            return True
+
+        return False
+
+class ShiftOverridePermission(permissions.BasePermission):
+    """
+    Custom permission to allow users with specific permissions for Shift.
+    """
+
+    def has_permission(self, request, view):
+        # Check if the user is authenticated
+        if not request.user.is_authenticated:
+            return False
+        if request.user.is_superuser:
+            return True
+        # Attempt to retrieve user permissions
+        try:
+            user_permissions = UserTenantPermissions.objects.get(profile=request.user)
+        except UserTenantPermissions.DoesNotExist:
+            return False
+
+        # Define required permissions for Shift model actions
+        required_permissions = [
+            'view_shiftoverride',
+            'add_shiftoverride',
+            'change_shiftoverride',
+            'delete_shiftoverride'
+        ]
+
+        # Check if any group the user belongs to has the required permissions
+        user_group_permissions = [
+            p.codename for group in user_permissions.groups.all() for p in group.permissions.all()
+        ]
+
+        # Check if user has at least one of the required permissions
+        if any(permission in user_group_permissions for permission in required_permissions):
+            return True
+
+        return False
+
+class EmployeeShiftSchedulePermission(permissions.BasePermission):
+    """
+    Custom permission to allow users with specific permissions for Shift.
+    """
+
+    def has_permission(self, request, view):
+        # Check if the user is authenticated
+        if not request.user.is_authenticated:
+            return False
+        if request.user.is_superuser:
+            return True
+        # Attempt to retrieve user permissions
+        try:
+            user_permissions = UserTenantPermissions.objects.get(profile=request.user)
+        except UserTenantPermissions.DoesNotExist:
+            return False
+
+        # Define required permissions for Shift model actions
+        required_permissions = [
+            'view_employeeshiftschedule',
+            'add_employeeshiftschedule',
+            'change_employeeshiftschedule',
+            'delete_employeeshiftschedule'
+        ]
+
+        # Check if any group the user belongs to has the required permissions
+        user_group_permissions = [
+            p.codename for group in user_permissions.groups.all() for p in group.permissions.all()
+        ]
+
+        # Check if user has at least one of the required permissions
+        if any(permission in user_group_permissions for permission in required_permissions):
+            return True
+
+        return False
+
+class WeekPatternAssignmentPermission(permissions.BasePermission):
     """
     Custom permission to allow users with specific permissions for WeeklyShiftSchedule.
     """
@@ -575,7 +770,8 @@ class WeeklyShiftSchedulePermission(permissions.BasePermission):
         # Check if the user is authenticated
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         # Attempt to retrieve user permissions
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
@@ -584,10 +780,10 @@ class WeeklyShiftSchedulePermission(permissions.BasePermission):
 
         # Define required permissions for WeeklyShiftSchedule model actions
         required_permissions = [
-            'view_weeklyshiftschedule',
-            'add_weeklyshiftschedule',
-            'change_weeklyshiftschedule',
-            'delete_weeklyshiftschedule'
+            'view_weekpatternassignment',
+            'add_weekpatternassignment',
+            'change_weekpatternassignment',
+            'delete_weekpatternassignment'
         ]
 
         # Check if any group the user belongs to has the required permissions
@@ -610,7 +806,8 @@ class AttendancePermission(permissions.BasePermission):
         # Check if the user is authenticated
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         # Attempt to retrieve user permissions
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
@@ -646,7 +843,8 @@ class LeaveReportPermission(permissions.BasePermission):
         # Check if the user is authenticated
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         # Attempt to retrieve user permissions
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
@@ -682,7 +880,8 @@ class LeaveApprovalReportPermission(permissions.BasePermission):
         # Check if the user is authenticated
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         # Attempt to retrieve user permissions
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
@@ -719,7 +918,8 @@ class AttendanceReportPermission(permissions.BasePermission):
         # Check if the user is authenticated
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         # Attempt to retrieve user permissions
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
@@ -756,7 +956,8 @@ class LvBalanceReportPermission(permissions.BasePermission):
         # Check if the user is authenticated
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         # Attempt to retrieve user permissions
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
@@ -770,6 +971,150 @@ class LvBalanceReportPermission(permissions.BasePermission):
             'change_lvbalancereport',
             'delete_lvbalancereport',
             'export_report'  # Custom permission for exporting reports
+        ]
+
+        # Check if any group the user belongs to has the required permissions
+        user_group_permissions = [
+            p.codename for group in user_permissions.groups.all() for p in group.permissions.all()
+        ]
+
+        # Check if user has at least one of the required permissions
+        if any(permission in user_group_permissions for permission in required_permissions):
+            return True
+
+        return False
+class CompensatoryLeaveRequestPermission(permissions.BasePermission):
+    """
+    Custom permission to allow users with specific permissions for LvBalanceReport.
+    """
+
+    def has_permission(self, request, view):
+        # Check if the user is authenticated
+        if not request.user.is_authenticated:
+            return False
+        if request.user.is_superuser:
+            return True
+        # Attempt to retrieve user permissions
+        try:
+            user_permissions = UserTenantPermissions.objects.get(profile=request.user)
+        except UserTenantPermissions.DoesNotExist:
+            return False
+
+        # Define required permissions for lvBalanceReport model actions
+        required_permissions = [
+            'view_compensatoryleaverequest',
+            'add_compensatoryleaverequestt',
+            'change_compensatoryleaverequest',
+            'delete_compensatoryleaverequest',
+        ]
+
+        # Check if any group the user belongs to has the required permissions
+        user_group_permissions = [
+            p.codename for group in user_permissions.groups.all() for p in group.permissions.all()
+        ]
+
+        # Check if user has at least one of the required permissions
+        if any(permission in user_group_permissions for permission in required_permissions):
+            return True
+
+        return False
+
+class CompensatoryLeaveBalancePermission(permissions.BasePermission):
+    """
+    Custom permission to allow users with specific permissions for LvBalanceReport.
+    """
+
+    def has_permission(self, request, view):
+        # Check if the user is authenticated
+        if not request.user.is_authenticated:
+            return False
+        if request.user.is_superuser:
+            return True
+        # Attempt to retrieve user permissions
+        try:
+            user_permissions = UserTenantPermissions.objects.get(profile=request.user)
+        except UserTenantPermissions.DoesNotExist:
+            return False
+
+        # Define required permissions for lvBalanceReport model actions
+        required_permissions = [
+            'view_compensatoryleavebalance',
+            'add_compensatoryleavebalance',
+            'change_compensatoryleavebalance',
+            'delete_compensatoryleavebalance',
+           
+        ]
+
+        # Check if any group the user belongs to has the required permissions
+        user_group_permissions = [
+            p.codename for group in user_permissions.groups.all() for p in group.permissions.all()
+        ]
+
+        # Check if user has at least one of the required permissions
+        if any(permission in user_group_permissions for permission in required_permissions):
+            return True
+
+        return False
+class CompensatoryLeaveTransactionPermission(permissions.BasePermission):
+    """
+    Custom permission to allow users with specific permissions for LvBalanceReport.
+    """
+
+    def has_permission(self, request, view):
+        # Check if the user is authenticated
+        if not request.user.is_authenticated:
+            return False
+        if request.user.is_superuser:
+            return True
+        # Attempt to retrieve user permissions
+        try:
+            user_permissions = UserTenantPermissions.objects.get(profile=request.user)
+        except UserTenantPermissions.DoesNotExist:
+            return False
+
+        # Define required permissions for lvBalanceReport model actions
+        required_permissions = [
+            'view_compensatoryleavetransaction',
+            'add_compensatoryleavetransaction',
+            'change_compensatoryleavetransaction',
+            'delete_compensatoryleavetransaction',
+            
+        ]
+
+        # Check if any group the user belongs to has the required permissions
+        user_group_permissions = [
+            p.codename for group in user_permissions.groups.all() for p in group.permissions.all()
+        ]
+
+        # Check if user has at least one of the required permissions
+        if any(permission in user_group_permissions for permission in required_permissions):
+            return True
+
+        return False
+class EmployeeYearlyCalendarPermission(permissions.BasePermission):
+    """
+    Custom permission to allow users with specific permissions for LvBalanceReport.
+    """
+
+    def has_permission(self, request, view):
+        # Check if the user is authenticated
+        if not request.user.is_authenticated:
+            return False
+        if request.user.is_superuser:
+            return True
+        # Attempt to retrieve user permissions
+        try:
+            user_permissions = UserTenantPermissions.objects.get(profile=request.user)
+        except UserTenantPermissions.DoesNotExist:
+            return False
+
+        # Define required permissions for lvBalanceReport model actions
+        required_permissions = [
+            'view_employeeyearlycalendar',
+            'add_employeeyearlycalendar',
+            'change_employeeyearlycalendar',
+            'delete_employeeyearlycalendar',
+            
         ]
 
         # Check if any group the user belongs to has the required permissions

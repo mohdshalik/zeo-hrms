@@ -44,10 +44,11 @@ class DeptSerializer(serializers.ModelSerializer):
     class Meta:
         model = dept_master
         fields= '__all__'
-    # def to_representation(self, instance):
-    #     rep = super(DeptSerializer, self).to_representation(instance)
-    #     rep['branch_id'] = instance.branch_id.branch_name
-    #     return rep
+    def to_representation(self, instance):
+        rep = super(DeptSerializer, self).to_representation(instance)
+        if instance.branch_id:
+            rep['branch_id'] =instance.branch_id.branch_name
+        return rep
 class DeptUploadSerializer(serializers.ModelSerializer):
     file = serializers.FileField(write_only=True)
     class Meta:
@@ -77,7 +78,12 @@ class CtgrySerializer(serializers.ModelSerializer):
     class Meta:
         model = ctgry_master
         fields= '__all__'
-
+#CATEGARY Bulupload SERIALIZER
+class CtgryUploadSerializer(serializers.ModelSerializer):
+    file = serializers.FileField(write_only=True)
+    class Meta:
+        model = ctgry_master
+        fields= '__all__'
 
 class FiscalYearSerializer(serializers.ModelSerializer):
     class Meta:

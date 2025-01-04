@@ -358,86 +358,6 @@ class NotificationPermission(permissions.BasePermission):
         return any(permission in user_group_permissions for permission in required_permissions)
 
 
-class LanguageSkillPermission(permissions.BasePermission):
-    """
-    Custom permission to only allow users with specific permissions to access the LanguageSkill model.
-    """
-    def has_permission(self, request, view):
-        if not request.user.is_authenticated:
-            return False
-
-        try:
-            user_permissions = UserTenantPermissions.objects.get(profile=request.user)
-        except UserTenantPermissions.DoesNotExist:
-            return False
-
-        if user_permissions.is_superuser:
-            return True
-
-        required_permissions = [
-            'view_languageskill', 'add_languageskill', 'change_languageskill', 'delete_languageskill'
-        ]
-
-        user_group_permissions = [
-            p.codename for group in user_permissions.groups.all() for p in group.permissions.all()
-        ]
-
-        return any(permission in user_group_permissions for permission in required_permissions)
-
-
-class MarketingSkillPermission(permissions.BasePermission):
-    """
-    Custom permission to only allow users with specific permissions to access the MarketingSkill model.
-    """
-    def has_permission(self, request, view):
-        if not request.user.is_authenticated:
-            return False
-
-        try:
-            user_permissions = UserTenantPermissions.objects.get(profile=request.user)
-        except UserTenantPermissions.DoesNotExist:
-            return False
-
-        if user_permissions.is_superuser:
-            return True
-
-        required_permissions = [
-            'view_marketingskill', 'add_marketingskill', 'change_marketingskill', 'delete_marketingskill'
-        ]
-
-        user_group_permissions = [
-            p.codename for group in user_permissions.groups.all() for p in group.permissions.all()
-        ]
-
-        return any(permission in user_group_permissions for permission in required_permissions)
-
-
-class ProgrammingLanguageSkillPermission(permissions.BasePermission):
-    """
-    Custom permission to only allow users with specific permissions to access the ProgrammingLanguageSkill model.
-    """
-    def has_permission(self, request, view):
-        if not request.user.is_authenticated:
-            return False
-
-        try:
-            user_permissions = UserTenantPermissions.objects.get(profile=request.user)
-        except UserTenantPermissions.DoesNotExist:
-            return False
-
-        if user_permissions.is_superuser:
-            return True
-
-        required_permissions = [
-            'view_programminglanguageskill', 'add_programminglanguageskill', 'change_programminglanguageskill', 'delete_programminglanguageskill'
-        ]
-
-        user_group_permissions = [
-            p.codename for group in user_permissions.groups.all() for p in group.permissions.all()
-        ]
-
-        return any(permission in user_group_permissions for permission in required_permissions)
-
 
 class EmployeeSkillPermission(permissions.BasePermission):
     """
@@ -583,3 +503,65 @@ class RequestTypePermission(permissions.BasePermission):
                     return True
 
         return False
+
+class EmployeePermission(permissions.BasePermission):
+    """
+    Custom permission to only allow users with specific permissions to access company API.
+    """
+
+    def has_permission(self, request, view):
+        # Check if the user is authenticated
+        if not request.user.is_authenticated:
+            return False
+
+        # Grant access if the user is a superuser in the user model
+        if request.user.is_superuser:
+            return True
+
+        # Grant access if the user has is_ess=True in the user model
+        if hasattr(request.user, 'is_ess') and request.user.is_ess:
+            return True
+
+        # Retrieve UserTenantPermissions efficiently using get (if unique) or filter
+        try:
+            user_permissions = UserTenantPermissions.objects.get(profile=request.user)
+        except UserTenantPermissions.DoesNotExist:
+            return False
+
+        # Check if the user's group has any of the necessary permissions
+        required_permissions = ['view_emp_master', 'delete_emp_master', 'add_emp_master', 'change_emp_master']
+        for group in user_permissions.groups.all():  # Access all related groups
+            for permission in group.permissions.all():  # Access permissions of each group
+                if permission.codename in required_permissions:
+                    return True
+
+class ApprovalLevelPermission(permissions.BasePermission):
+    """
+    Custom permission to only allow users with specific permissions to access company API.
+    """
+
+    def has_permission(self, request, view):
+        # Check if the user is authenticated
+        if not request.user.is_authenticated:
+            return False
+
+        # Grant access if the user is a superuser in the user model
+        if request.user.is_superuser:
+            return True
+
+        # Grant access if the user has is_ess=True in the user model
+        if hasattr(request.user, 'is_ess') and request.user.is_ess:
+            return True
+
+        # Retrieve UserTenantPermissions efficiently using get (if unique) or filter
+        try:
+            user_permissions = UserTenantPermissions.objects.get(profile=request.user)
+        except UserTenantPermissions.DoesNotExist:
+            return False
+
+        # Check if the user's group has any of the necessary permissions
+        required_permissions = ['view_approvallevel', 'delete_approvallevel', 'add_approvallevel', 'change_approvallevel']
+        for group in user_permissions.groups.all():  # Access all related groups
+            for permission in group.permissions.all():  # Access permissions of each group
+                if permission.codename in required_permissions:
+                    return True
