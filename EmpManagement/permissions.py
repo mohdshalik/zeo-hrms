@@ -100,7 +100,8 @@ class EmpCustomFieldPermission(permissions.BasePermission):
         # Check if the user is authenticated
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         # Attempt to retrieve user permissions
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
@@ -132,7 +133,8 @@ class EmpCustomFieldValuePermission(permissions.BasePermission):
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
         except UserTenantPermissions.DoesNotExist:
@@ -161,7 +163,8 @@ class EmpFamilyCustomFieldPermission(permissions.BasePermission):
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
         except UserTenantPermissions.DoesNotExist:
@@ -191,7 +194,8 @@ class EmpJobHistoryCustomFieldPermission(permissions.BasePermission):
         # Check if the user is authenticated
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         # Retrieve user permissions
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
@@ -225,7 +229,8 @@ class EmpQualificationCustomFieldPermission(permissions.BasePermission):
         # Check if the user is authenticated
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         # Retrieve user permissions (adjust according to your UserTenantPermissions model)
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
@@ -259,7 +264,8 @@ class ReportPermission(permissions.BasePermission):
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         # Retrieve user permissions from UserTenantPermissions (modify if your model is different)
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
@@ -288,7 +294,8 @@ class DocReportPermission(permissions.BasePermission):
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
         except UserTenantPermissions.DoesNotExist:
@@ -313,7 +320,8 @@ class GeneralRequestReportPermission(permissions.BasePermission):
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
         except UserTenantPermissions.DoesNotExist:
@@ -338,7 +346,8 @@ class NotificationPermission(permissions.BasePermission):
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
         except UserTenantPermissions.DoesNotExist:
@@ -366,7 +375,8 @@ class EmployeeSkillPermission(permissions.BasePermission):
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
         except UserTenantPermissions.DoesNotExist:
@@ -395,7 +405,8 @@ class EmployeeMarketingSkillPermission(permissions.BasePermission):
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
         except UserTenantPermissions.DoesNotExist:
@@ -423,7 +434,8 @@ class EmployeeProgramSkillPermission(permissions.BasePermission):
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
         except UserTenantPermissions.DoesNotExist:
@@ -451,7 +463,8 @@ class EmployeeLangSkillPermission(permissions.BasePermission):
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
-
+        if request.user.is_superuser:
+            return True
         try:
             user_permissions = UserTenantPermissions.objects.get(profile=request.user)
         except UserTenantPermissions.DoesNotExist:
