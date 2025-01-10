@@ -99,14 +99,20 @@ class SchemaMiddleware(MiddlewareMixin):
             request.path = request.path.replace(settings.MEDIA_URL, f"{settings.MEDIA_URL}{schema_name}/")
             return self.get_response(request)
         
-        # Activate schema for tenant apps
+        # Get schema name from the query parameter
         schema_name = request.GET.get('schema')
         if not schema_name:
             return JsonResponse({"error": "Schema name is required"}, status=400)
 
+        # Validate and activate the tenant schema
         try:
+            TenantModel = get_tenant_model()
+            tenant = TenantModel.objects.get(schema_name=schema_name)
+            request.tenant = tenant  # Attach the tenant to the request
             with schema_context(schema_name):
                 response = self.get_response(request)
             return response
+        except TenantModel.DoesNotExist:
+            return JsonResponse({"error": "Invalid schema name"}, status=400)
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=400)
