@@ -2,6 +2,7 @@ from django.shortcuts import render
 from django.conf import settings
 from datetime import date
 import logging
+from openpyxl import load_workbook
 from .models import (emp_family,Emp_Documents,EmpJobHistory,EmpLeaveRequest,EmpQualification,GeneralRequest,RequestType,
                      emp_master,notification,EmpFamily_CustomField,EmpJobHistory_CustomField,
                      EmpQualification_CustomField,EmpDocuments_CustomField,LanguageSkill,MarketingSkill,ProgrammingLanguageSkill,Emp_CustomField,Report,Doc_Report,GeneralRequest,RequestType,GeneralRequestReport,EmployeeLangSkill,EmployeeProgramSkill,
@@ -907,62 +908,75 @@ class EmpbulkuploadViewSet(viewsets.ModelViewSet):
             excel_file = request.FILES['file']
             if excel_file.name.endswith('.xlsx'):
                 try:
-                    workbook = openpyxl.load_workbook(excel_file)
-                    all_errors_sheet1 = []
-                    all_errors_field_values = []
+                    # Load workbook and initialize error storage
+                    workbook = load_workbook(excel_file)
+                    all_errors = {
+                        "sheet1_errors": [],
+                        "sheet2_errors": []
+                    }
 
+                    # Validate presence of sheets
                     sheet1 = workbook.get_sheet_by_name('EmployeeMaster')
-                    sheet2 = workbook.get_sheet_by_name('UDF')
+                    sheet2 = workbook.get_sheet_by_name('UDF')  # Optional
 
                     if sheet1 is None or sheet1.max_row == 1:
                         return Response({"error": "Sheet1 is either missing or empty."}, status=400)
 
-                    if sheet2 is None or sheet2.max_row == 1:
-                        return Response({"error": "Sheet2 is either missing or empty."}, status=400)
-
+                    # Prepare datasets for Sheet1
                     dataset_sheet1 = Dataset()
                     dataset_sheet1.headers = [cell.value for cell in sheet1[1]]
                     for row in sheet1.iter_rows(min_row=2):
                         dataset_sheet1.append([cell.value for cell in row])
 
-                    dataset_sheet2 = Dataset()
-                    dataset_sheet2.headers = [cell.value for cell in sheet2[1]]
-                    for row in sheet2.iter_rows(min_row=2):
-                        dataset_sheet2.append([str(cell.value) for cell in row])
+                    # Prepare dataset for Sheet2 if it exists
+                    dataset_sheet2 = None
+                    if sheet2 and sheet2.max_row > 1:
+                        dataset_sheet2 = Dataset()
+                        dataset_sheet2.headers = [cell.value for cell in sheet2[1]]
+                        for row in sheet2.iter_rows(min_row=2):
+                            dataset_sheet2.append([str(cell.value) for cell in row])
 
+                    # Resources for import
                     employee_resource = EmployeeResource()
                     custom_field_value_resource = EmpCustomFieldValueResource()
 
-                    with transaction.atomic():
-                        for row_idx, row in enumerate(dataset_sheet1.dict, start=2):
-                            try:
-                                employee_resource.before_import_row(row, row_idx=row_idx)
-                            except ValidationError as e:
-                                all_errors_sheet1.append({"row": row_idx, "error": str(e)})
+                    # Validate sheet1
+                    for row_idx, row in enumerate(dataset_sheet1.dict, start=2):
+                        try:
+                            employee_resource.before_import_row(row, row_idx=row_idx)
+                        except ValidationError as e:
+                            all_errors["sheet1_errors"].append({"row": row_idx, "error": str(e)})
 
-                    if all_errors_sheet1:
-                        return Response({"errors_sheet1": all_errors_sheet1}, status=400)
-
-                    with transaction.atomic():
-                        employee_result = employee_resource.import_data(dataset_sheet1, dry_run=False, raise_errors=True)
-
-                    with transaction.atomic():
+                    # Validate sheet2 (if present)
+                    if dataset_sheet2:
                         for row_idx, row in enumerate(dataset_sheet2.dict, start=2):
                             try:
                                 custom_field_value_resource.before_import_row(row, row_idx=row_idx)
                             except ValidationError as e:
-                                all_errors_field_values.append({"row": row_idx, "error": str(e)})
+                                all_errors["sheet2_errors"].append({"row": row_idx, "error": str(e)})
 
-                    if all_errors_field_values:
-                        return Response({"errors_field_values": all_errors_field_values}, status=400)
+                    # Check for errors in both sheets
+                    if all_errors["sheet1_errors"] or all_errors["sheet2_errors"]:
+                        return Response({"errors": all_errors}, status=400)
 
+                    # Upload data for sheet1
                     with transaction.atomic():
-                        custom_field_value_result = custom_field_value_resource.import_data(dataset_sheet2, dry_run=False, raise_errors=True)
+                        employee_result = employee_resource.import_data(dataset_sheet1, dry_run=False, raise_errors=True)
 
+                    # Upload data for sheet2 (if present)
+                    if dataset_sheet2:
+                        with transaction.atomic():
+                            custom_field_value_result = custom_field_value_resource.import_data(dataset_sheet2, dry_run=False, raise_errors=True)
+                        return Response({
+                            "message": f"{employee_result.total_rows} records created for Sheet1, "
+                                    f"{custom_field_value_result.total_rows} records created for Sheet2 successfully"
+                        })
+
+                    # If sheet2 is not present
                     return Response({
-                        "message": f"{employee_result.total_rows} records created for Sheet1, "
-                                   f"{custom_field_value_result.total_rows} records created for Sheet2 successfully"
+                        "message": f"{employee_result.total_rows} records created for Sheet1 successfully. Sheet2 was not provided."
                     })
+
                 except Exception as e:
                     return Response({"error": str(e)}, status=400)
             else:
@@ -975,11 +989,11 @@ class EmpbulkuploadViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])  # New endpoint for downloading default file
     def download_default_excel_file(self, request):
         # demo_file_path = os.path.join(settings.BASE_DIR,'defaults', 'emp mstr.xlsx')
-        demo_file_path = os.path.join(os.path.dirname(__file__), 'defaults', 'demosheet.xlsx')
+        demo_file_path = os.path.join(os.path.dirname(__file__), 'defaults', 'Bulkupload_Demo_Sheet.xlsx')
         try:
             with open(demo_file_path, 'rb') as f:
                 response = HttpResponse(f.read(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-                response['Content-Disposition'] = 'attachment; filename="demo.xlsx"'
+                response['Content-Disposition'] = 'attachment; filename="Bulkupload_Demo_Sheet.xlsx"'
                 return response
         except FileNotFoundError:
             return Response({"error": "Default demo file not found."}, status=400)

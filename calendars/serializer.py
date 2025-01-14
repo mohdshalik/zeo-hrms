@@ -10,6 +10,7 @@ from OrganisationManager.models import brnch_mstr,dept_master,ctgry_master
 from EmpManagement.models import emp_master
 from rest_framework import serializers
 from django.utils import timezone
+from UserManagement .models import CustomUser
 
 
 class WeekendDetailSerializer(serializers.ModelSerializer):
@@ -295,6 +296,7 @@ class LeaveReportSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class LvApprovalLevelSerializer(serializers.ModelSerializer):
+    approver = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.filter(is_ess=False))
     class Meta:
         model = LeaveApprovalLevels
         fields = '__all__'

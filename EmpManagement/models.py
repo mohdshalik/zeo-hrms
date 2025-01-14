@@ -861,7 +861,7 @@ class Approval(models.Model):
             'emp_branch_name': self.general_request.employee.emp_branch_id,
             'emp_department_name': self.general_request.employee.emp_dept_id,
             'emp_designation_name': self.general_request.employee.emp_desgntn_id,
-            'emp_hired_date':self.general_request.employee.emp_hired_date,
+            'emp_joined_date':self.general_request.employee.emp_joined_date,
 
         })
 

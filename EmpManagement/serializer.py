@@ -24,6 +24,7 @@ from .models import (emp_family,EmpJobHistory,EmpQualification,Emp_Documents,Emp
 
 from OrganisationManager.serializer import CompanyPolicySerializer
 from calendars.models import employee_leave_request
+from UserManagement .models import CustomUser
 
 
 '''employee set'''
@@ -372,6 +373,7 @@ class GeneralRequestSerializer(serializers.ModelSerializer):
         return rep
 
 class ApprovalLevelSerializer(serializers.ModelSerializer):
+    approver = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.filter(is_ess=False))
     class Meta:
         model = ApprovalLevel
         fields = '__all__'

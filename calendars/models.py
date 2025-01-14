@@ -837,24 +837,75 @@ class employee_leave_request(models.Model):
 
 
     def save(self, *args, **kwargs):
-        if self.start_date and self.end_date:
-            # Get the employee's leave balance record
-            leave_balance = emp_leave_balance.objects.get(employee=self.employee, leave_type=self.leave_type)
+        # Calculate leave days based on start and end date
+        self.number_of_days = self.calculate_leave_days()
+        # Check if the status changed to "approved"
+        previous_instance = type(self).objects.filter(pk=self.pk).first()
+        status_changed_to_approved = (
+            previous_instance is None or previous_instance.status != 'Approved'
+        ) and self.status == 'Approved'
+        print("s",status_changed_to_approved)
+        with transaction.atomic():
+            super().save(*args, **kwargs)
+            if status_changed_to_approved:
+                self.deduct_leave_balance()
+            
+    def calculate_leave_days(self):
+        leave_days = 0
+        current_date = self.start_date
 
-            # Calculate leave days considering weekends and holidays
-            if self.dis_half_day:
-                self.number_of_days = 0.5
-            else:
-                self.number_of_days = leave_balance.get_leave_days(self.start_date, self.end_date)
+        # Determine if weekends and holidays should be included
+        include_weekend_and_holiday = self.leave_type.include_weekend_and_holiday
 
-        # Deduct leave only if the status is set to 'approved' and it's a new request (not an update)
-        if self.status == 'approved' and not self.pk:
-            leave_balance.deduct_leave(self.number_of_days)
+        # Fetch assigned weekend and holiday calendars for the employee
+        assigned_weekend = assign_weekend.objects.filter(employee=self.employee).first()
+        assigned_holiday = assign_holiday.objects.filter(employee=self.employee).first()
 
-        super().save(*args, **kwargs)  # Call the parent class's save method
+        weekend_days = []
+        if assigned_weekend and not include_weekend_and_holiday:
+            calendar = assigned_weekend.weekend_model
+            weekend_days = [
+                day for day, value in {
+                    'monday': calendar.monday,
+                    'tuesday': calendar.tuesday,
+                    'wednesday': calendar.wednesday,
+                    'thursday': calendar.thursday,
+                    'friday': calendar.friday,
+                    'saturday': calendar.saturday,
+                    'sunday': calendar.sunday
+                }.items() if value == 'leave'
+            ]
 
-    def __str__(self):
-        return f"{self.employee} - {self.leave_type} from {self.start_date} to {self.end_date}"
+        holiday_dates = set()
+        if assigned_holiday and not include_weekend_and_holiday:
+            holiday_dates = set(assigned_holiday.holiday_model.holiday.all().values_list('date', flat=True))
+
+        # Iterate over the date range
+        while current_date <= self.end_date:
+            # Check if the day should be counted
+            if include_weekend_and_holiday or (
+                current_date.strftime('%A').lower() not in weekend_days and current_date not in holiday_dates
+            ):
+                if self.dis_half_day and current_date == self.start_date == self.end_date:
+                    leave_days += 0.5
+                else:
+                    leave_days += 1
+            current_date += timedelta(days=1)
+
+        return leave_days
+    def deduct_leave_balance(self):
+        # Fetch or create the employee's leave balance for this leave type
+        leave_balance, created = emp_leave_balance.objects.get_or_create(
+            employee=self.employee,
+            leave_type=self.leave_type
+        )
+        print(leave_balance)
+        # Deduct the number_of_days from balance, allow negative if leave_type.negative is True
+        # if not self.leave_type.negative and leave_balance.balance < self.number_of_days:
+        #     raise ValueError("Insufficient leave balance for this leave type.")
+
+        leave_balance.balance -= self.number_of_days
+        leave_balance.save()
 
    
     def __str__(self):
@@ -974,7 +1025,16 @@ class employee_leave_request(models.Model):
                     'emp_department_name': self.employee.emp_dept_id,
                     'emp_designation_name': self.employee.emp_desgntn_id,
                 })
+class EmployeeRejoining(models.Model):
+    employee = models.ForeignKey('EmpManagement.emp_master', on_delete=models.CASCADE)
+    leave_request = models.OneToOneField('employee_leave_request', on_delete=models.CASCADE)
+    rejoining_date = models.DateField()
+    unpaid_leave_days = models.FloatField(default=0)
+    # paid_leave_days = models.IntegerField(default=0)
+    created_at      = models.DateTimeField(auto_now_add=True)
     
+    def __str__(self):
+        return f"Rejoining for {self.employee.emp_first_name} on {self.rejoining_date}"   
 class LvRejectionReason(models.Model):
     reason_text = models.CharField(max_length=255, unique=True)
 
@@ -1053,7 +1113,7 @@ class LeaveApproval(models.Model):
                 'emp_branch_name': self.leave_request.employee.emp_branch_id,
                 'emp_department_name': self.leave_request.employee.emp_dept_id,
                 'emp_designation_name': self.leave_request.employee.emp_desgntn_id,
-                'emp_hired_date': self.leave_request.employee.emp_hired_date,
+                'emp_joined_date': self.leave_request.employee.emp_joined_date,
             })
 
             if self.leave_request.employee:
@@ -1070,7 +1130,7 @@ class LeaveApproval(models.Model):
                     'emp_branch_name': self.leave_request.employee.emp_branch_id,
                     'emp_department_name': self.leave_request.employee.emp_dept_id,
                     'emp_designation_name': self.leave_request.employee.emp_desgntn_id,
-                    'emp_hired_date': self.leave_request.employee.emp_hired_date,
+                    'emp_joined_date': self.leave_request.employee.emp_joined_date,
                 })
 
         # Handle notifications for compensatory requests
@@ -1091,7 +1151,7 @@ class LeaveApproval(models.Model):
                 'emp_branch_name': self.compensatory_request.employee.emp_branch_id,
                 'emp_department_name': self.compensatory_request.employee.emp_dept_id,
                 'emp_designation_name': self.compensatory_request.employee.emp_desgntn_id,
-                'emp_hired_date': self.compensatory_request.employee.emp_hired_date,
+                'emp_joined_date': self.compensatory_request.employee.emp_joined_date,
             })
 
             if self.compensatory_request.employee:
@@ -1108,7 +1168,7 @@ class LeaveApproval(models.Model):
                     'emp_branch_name': self.compensatory_request.employee.emp_branch_id,
                     'emp_department_name': self.compensatory_request.employee.emp_dept_id,
                     'emp_designation_name': self.compensatory_request.employee.emp_desgntn_id,
-                    'emp_hired_date': self.compensatory_request.employee.emp_hired_date,
+                    'emp_joined_date': self.compensatory_request.employee.emp_joined_date,
                 })
     
 @receiver(post_save, sender=employee_leave_request)
@@ -1303,7 +1363,62 @@ class Attendance(models.Model):
             total_duration = check_out_datetime - check_in_datetime
             self.total_hours = total_duration  # Store as timedelta (if using DurationField)
             self.save()
-    
+@receiver(post_save, sender=Attendance)
+def handle_rejoining(sender, instance, **kwargs):
+    """
+    Signal to handle rejoining date creation and unpaid leave calculation based on attendance.
+    """
+    employee = instance.employee
+    attendance_date = instance.date
+
+    print(f"DEBUG: Handling attendance for employee {employee.id} on {attendance_date}")
+
+    # Fetch approved leave requests that ended before this attendance date
+    leave_requests = employee_leave_request.objects.filter(
+        employee=employee,
+        status='Approved',
+        end_date__lt=attendance_date,
+        employeerejoining__isnull=True  # Ensure no rejoining record exists for the leave request
+    ).order_by('end_date')
+
+    if not leave_requests.exists():
+        print(f"DEBUG: No pending leave requests found for employee {employee.id}")
+        return
+
+    # Get the most recent leave request
+    leave_request = leave_requests.first()
+    print(f"DEBUG: Found leave request {leave_request.id} with end_date {leave_request.end_date}")
+
+    # Calculate unpaid days
+    unpaid_days = max(0, (attendance_date - leave_request.end_date).days)-1
+    print(f"DEBUG: Calculated unpaid leave days: {unpaid_days}")
+
+    # Create the rejoining record
+    rejoining_record, created = EmployeeRejoining.objects.get_or_create(
+        employee=employee,
+        leave_request=leave_request,
+        defaults={
+            'rejoining_date': attendance_date,
+            'unpaid_leave_days': unpaid_days,
+        }
+    )
+
+    if created:
+        print(f"DEBUG: Created rejoining record for employee {employee.id}")
+    else:
+        print(f"DEBUG: Rejoining record already exists for employee {employee.id}")
+
+    # Deduct unpaid days from the leave balance if any
+    if unpaid_days > 0:
+        leave_balance, _ = emp_leave_balance.objects.get_or_create(
+            employee=employee,
+            leave_type=leave_request.leave_type
+        )
+        old_balance = leave_balance.balance
+        leave_balance.balance -= unpaid_days
+        s=leave_balance.save()
+        print(f"DEBUG: Deducted {unpaid_days} from leave balance (old: {old_balance}, new: {leave_balance.balance})")  
+   
 class LeaveReport(models.Model):
     file_name   = models.CharField(max_length=100,null=True,unique=True)
     report_data = models.FileField(upload_to='leave_report/', null=True, blank=True)

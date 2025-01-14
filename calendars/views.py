@@ -831,7 +831,14 @@ class LvApprovalViewset(viewsets.ModelViewSet):
     queryset=LeaveApproval.objects.all()
     serializer_class=LvApprovalSerializer
     lookup_field = 'pk'
-
+    def get_queryset(self):
+        """
+        Filter approvals based on the authenticated user.
+        """
+        user = self.request.user  # Get the logged-in user
+        if user.is_superuser:
+            return LeaveApproval.objects.all()
+        return LeaveApproval.objects.filter(approver=user)  # Filter approvals assigned to the user
     @action(detail=True, methods=['post'])
     def approve(self, request, pk=None):
         approval = self.get_object()

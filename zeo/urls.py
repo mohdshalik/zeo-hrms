@@ -26,6 +26,7 @@ urlpatterns = [
     path('employee/',include('EmpManagement.urls')),
     path('organisation/',include('OrganisationManager.urls')),
     path('calendars/',include('calendars.urls')),
+    path('payroll/',include('PayrollManagement.urls')),
     
 
 

@@ -63,6 +63,7 @@ TENANT_APPS = [
     'EmpManagement',
     'calendars',
     'django.contrib.admin',
+    'PayrollManagement'
 ]
 
 INSTALLED_APPS = list(set(SHARED_APPS + TENANT_APPS))
