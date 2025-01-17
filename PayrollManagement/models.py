@@ -80,6 +80,8 @@ class PayrollSettings(models.Model):
     pay_period_end_date = models.DateField()
     category = models.ManyToManyField('OrganisationManager.ctgry_master',  null=True, blank=True,
                                  help_text="Category for payroll processing")
+    created_at         = models.DateTimeField(auto_now_add=True)
+    created_by         = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
 
     def update_next_run_date(self):
         if self.payroll_frequency == 'monthly':
@@ -101,6 +103,9 @@ class Payroll(models.Model):
     total_deductions = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     net_salary = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     is_paid = models.BooleanField(default=False)
+    created_at         = models.DateTimeField(auto_now_add=True)
+    created_by         = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
     def calculate_net_salary(self):
         self.net_salary = self.total_earnings - self.total_deductions
         return self.net_salary
@@ -153,6 +158,8 @@ class Payslip(models.Model):
     payroll = models.OneToOneField(Payroll, on_delete=models.CASCADE, related_name='payslip')
     issued_date = models.DateTimeField(auto_now_add=True)
     payslip_pdf = models.FileField(upload_to='payslips/', blank=True, null=True, help_text="Generated Payslip PDF")
+    created_at         = models.DateTimeField(auto_now_add=True)
+    created_by         = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
 
     def __str__(self):
         return f"Payslip for {self.payroll.employee} - {self.payroll.period.name}"
@@ -162,6 +169,9 @@ class SalaryFormula(models.Model):
     component = models.ForeignKey(SalaryComponent, on_delete=models.CASCADE, related_name='formulas')
     formula = models.TextField(help_text="Formula for calculating the component amount. Use placeholders for employee attributes.")
     description = models.TextField(blank=True, null=True)
+    created_at         = models.DateTimeField(auto_now_add=True)
+    created_by         = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
 
     def __str__(self):
         return f"Formula for {self.component.name}"
@@ -170,6 +180,9 @@ class LoanCommonWorkflow(models.Model):
     level    = models.IntegerField()
     role     = models.CharField(max_length=50, null=True, blank=True)
     approver = models.ForeignKey('UserManagement.CustomUser', null=True, blank=True, on_delete=models.SET_NULL)
+    created_at         = models.DateTimeField(auto_now_add=True)
+    created_by         = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=['level'], name='Loan_common_workflow_levels')
@@ -184,6 +197,9 @@ class LoanType(models.Model):
     created_at          = models.DateTimeField(auto_now_add=True)
     updated_at          = models.DateTimeField(auto_now=True)
     use_common_workflow = models.BooleanField(default=False)
+    created_at          = models.DateTimeField(auto_now_add=True)
+    created_by          = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
 
     def __str__(self):
         return f"{self.loan_type}"

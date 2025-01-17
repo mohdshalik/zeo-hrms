@@ -30,9 +30,7 @@ SECRET_KEY = 'django-insecure-bu8sj-dd80ca20luk_(bo_tho55@wtmlpy^9k9gun$!f8&z4)&
 DEBUG = True
 
 CORS_ALLOW_CREDENTIALS = True
-ALLOWED_HOSTS = [ 'zeoproducts.com','.zeoproducts.com','*','.zeo.com']
-
-
+ALLOWED_HOSTS = ['80.65.208.178', 'localhost', '127.0.0.1']
 
 SHARED_APPS = [
     'django_tenants',
@@ -55,6 +53,7 @@ SHARED_APPS = [
     'import_export',
     'django_celery_beat',
     'oauth2_provider',
+    'corsheaders',
 ]
 
 TENANT_APPS = [
@@ -62,11 +61,12 @@ TENANT_APPS = [
     'OrganisationManager',
     'EmpManagement',
     'calendars',
+    'PayrollManagement',
     'django.contrib.admin',
-    'PayrollManagement'
+
 ]
 
-INSTALLED_APPS = list(set(SHARED_APPS + TENANT_APPS))
+# INSTALLED_APPS = list(set(SHARED_APPS + TENANT_APPS))
 INSTALLED_APPS = SHARED_APPS + [app for app in TENANT_APPS if app not in SHARED_APPS]
 SITE_ID = 1
 TENANT_SCHEMA_DEFAULT ='public'
@@ -80,17 +80,26 @@ DATABASE_ROUTERS = (
     'django_tenants.routers.TenantSyncRouter',
 )
 PG_EXTRA_SEARCH_PATHS = ['extensions']
-# SESSION_COOKIE_DOMAIN = '.zeo.com'
+SESSION_COOKIE_DOMAIN = '.zeo.com'
 SESSION_COOKIE_SECURE = True
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media/')
 
-CORS_ORIGIN_ALLOW_ALL = True
+# CORS_ORIGIN_ALLOW_ALL = True
 
 CORS_ALLOWED_ORIGINS = [
-  "http://localhost:4200"   # Example for your frontend URL
-    # Add other allowed origins as needed
+    "http://localhost:4200",  # Angular app running locally
+    "http://80.65.208.178:4200",  # Example for your frontend URL
+#    "http://80.65.208.178",  # Your server IP if accessing directly
+
 ]
+
+CORS_ALLOW_HEADERS = [
+    'content-type',
+    'Authorization',  # Add this if you're using authorization headers
+    ...
+]
+
 
 CORS_ALLOW_METHODS = [
     'DELETE',
@@ -100,27 +109,19 @@ CORS_ALLOW_METHODS = [
     'POST',
     'PUT',
 ]
-
 MIDDLEWARE = [
-    # 'UserManagement.middleware.RequestIDTenantMiddleware',
-
-    
     'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.common.CommonMiddleware',  # Optional for trailing slash handling
     'django.middleware.security.SecurityMiddleware',
+#    'corsheaders.middleware.CorsMiddleware',  # Ensure this is before CommonMiddleware
+#    'django.middleware.common.CommonMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    # 'django_tenants.middleware.TenantMiddleware',
-    'UserManagement.middleware.SchemaMiddleware',
-    'UserManagement.middleware.TenantTimezoneMiddleware'
-    
-    # 'django_tenant_users.middleware.TenantUserMiddleware',
-    
-    # 'UserManagement.middleware.MultiTenantAuthenticationMiddleware',
-      
+    'UserManagement.middleware.SchemaMiddleware',  # Your custom schema middleware
+    'UserManagement.middleware.TenantTimezoneMiddleware',  # Your timezone middleware
 ]
 
 
@@ -221,9 +222,13 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = "UserManagement.CustomUser"
 
 AUTHENTICATION_BACKENDS = [
+    
+
     'UserManagement.authentication.CustomAuthBackend',
     'django.contrib.auth.backends.ModelBackend',
 ]
+#auth and permissions
+#auth and permissions
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         # 'oauth2_provider.contrib.rest_framework.OAuth2Authentication',
@@ -234,6 +239,7 @@ REST_FRAMEWORK = {
         # 'rest_framework.permissions.IsAuthenticated',
     ),
 }
+
 REST_USE_JWT = True
 SIMPLE_JWT = {
     # Customize token settings if needed
@@ -244,8 +250,6 @@ SIMPLE_JWT = {
 SHOW_PUBLIC_IF_NO_TENANT_FOUND = True
 #https://github.com/microsoftarchive/redis/releases
 # Celery settings
-#celery -A zeo beat --loglevel=info, celery -A zeo worker -l info -P eventlet 
-#or in linux celery -A zeo worker -l info -P gevent
 CELERY_BROKER_URL = 'redis://localhost:6379/0'  # Or your Redis server URL
 CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
 # Set this to ensure retries during startup
@@ -267,11 +271,11 @@ CELERY_BEAT_SCHEDULE = {
     },
     'accrue-leaves-every-day': {
         'task': 'calendars.tasks.accrue_leaves',  # Use the correct path to your task
-        'schedule': crontab(hour=18, minute=16),  
+        'schedule': crontab(hour=12, minute=00),  
     },
     'reset-leave-month':{
         'task':'calendars.tasks.reset_leave_balances',
-        'schedule':crontab(hour=12,minute=00)
+        'schedule':crontab(hour=12, minute=00)
     }
 }
 # CELERY_BEAT_SCHEDULE_FILENAME = 'celerybeat-schedule'  # Save Celery Beat schedule state

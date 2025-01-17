@@ -45,6 +45,9 @@ class weekend_calendar(models.Model):
     friday            = models.CharField(choices=DAY_TYPE_CHOICES,default='fullday')
     saturday          = models.CharField(choices=DAY_TYPE_CHOICES,default='fullday')
     sunday            = models.CharField(choices=DAY_TYPE_CHOICES,default='fullday')
+    created_at        = models.DateTimeField(auto_now_add=True)
+    created_by        = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
     def __str__(self):
         return f"{self.calendar_code} - {self.year}"
     def is_weekend(self, date):
@@ -77,6 +80,9 @@ class WeekendDetail(models.Model):
     week_of_month    = models.PositiveIntegerField(null=True, blank=True)  # 1 to 5 for specifying specific weeks
     month_of_year    = models.PositiveIntegerField(null=True, blank=True)
     date             = models.DateField(null=True, blank=True)  # Specific date for the day
+    created_at       = models.DateTimeField(auto_now_add=True)
+    created_by       = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
     class Meta:
         ordering = [ 'pk']
 @receiver(post_save, sender=weekend_calendar)
@@ -126,6 +132,9 @@ class assign_weekend(models.Model):
     category      = models.ManyToManyField('OrganisationManager.dept_master',  null=True, blank=True)
     employee      = models.ManyToManyField('EmpManagement.emp_master',  null=True, blank=True)
     weekend_model = models.ForeignKey(weekend_calendar,on_delete=models.CASCADE)
+    created_at    = models.DateTimeField(auto_now_add=True)
+    created_by    = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
 
 @receiver(m2m_changed, sender=assign_weekend.branch.through)
 def update_branch_weekend_calendar(sender, instance, action, **kwargs):
@@ -194,6 +203,9 @@ def update_employee_yearly_calendar(employee, weekend_model):
 class holiday_calendar(models.Model):
     calendar_title  = models.CharField(max_length=50)
     year            = models.IntegerField()
+    created_at      = models.DateTimeField(auto_now_add=True)
+    created_by      = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
     
     def __str__(self):
         return f"{self.calendar_title} - {self.year}"
@@ -206,8 +218,11 @@ class holiday(models.Model):
     description = models.CharField(max_length=50,unique=True)
     start_date  = models.DateField()
     end_date    = models.DateField()
-    calendar = models.ForeignKey(holiday_calendar,on_delete=models.CASCADE,null=True)
+    calendar    = models.ForeignKey(holiday_calendar,on_delete=models.CASCADE,null=True)
     restricted  = models.BooleanField(default=False)
+    created_at  = models.DateTimeField(auto_now_add=True)
+    created_by  = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
 
 
 class assign_holiday(models.Model):
@@ -223,6 +238,9 @@ class assign_holiday(models.Model):
     category       = models.ManyToManyField('OrganisationManager.dept_master',  null=True, blank=True)
     employee       = models.ManyToManyField('EmpManagement.emp_master',  null=True, blank=True)
     holiday_model  = models.ForeignKey(holiday_calendar,on_delete=models.CASCADE)
+    created_at     = models.DateTimeField(auto_now_add=True)
+    created_by     = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
 
 @receiver(m2m_changed, sender=assign_holiday.branch.through)
 def update_branch_holiday_calendar(sender, instance, action, **kwargs):
@@ -299,7 +317,7 @@ class leave_type(models.Model):
     
     name                          = models.CharField(max_length=50,unique=True)
     image                         = models.ImageField(upload_to='leave_images/')
-    code                          =  models.CharField(max_length=30,unique=True)
+    code                          = models.CharField(max_length=30,unique=True)
     type                          = models.CharField(max_length=20,choices=type_choice)
     unit                          = models.CharField(max_length=10,choices=unit_choice)
     negative                      = models.BooleanField(default=False)
@@ -310,6 +328,8 @@ class leave_type(models.Model):
     include_weekend_and_holiday   = models.BooleanField(default=False)
     use_common_workflow           = models.BooleanField(default=False)
     created_at                    = models.DateTimeField(default=timezone.now)
+    created_by                    = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
     # allow_opening_balance =models.BooleanField(default=False)
     def __str__(self):
         return f"{self.name}"
@@ -394,19 +414,22 @@ class leave_entitlement(models.Model):
     encashment_max_limit           = models.PositiveIntegerField()
     prorate_accrual                = models.BooleanField(default=False, help_text="Enable prorate accrual for this leave type.")
     prorate_type                   = models.CharField(max_length=30, choices=PRORATE_CHOICES, null=True, blank=True, help_text="Prorate accrual type.")
+    created_at                     = models.DateTimeField(auto_now_add=True)
+    created_by                     = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
     def __str__(self):
         return f"{self.leave_type.name} Entitlement"
 # from django.db.models import Q
 
 class emp_leave_balance(models.Model):
-    employee = models.ForeignKey('EmpManagement.emp_master',on_delete=models.CASCADE)
-    leave_type= models.ForeignKey('leave_type',on_delete=models.CASCADE)
-    balance = models.FloatField(null=True,blank=True)
-    openings = models.IntegerField(null=True,blank=True)
-    # accrued = models.FloatField(null=True, blank=True)
-    # carried_forward = models.FloatField(null=True, blank=True)
-    # encashed = models.FloatField(null=True, blank=True)
-    updated_at = models.DateTimeField(auto_now=True)  # Track last update
+    employee       = models.ForeignKey('EmpManagement.emp_master',on_delete=models.CASCADE)
+    leave_type     = models.ForeignKey('leave_type',on_delete=models.CASCADE)
+    balance        = models.FloatField(null=True,blank=True)
+    openings       = models.IntegerField(null=True,blank=True)
+    updated_at     = models.DateTimeField(auto_now=True)  # Track last update
+    created_at     = models.DateTimeField(auto_now_add=True)
+    created_by     = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
     def is_weekend(self, date):
         """ Check if the given date is a weekend based on the employee's weekend calendar """
         if self.employee.emp_weekend_calendar:
@@ -461,6 +484,9 @@ class leave_accrual_transaction(models.Model):
     accrual_date  = models.DateField()
     amount        = models.DecimalField(max_digits=5, decimal_places=2)
     year          = models.PositiveIntegerField(default=datetime.now().year)
+    created_at    = models.DateTimeField(auto_now_add=True)
+    created_by    = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
 
 class leave_reset_transaction(models.Model):
     employee              = models.ForeignKey('EmpManagement.emp_master', on_delete=models.CASCADE)
@@ -470,6 +496,9 @@ class leave_reset_transaction(models.Model):
     encashment_amount     = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     reset_balance         = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     year                  = models.PositiveIntegerField(default=datetime.now().year) 
+    created_at            = models.DateTimeField(auto_now_add=True)
+    created_by            = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
     def __str__(self):
         return f"{self.employee} - {self.leave_type} Reset on {self.reset_date}"
     
@@ -487,6 +516,9 @@ class applicablity_critirea(models.Model):
     department   = models.ManyToManyField('OrganisationManager.dept_master',blank=True)
     designation  = models.ManyToManyField('OrganisationManager.desgntn_master',blank=True)
     role         = models.ManyToManyField('OrganisationManager.ctgry_master',blank=True)
+    created_at   = models.DateTimeField(auto_now_add=True)
+    created_by   = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
 
 class LvEmailTemplate(models.Model):
     request_type  = models.ForeignKey('leave_type', related_name='email_templates', on_delete=models.CASCADE,null=True)
@@ -497,6 +529,9 @@ class LvEmailTemplate(models.Model):
     ])
     subject     = models.CharField(max_length=255)
     body        = models.TextField()
+    created_at  = models.DateTimeField(auto_now_add=True)
+    created_by  = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
     
 class LvApprovalNotify(models.Model):
     recipient_user     = models.ForeignKey('UserManagement.CustomUser', null=True, blank=True,on_delete=models.CASCADE)
@@ -580,9 +615,12 @@ class LvApprovalNotify(models.Model):
         except Exception as e:
             print(f"An unexpected error occurred: {e}")
 class LvCommonWorkflow(models.Model):
-    level    = models.IntegerField()
-    role     = models.CharField(max_length=50, null=True, blank=True)
-    approver = models.ForeignKey('UserManagement.CustomUser', null=True, blank=True, on_delete=models.SET_NULL)
+    level        = models.IntegerField()
+    role         = models.CharField(max_length=50, null=True, blank=True)
+    approver     = models.ForeignKey('UserManagement.CustomUser', null=True, blank=True, on_delete=models.SET_NULL)
+    created_at   = models.DateTimeField(auto_now_add=True)
+    created_by   = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=['level'], name='Lv_common_workflow_level')
@@ -603,6 +641,9 @@ class CompensatoryLeaveTransaction(models.Model):
     transaction_type = models.CharField(max_length=10, choices=TRANSACTION_TYPE_CHOICES)
     days             = models.FloatField()
     reason           = models.TextField()
+    created_at       = models.DateTimeField(auto_now_add=True)
+    created_by       = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
 
     def __str__(self):
         return f"{self.employee} - {self.transaction_type} of {self.days} days on {self.transaction_date}"
@@ -631,7 +672,9 @@ class CompensatoryLeaveRequest(models.Model):
     work_date       = models.DateField()  # Date employee worked on weekend/holiday
     reason          = models.TextField()
     status          = models.CharField(max_length=10, choices=LEAVE_STATUS_CHOICES, default='pending')
-    created_by=models.ForeignKey('UserManagement.CustomUser',on_delete=models.CASCADE,null=True,blank=True)
+    created_at         = models.DateTimeField(auto_now_add=True)
+    created_by         = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
     def __str__(self):
         return f"Compensatory Request for {self.employee} on {self.work_date} - {self.status}"
     def save(self, *args, **kwargs):
@@ -825,6 +868,9 @@ class employee_leave_request(models.Model):
     half_day_period   = models.CharField(max_length=20, choices=HALF_DAY_CHOICES, null=True, blank=True)  # First Half / Second Half
     created_by        = models.ForeignKey('UserManagement.CustomUser',on_delete=models.CASCADE,null=True,blank=True)
     number_of_days    = models.FloatField(default=1)
+    created_at        = models.DateTimeField(auto_now_add=True)
+    created_by        = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
     def clean(self):
         super().clean()
         # Validate if half-day leave is allowed for this leave type
@@ -1026,12 +1072,13 @@ class employee_leave_request(models.Model):
                     'emp_designation_name': self.employee.emp_desgntn_id,
                 })
 class EmployeeRejoining(models.Model):
-    employee = models.ForeignKey('EmpManagement.emp_master', on_delete=models.CASCADE)
-    leave_request = models.OneToOneField('employee_leave_request', on_delete=models.CASCADE)
-    rejoining_date = models.DateField()
-    unpaid_leave_days = models.FloatField(default=0)
-    # paid_leave_days = models.IntegerField(default=0)
-    created_at      = models.DateTimeField(auto_now_add=True)
+    employee           = models.ForeignKey('EmpManagement.emp_master', on_delete=models.CASCADE)
+    leave_request      = models.OneToOneField('employee_leave_request', on_delete=models.CASCADE)
+    rejoining_date     = models.DateField()
+    unpaid_leave_days  = models.FloatField(default=0)
+    created_at         = models.DateTimeField(auto_now_add=True)
+    created_by         = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
     
     def __str__(self):
         return f"Rejoining for {self.employee.emp_first_name} on {self.rejoining_date}"   
@@ -1044,9 +1091,12 @@ class LvRejectionReason(models.Model):
 class LeaveApprovalLevels(models.Model):
     level            = models.IntegerField()
     role             = models.CharField(max_length=50, null=True, blank=True)  # Use this for role-based approval like 'CEO' or 'Manager'
-    approver         = models.ForeignKey('UserManagement.CustomUser', null=True, blank=True, on_delete=models.SET_NULL)  # Use this for user-based approval
+    approver         = models.ForeignKey('UserManagement.CustomUser',on_delete=models.SET_NULL)  # Use this for user-based approval
     request_type     = models.ForeignKey('leave_type', related_name='leave_approval_levels', on_delete=models.CASCADE, null=True, blank=True)  # Nullable for common workflow
     is_compensatory  = models.BooleanField(default=False)
+    created_at       = models.DateTimeField(auto_now_add=True)
+    created_by       = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
     class Meta:
         unique_together = ('level', 'request_type')
 
@@ -1069,6 +1119,7 @@ class LeaveApproval(models.Model):
     note                 = models.TextField(null=True, blank=True)
     rejection_reason     = models.ForeignKey(LvRejectionReason,null=True, blank=True, on_delete=models.SET_NULL)
     created_at           = models.DateField(auto_now_add=True)
+    created_by           = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
     updated_at           = models.DateField(auto_now=True)
     employee_id          = models.IntegerField(null=True, blank=True)
 
@@ -1216,10 +1267,14 @@ class EmployeeMachineMapping(models.Model):
         return f'{self.employee.emp_code} - {self.machine_code}'
 
 class Shift(models.Model):
-    name           = models.CharField(max_length=50)
+    name           = models.CharField(max_length=50,unique=True)
     start_time     = models.TimeField(null=True, blank=True)  # Optional for off days
     end_time       = models.TimeField(null=True, blank=True)    # Optional for off days
     break_duration = models.DurationField(default=timedelta(minutes=0))  # Break time in minutes
+    created_at     = models.DateTimeField(auto_now_add=True)
+    created_by     = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
+    
 
     def __str__(self):
         return f"{self.name}"
@@ -1235,6 +1290,8 @@ class ShiftPattern(models.Model):
     friday_shift     = models.ForeignKey(Shift, on_delete=models.SET_NULL, null=True, related_name='pattern_friday')
     saturday_shift   = models.ForeignKey(Shift, on_delete=models.SET_NULL, null=True, related_name='pattern_saturday')
     sunday_shift     = models.ForeignKey(Shift, on_delete=models.SET_NULL, null=True, related_name='pattern_sunday')
+    created_at     = models.DateTimeField(auto_now_add=True)
+    created_by     = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
 
     def get_shift_for_day(self, weekday):
         """Return the shift for the given weekday (0=Monday, ..., 6=Sunday)."""
@@ -1261,6 +1318,9 @@ class EmployeeShiftSchedule(models.Model):
     start_date           = models.DateField(default=timezone.now, blank=True)
     is_rotating          = models.BooleanField(default=True)  # Flag for rotating schedule or not
     single_shift_pattern = models.ForeignKey(ShiftPattern, null=True, blank=True, on_delete=models.SET_NULL,related_name='single_shift_schedules')
+    created_at           = models.DateTimeField(auto_now_add=True)
+    created_by           = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
     def get_shift_for_date(self, employee, date):
         """Determine the shift for a given date."""
         if not self.is_rotating:  # If not rotating, use a single shift pattern
@@ -1317,6 +1377,9 @@ class WeekPatternAssignment(models.Model):
     schedule    = models.ForeignKey(EmployeeShiftSchedule, on_delete=models.CASCADE)
     week_number = models.IntegerField()  # Week number in the cycle
     template    = models.ForeignKey(ShiftPattern, on_delete=models.SET_NULL, null=True)
+    created_at  = models.DateTimeField(auto_now_add=True)
+    created_by  = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
 
     class Meta:
         unique_together = ('schedule', 'week_number')  # Ensure unique assignment per week in a schedule
@@ -1328,6 +1391,8 @@ class ShiftOverride(models.Model):
     employee       = models.ForeignKey('EmpManagement.emp_master', on_delete=models.CASCADE)
     date           = models.DateField()
     override_shift = models.ForeignKey(Shift, on_delete=models.SET_NULL, null=True)
+    created_at     = models.DateTimeField(auto_now_add=True)
+    created_by     = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
 
     class Meta:
         unique_together = ('employee', 'date')  # Ensure only one override per employee per date
@@ -1342,6 +1407,9 @@ class Attendance(models.Model):
     check_in_time   = models.TimeField(null=True, blank=True)
     check_out_time  = models.TimeField(null=True, blank=True)
     total_hours     = models.DurationField(null=True, blank=True)
+    created_at      = models.DateTimeField(auto_now_add=True)
+    created_by      = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
     class Meta:
         unique_together = ('employee', 'date')
     
@@ -1420,8 +1488,11 @@ def handle_rejoining(sender, instance, **kwargs):
         print(f"DEBUG: Deducted {unpaid_days} from leave balance (old: {old_balance}, new: {leave_balance.balance})")  
    
 class LeaveReport(models.Model):
-    file_name   = models.CharField(max_length=100,null=True,unique=True)
+    file_name   = models.CharField(max_length=100,unique=True)
     report_data = models.FileField(upload_to='leave_report/', null=True, blank=True)
+    created_at  = models.DateTimeField(auto_now_add=True)
+    created_by  = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
     class Meta:
         permissions = (
             ('export_report', 'Can export report'),
@@ -1433,8 +1504,12 @@ class LeaveReport(models.Model):
         return self.file_name 
     
 class LeaveApprovalReport(models.Model):
-    file_name   = models.CharField(max_length=100,null=True,unique=True)
+    file_name   = models.CharField(max_length=100,unique=True)
     report_data = models.FileField(upload_to='leave_approval_report/', null=True, blank=True)
+    created_at  = models.DateTimeField(auto_now_add=True)
+    created_by  = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
+
     class Meta:
         permissions = (
             ('export_report', 'Can export report'),
@@ -1445,8 +1520,11 @@ class LeaveApprovalReport(models.Model):
         return self.file_name 
 
 class AttendanceReport(models.Model):
-    file_name   = models.CharField(max_length=100,null=True,unique=True)
+    file_name   = models.CharField(max_length=100,unique=True)
     report_data = models.FileField(upload_to='attendance_report/', null=True, blank=True)
+    created_at  = models.DateTimeField(auto_now_add=True)
+    created_by  = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
     class Meta:
         permissions = (
             ('export_report', 'Can export report'),
@@ -1457,8 +1535,11 @@ class AttendanceReport(models.Model):
         return self.file_name 
 
 class lvBalanceReport(models.Model):
-    file_name   = models.CharField(max_length=100,null=True,unique=True)
+    file_name   = models.CharField(max_length=100,unique=True)
     report_data = models.FileField(upload_to='lvbalance_report/', null=True, blank=True)
+    created_at  = models.DateTimeField(auto_now_add=True)
+    created_by  = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
     class Meta:
         permissions = (
             ('export_report', 'Can export report'),

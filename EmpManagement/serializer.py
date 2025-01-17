@@ -358,7 +358,7 @@ class GeneralRequestSerializer(serializers.ModelSerializer):
     def get_document_numbering_details(self, obj):
         # Fetch the document numbering details based on the selected branch
         try:
-            doc_num = document_numbering.objects.get(branch_id=obj.branch)
+            doc_num = document_numbering.objects.get(branch_id=obj.branch,type='general_request')
             return DocumentNumberingSerializer(doc_num).data
         except document_numbering.DoesNotExist:
             return None

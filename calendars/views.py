@@ -38,6 +38,9 @@ from rest_framework import viewsets,filters, status
 from django.views.decorators.csrf import csrf_exempt
 from datetime import datetime, timedelta
 from django.db.models import Field
+from OrganisationManager.models import document_numbering
+from OrganisationManager.serializer import DocumentNumberingSerializer
+from django.db import transaction
 
 # Create your views here.
 
@@ -237,7 +240,58 @@ class LeaveRequestviewset(viewsets.ModelViewSet):
             # Return only requests related to the ESS user's employee record
             return self.queryset.filter(employee__emp_code=self.request.user.username)
         return super().get_queryset()  # Non-ESS users can access as per their permissions
+    def create(self, request, *args, **kwargs):
+        data = request.data.copy()  # Make a mutable copy of request data
 
+        branch = data.get('branch')
+        try:
+            doc_numbering = document_numbering.objects.get(branch_id=branch ,type='leave_request')
+        except document_numbering.DoesNotExist:
+            return Response({"error": "Document numbering not found for this branch and type"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if doc_numbering.automatic_numbering:
+            # Generate the document number if automatic numbering is enabled
+            doc_number = f"{doc_numbering.preffix}{doc_numbering.suffix}{doc_numbering.year.year}{doc_numbering.start_number}{doc_numbering.current_number}"
+
+            # Update current_number
+            with transaction.atomic():
+                doc_numbering.current_number += 1
+                doc_numbering.save()
+
+            # Add the generated document number to the data
+            data['doc_number'] = doc_number
+        else:
+            # If automatic numbering is disabled, check if 'doc_number' is provided in the request data
+            if 'doc_number' not in data or not data['doc_number']:
+                # Generate the document number automatically if 'doc_number' is not provided or empty
+                doc_number = f"{doc_numbering.preffix}{doc_numbering.year.year}{doc_numbering.start_number}{doc_numbering.current_number}{doc_numbering.suffix}"
+                # Update current_number
+                with transaction.atomic():
+                    doc_numbering.current_number += 1
+                    doc_numbering.save()
+                # Add the generated document number to the data
+                data['doc_number'] = doc_number
+
+        # Proceed to create the GeneralRequest
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+    
+    @action(detail=False, methods=['get'])
+    def document_numbering_by_branch(self, request):
+        branch_id = request.query_params.get('branch_id')
+        if not branch_id:
+            return Response({"error": "Branch ID is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            doc_numbering = document_numbering.objects.get(branch_id=branch_id,type='leave_request')
+        except document_numbering.DoesNotExist:
+            return Response({"error": "Document numbering not found for this branch and type"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = DocumentNumberingSerializer(doc_numbering)
+        return Response(serializer.data, status=status.HTTP_200_OK)
     def perform_create(self, serializer):
         if self.request.user.is_ess:
             # Set the employee field to the ESS user's employee record

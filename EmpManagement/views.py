@@ -1590,9 +1590,9 @@ class GeneralRequestViewset(viewsets.ModelViewSet):
 
         branch = data.get('branch')
         try:
-            doc_numbering = document_numbering.objects.get(branch_id=branch)
+            doc_numbering = document_numbering.objects.get(branch_id=branch ,type='general_request')
         except document_numbering.DoesNotExist:
-            return Response({"error": "Document numbering not found for this branch"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Document numbering not found for this branch and type"}, status=status.HTTP_400_BAD_REQUEST)
 
         if doc_numbering.automatic_numbering:
             # Generate the document number if automatic numbering is enabled
@@ -1623,6 +1623,7 @@ class GeneralRequestViewset(viewsets.ModelViewSet):
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+    
     @action(detail=False, methods=['get'])
     def document_numbering_by_branch(self, request):
         branch_id = request.query_params.get('branch_id')
@@ -1630,9 +1631,9 @@ class GeneralRequestViewset(viewsets.ModelViewSet):
             return Response({"error": "Branch ID is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            doc_numbering = document_numbering.objects.get(branch_id=branch_id)
+            doc_numbering = document_numbering.objects.get(branch_id=branch_id,type='general_request')
         except document_numbering.DoesNotExist:
-            return Response({"error": "Document numbering not found for this branch"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Document numbering not found for this branch and type"}, status=status.HTTP_404_NOT_FOUND)
 
         serializer = DocumentNumberingSerializer(doc_numbering)
         return Response(serializer.data, status=status.HTTP_200_OK)

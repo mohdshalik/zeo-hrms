@@ -34,29 +34,29 @@ class emp_master(models.Model):
     GENDER_CHOICES = [ ("M", "Male"), ("F", "Female"),("O", "Other"),]
     MARITAL_STATUS_CHOICES = [("M", "Married"),("S", "Single"),('divorced','divorced'),('widow','widow')]
     
-    emp_code                 = models.CharField(max_length=50,unique=True,null=True,blank =True)
-    emp_first_name           = models.CharField(max_length=50,null=True,blank =True)
+    emp_code                 = models.CharField(max_length=50,unique=True)
+    emp_first_name           = models.CharField(max_length=50)
     emp_last_name            = models.CharField(max_length=50,null=True,blank =True)
-    emp_gender               = models.CharField(max_length=20,choices=GENDER_CHOICES,null=True,blank =True)
+    emp_gender               = models.CharField(max_length=20,choices=GENDER_CHOICES)
     emp_date_of_birth        = models.DateField(null=True,blank =True)
-    emp_personal_email       = models.EmailField(unique=True,null=True,blank =True)
+    emp_personal_email       = models.EmailField(unique=True)
     emp_company_email        = models.EmailField(unique=True,null=True,blank =True)
-    emp_mobile_number_1      = models.CharField(null=True,blank =True)
+    emp_mobile_number_1      = models.CharField()
     emp_mobile_number_2      = models.CharField(null=True,blank =True)
     emp_reporting_manager    = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True)
-    emp_country_id           = models.ForeignKey("Core.cntry_mstr",on_delete = models.CASCADE,null=True,blank =True)
+    emp_country_id           = models.ForeignKey("Core.cntry_mstr",on_delete = models.CASCADE)
     emp_state_id             = models.ForeignKey("Core.state_mstr",on_delete=models.CASCADE,null=True,blank =True)
     emp_city                 = models.CharField(max_length=50,null=True,blank =True)
     emp_permenent_address    = models.CharField(max_length=200,null=True,blank =True)
     emp_present_address      = models.CharField(max_length=200,blank=True,null=True)
     emp_status               = models.BooleanField(default=True,null=True,blank =True)
-    emp_joined_date          = models.DateField(null=True,blank =True)
-    emp_date_of_confirmation = models.DateField(null=True,blank=True)
+    emp_joined_date          = models.DateField()
+    emp_date_of_confirmation = models.DateField()
     emp_relegion             = models.CharField(max_length=50,null=True,blank =True)
     emp_profile_pic          = models.ImageField(null=True,blank =True )
     emp_blood_group          = models.CharField(max_length=50,blank=True)
     emp_nationality          = models.CharField(null=True,blank =True)
-    emp_marital_status       = models.CharField(max_length=10,choices=MARITAL_STATUS_CHOICES,null=True,blank =True)
+    emp_marital_status       = models.CharField(max_length=10,choices=MARITAL_STATUS_CHOICES)
     emp_father_name          = models.CharField(max_length=50,null=True,blank =True)
     emp_mother_name          = models.CharField(max_length=50,null=True,blank =True)
     created_at               = models.DateTimeField(auto_now_add=True,null=True,blank =True)
@@ -66,14 +66,16 @@ class emp_master(models.Model):
     is_active                = models.BooleanField(default=True,null=True,blank =True)
     epm_ot_applicable        = models.BooleanField(default=False,null=True,blank =True)
     is_ess                   = models.BooleanField(default=False)
-    emp_branch_id            = models.ForeignKey("OrganisationManager.brnch_mstr",on_delete = models.CASCADE,null=True,blank =True)
-    emp_dept_id              = models.ForeignKey("OrganisationManager.dept_master",on_delete = models.CASCADE,null=True,blank =True)
-    emp_desgntn_id           = models.ForeignKey("OrganisationManager.desgntn_master",on_delete = models.CASCADE,null=True,blank =True)
-    emp_ctgry_id             = models.ForeignKey("OrganisationManager.ctgry_master",on_delete = models.CASCADE,null=True,blank =True)
+    emp_branch_id            = models.ForeignKey("OrganisationManager.brnch_mstr",on_delete = models.CASCADE)
+    emp_dept_id              = models.ForeignKey("OrganisationManager.dept_master",on_delete = models.CASCADE)
+    emp_desgntn_id           = models.ForeignKey("OrganisationManager.desgntn_master",on_delete = models.CASCADE)
+    emp_ctgry_id             = models.ForeignKey("OrganisationManager.ctgry_master",on_delete = models.CASCADE)
     emp_weekend_calendar     = models.ForeignKey("calendars.weekend_calendar",on_delete = models.CASCADE,null=True,blank =True)
     holiday_calendar         = models.ForeignKey("calendars.holiday_calendar",on_delete = models.CASCADE,null=True,blank =True)
     users                    = models.ForeignKey('UserManagement.CustomUser', on_delete=models.CASCADE, related_name='employees',null=True,blank =True)
-    
+    created_at               = models.DateTimeField(auto_now_add=True)
+    created_by               = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+      
     def save(self, *args, **kwargs):
         from UserManagement.models import company
         created = not self.pk  # Check if the instance is being created for the first time
@@ -119,8 +121,11 @@ class emp_master(models.Model):
         return Attendance.objects.filter(employee=self)
 
 class Report(models.Model):
-    file_name   = models.CharField(max_length=100,null=True,unique=True)
-    report_data = models.FileField(upload_to='employee_report/', null=True, blank=True) 
+    file_name   = models.CharField(max_length=100,unique=True)
+    report_data = models.FileField(upload_to='employee_report/', null=True, blank=True)
+    created_at  = models.DateTimeField(auto_now_add=True)
+    created_by  = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+ 
     # created_at = models.DateTimeField(auto_now_add=True,null=True,blank =True)
     class Meta:
         permissions = (
@@ -133,8 +138,11 @@ class Report(models.Model):
         return self.file_name
 
 class Doc_Report(models.Model):
-    file_name   = models.CharField(max_length=100,null=True,unique=True)
+    file_name   = models.CharField(max_length=100,unique=True)
     report_data = models.FileField(upload_to='document_report/', null=True, blank=True)
+    created_at  = models.DateTimeField(auto_now_add=True)
+    created_by  = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
     class Meta:
         permissions = (
             ('export_document_report', 'Can export doc report'),
@@ -145,8 +153,11 @@ class Doc_Report(models.Model):
         return self.file_name
 
 class GeneralRequestReport(models.Model):
-    file_name   = models.CharField(max_length=100,null=True,unique=True)
+    file_name   = models.CharField(max_length=100,unique=True)
     report_data = models.FileField(upload_to='general_report/', null=True, blank=True)
+    created_at  = models.DateTimeField(auto_now_add=True)
+    created_by  = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
     class Meta:
         permissions = (
             ('export_general_request_report', 'Can export general request report'),
@@ -170,6 +181,9 @@ class Emp_CustomField(models.Model):
     dropdown_values  = models.JSONField(null=True, blank=True)
     radio_values     = models.JSONField(null=True, blank=True)
     checkbox_values  = models.JSONField(null=True,blank=True)
+    created_at       = models.DateTimeField(auto_now_add=True)
+    created_by       = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
     def __str__(self):
         return self.emp_custom_field    
     
@@ -204,9 +218,12 @@ class Emp_CustomField(models.Model):
     
 
 class Emp_CustomFieldValue(models.Model):
-    emp_custom_field = models.CharField(max_length=100,null=True)
+    emp_custom_field = models.CharField(max_length=100)
     field_value      = models.TextField(null=True, blank=True)  # Field value provided by end user
-    emp_master       = models.ForeignKey('emp_master', on_delete=models.CASCADE, related_name='custom_field_values',null=True)
+    emp_master       = models.ForeignKey('emp_master', on_delete=models.CASCADE, related_name='custom_field_values')
+    created_at       = models.DateTimeField(auto_now_add=True)
+    created_by       = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+ 
 
     def __str__(self):
         return f'{self.emp_custom_field.emp_custom_field}: {self.field_value}'
@@ -280,7 +297,7 @@ class Emp_CustomFieldValue(models.Model):
 
 #EMPLOYEE FAMILY(ef) data
 class emp_family(models.Model):
-    emp_id             = models.ForeignKey('emp_master',on_delete = models.CASCADE,null=True,blank=True, related_name='emp_family')
+    emp_id             = models.ForeignKey('emp_master',on_delete = models.CASCADE,related_name='emp_family')
     ef_member_name     = models.CharField(max_length=50)
     emp_relation       = models.CharField(max_length=50)
     ef_company_expence = models.FloatField()
@@ -306,6 +323,9 @@ class EmpFamily_CustomField(models.Model):
     data_type       = models.CharField(max_length=20, choices=FIELD_TYPES,null=True,blank =True)
     dropdown_values = models.JSONField(null=True, blank=True)
     radio_values    = models.JSONField(null=True, blank=True)
+    created_at      = models.DateTimeField(auto_now_add=True)
+    created_by      = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
     
 
 #EMPLOPYEE JOB HISTORY
@@ -334,6 +354,9 @@ class EmpJobHistory_CustomField(models.Model):
     data_type          = models.CharField(max_length=20, choices=FIELD_TYPES,null=True,blank =True)
     dropdown_values    = models.JSONField(null=True, blank=True)
     radio_values       = models.JSONField(null=True, blank=True)
+    created_at         = models.DateTimeField(auto_now_add=True)
+    created_by         = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
     
     
 
@@ -360,6 +383,9 @@ class EmpQualification_CustomField(models.Model):
     data_type            = models.CharField(max_length=20, choices=FIELD_TYPES,null=True,blank =True)
     dropdown_values      = models.JSONField(null=True, blank=True)
     radio_values         = models.JSONField(null=True, blank=True)
+    created_at           = models.DateTimeField(auto_now_add=True)
+    created_by           = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
     
     
 
@@ -373,8 +399,8 @@ from django.dispatch import receiver
 class Emp_Documents(models.Model):
     emp_id               =models.ForeignKey('emp_master',on_delete = models.CASCADE,related_name='emp_documents')
     emp_sl_no            = models.CharField(max_length=50, unique=True, null=True,blank =True,default=None)
-    document_type        = models.ForeignKey('Core.document_type',on_delete = models.CASCADE,null=True,blank =True)
-    emp_doc_number       = models.IntegerField()#unique number
+    document_type        = models.ForeignKey('Core.document_type',on_delete = models.CASCADE)
+    emp_doc_number       = models.IntegerField(unique=True)#unique number
     emp_doc_issued_date  = models.DateField()
     emp_doc_expiry_date  = models.DateField()
     emp_doc_document     = models.FileField()
@@ -387,31 +413,6 @@ class Emp_Documents(models.Model):
    
     def __str__(self):
         return f"{self.document_type} - {self.emp_id}" 
-# @receiver(post_save, sender=Emp_Documents)
-# def create_expiry_notification(sender, instance, created, **kwargs):
-#     if created:
-#         today = timezone.now().date()
-#         print("today",today)
-#         expiry_date = instance.emp_doc_expiry_date
-#         print("exipiry",expiry_date)
-        
-#         # Check if emp_master exists and has a valid branch
-#         if instance.emp_id and instance.emp_id.emp_branch_id:
-#             branch_notification_days = instance.emp_id.emp_branch_id.notification_period_days
-#             if branch_notification_days is not None:
-#                 notification_delta = timedelta(days=branch_notification_days)  # Notify based on branch's notification period
-#                 print(notification_delta )
-#                 if expiry_date - today <= notification_delta:
-#                     notification_message = f"The document '{instance.document_type}' of '{instance.emp_id}' is expiring on {expiry_date}."
-#                     # Create notification for the newly created document
-#                     notification.objects.create(
-#                         message=notification_message,
-#                         document_id=instance
-#                     )
-#         else:
-#             # Handle cases where emp_id or emp_branch_id is not valid
-#             print("Warning: Invalid emp_id or emp_branch_id detected. Cannot create notification.")      
-
 
 #Document UDF
 class EmpDocuments_CustomField(models.Model):
@@ -425,6 +426,9 @@ class EmpDocuments_CustomField(models.Model):
     data_type        = models.CharField(max_length=20, choices=FIELD_TYPES,null=True,blank =True)
     dropdown_values  = models.JSONField(null=True, blank=True)
     radio_values     = models.JSONField(null=True, blank=True)
+    created_at       = models.DateTimeField(auto_now_add=True)
+    created_by       = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
     
     
     
@@ -444,12 +448,18 @@ class notification(models.Model):
     message      = models.CharField(max_length=200)
     created_at   = models.DateTimeField(auto_now_add=True)
     document_id  = models.ForeignKey('Emp_Documents',on_delete = models.CASCADE,null=True)
+    created_at   = models.DateTimeField(auto_now_add=True)
+    created_by   = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
     
 class EmployeeMarketingSkill(models.Model):
     emp_id           = models.ForeignKey('emp_master',on_delete = models.CASCADE,related_name='emp_market_skills')
     marketing_skill  = models.ForeignKey(MarketingSkill, on_delete=models.SET_NULL, null=True, blank=True)
     percentage       = models.DecimalField(max_digits=5, decimal_places=2, default=None, null=True, blank=True)
     value            = models.CharField(max_length=100,null=True,blank =True,default=None)
+    created_at       = models.DateTimeField(auto_now_add=True)
+    created_by       = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+    
 
     def __str__(self):
         return f"{self.emp_id} - {self.value}"
@@ -462,6 +472,8 @@ class EmployeeProgramSkill(models.Model):
     program_skill = models.ForeignKey(ProgrammingLanguageSkill, on_delete=models.SET_NULL, null=True, blank=True)
     percentage    = models.DecimalField(max_digits=5, decimal_places=2, default=None, null=True, blank=True)
     value         = models.CharField(max_length=100,null=True,blank =True,default=None)
+    created_at    = models.DateTimeField(auto_now_add=True)
+    created_by    = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
 
     def __str__(self):
         return f"{self.emp_id} - {self.value}"
@@ -474,6 +486,9 @@ class EmployeeLangSkill(models.Model):
     language_skill  = models.ForeignKey(LanguageSkill, on_delete=models.SET_NULL, null=True, blank=True)
     percentage      = models.DecimalField(max_digits=5, decimal_places=2, default=None, null=True, blank=True)
     value           = models.CharField(max_length=100,null=True,blank =True,default=None)
+    created_at      = models.DateTimeField(auto_now_add=True)
+    created_by      = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
 
     def __str__(self):
         return f"{self.emp_id} - {self.value}"
@@ -494,6 +509,9 @@ class EmailTemplate(models.Model):
     subject             = models.CharField(max_length=255)
     body                = models.TextField()
     use_common_template = models.BooleanField(default=False)
+    created_at          = models.DateTimeField(auto_now_add=True)
+    created_by          = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
     def __str__(self):
         if self.use_common_template:
             return f"Common {self.template_type} template"
@@ -507,6 +525,9 @@ class EmailConfiguration(models.Model):
     email_host_user       = models.CharField(max_length=255, blank=True, null=True)
     email_host_password   = models.CharField(max_length=255, blank=True, null=True)
     is_active             = models.BooleanField(default=False)
+    created_at            = models.DateTimeField(auto_now_add=True)
+    created_by            = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
 
     def __str__(self):
         return f"Email Configuration ({'Active' if self.is_active else 'Inactive'})"
@@ -622,7 +643,7 @@ class RequestNotification(models.Model):
             email.send(fail_silently=False)
 
 class RequestType(models.Model):
-    name                =  models.CharField(max_length=50)
+    name                =  models.CharField(max_length=50,unique=True)
     description         = models.CharField(max_length=150)
     created_at          = models.DateField(auto_now_add=True)
     updated_at          = models.DateField(auto_now_add=True)
@@ -669,7 +690,7 @@ class CommonWorkflow(models.Model):
 
 
 class GeneralRequest(models.Model):
-    doc_number       =  models.CharField(max_length=120,unique=True,null=True,blank=True)
+    doc_number       =  models.CharField(max_length=120,unique=True)
     reason           =  models. CharField(max_length=200)
     branch           =  models.ForeignKey('OrganisationManager.brnch_mstr',on_delete = models.CASCADE)
     request_type     =  models.ForeignKey('RequestType',on_delete = models.CASCADE)
@@ -822,13 +843,14 @@ class Approval(models.Model):
         (REJECTED, 'Rejected'),
     ]
     general_request = models.ForeignKey(GeneralRequest, related_name='approvals', on_delete=models.CASCADE)
-    approver = models.ForeignKey('UserManagement.CustomUser', on_delete=models.CASCADE)
-    role = models.CharField(max_length=50, null=True, blank=True)
-    level = models.IntegerField(default=1)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES,default=PENDING)
-    note = models.TextField(null=True, blank=True)
-    created_at = models.DateField(auto_now_add=True)
-    updated_at = models.DateField(auto_now=True)
+    approver        = models.ForeignKey('UserManagement.CustomUser', on_delete=models.CASCADE)
+    role            = models.CharField(max_length=50, null=True, blank=True)
+    level           = models.IntegerField(default=1)
+    status          = models.CharField(max_length=20, choices=STATUS_CHOICES,default=PENDING)
+    note            = models.TextField(null=True, blank=True)
+    created_at      = models.DateField(auto_now_add=True)
+    created_by      = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+    updated_at      = models.DateField(auto_now=True)
    
     def approve(self,note=None):
         self.status = self.APPROVED
@@ -924,11 +946,17 @@ class SelectedEmpNotify(models.Model):
     # selected_ess_user = models.ForeignKey(emp_master, on_delete=models.SET_NULL, null=True, blank=True)
     # selected_ess_users=models.ManyToManyField(emp_master, blank=True)
     selected_employees = models.ManyToManyField(emp_master, blank=True)  # Allows multiple employee selections
+    created_at         = models.DateTimeField(auto_now_add=True)
+    created_by         = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
 
 class NotificationSettings(models.Model):
     branch              = models.ForeignKey("OrganisationManager.brnch_mstr", on_delete=models.CASCADE)
     days_before_expiry  = models.IntegerField(default=7)  # Default reminder 7 days before expiry
     days_after_expiry   = models.IntegerField(default=0)  # Default reminder 0 days after expiry (on expiry day)
+    created_at          = models.DateTimeField(auto_now_add=True)
+    created_by          = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
 
     def __str__(self):
         return f"Reminder Settings for {self.branch.name}"
@@ -940,6 +968,9 @@ class DocExpEmailTemplate(models.Model):
     template_name   = models.CharField(max_length=100,choices=Name_Choices)
     subject         = models.CharField(max_length=255)
     body            = models.TextField()
+    created_at      = models.DateTimeField(auto_now_add=True)
+    created_by      = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
         
     def __str__(self):
         return self.template_name

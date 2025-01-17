@@ -7,7 +7,7 @@ from EmpManagement .models import Emp_CustomField
 #branch model
 class brnch_mstr(models.Model):
     branch_name               = models.CharField(max_length=100)
-    branch_code               = models.CharField(max_length=50,unique=True,null=True,blank =True)
+    branch_code               = models.CharField(max_length=50,unique=True)
     branch_logo               = models.ImageField(null=True)
     notification_period_days  = models.IntegerField()
     br_start_date             = models.DateField(null=True)
@@ -31,7 +31,7 @@ class brnch_mstr(models.Model):
 #departments model
 class dept_master(models.Model):
     dept_name        = models.CharField(max_length=50)
-    dept_code        = models.CharField(max_length=50,unique=True,null=True,blank =True)
+    dept_code        = models.CharField(max_length=50,unique=True)
     dept_description = models.CharField(max_length=200)
     dept_created_at  = models.DateTimeField(auto_now_add=True)
     dept_created_by  = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
@@ -52,7 +52,7 @@ class dept_master(models.Model):
 #designation master
 class desgntn_master(models.Model):
     desgntn_job_title   =  models.CharField(max_length=50)
-    desgntn_code        = models.CharField(max_length=50,unique=True,null=True,blank =True)
+    desgntn_code        = models.CharField(max_length=50,unique=True)
     desgntn_description = models.CharField(max_length=200)
     desgntn_created_at  = models.DateTimeField(auto_now_add=True)
     desgntn_created_by  = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
@@ -65,7 +65,7 @@ class desgntn_master(models.Model):
 #CATOGARY master
 class ctgry_master(models.Model):
     ctgry_title       =  models.CharField(max_length=50)
-    ctgry_code        = models.CharField(max_length=50,unique=True,null=True,blank =True)    
+    ctgry_code        = models.CharField(max_length=50,unique=True)    
     ctgry_description = models.CharField(max_length=200)
     ctgry_created_at  = models.DateTimeField(auto_now_add=True)
     ctgry_created_by  = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
@@ -80,6 +80,9 @@ class FiscalYear(models.Model):
     name       = models.CharField(max_length=100)
     start_date = models.DateField()
     end_date   = models.DateField(blank=True,null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
 
 class FiscalPeriod(models.Model):
     fiscal_year   = models.ForeignKey(FiscalYear, on_delete=models.CASCADE)
@@ -107,6 +110,9 @@ class document_numbering(models.Model):
     start_number           = models.IntegerField()
     current_number         = models.IntegerField()
     end_number             = models.IntegerField()
+    created_at             = models.DateTimeField(auto_now_add=True)
+    created_by             = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
     class Meta:
         unique_together = ('branch_id', 'category', 'type')
     def str(self):
@@ -124,6 +130,7 @@ class CompanyPolicy(models.Model):
     specific_users  = models.ManyToManyField('UserManagement.CustomUser', blank=True)
     created_at      = models.DateTimeField(auto_now_add=True)
     updated_at      = models.DateTimeField(auto_now=True)
+    created_by     = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
 
     def __str__(self):
         return self.title
@@ -135,6 +142,9 @@ class AssetMaster(models.Model):
     available_quantity = models.PositiveIntegerField()
     created_at         = models.DateTimeField(auto_now_add=True)
     updated_at         = models.DateTimeField(auto_now=True)
+    created_at         = models.DateTimeField(auto_now_add=True)
+    created_by         = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
 
     def __str__(self):
         return self.name
@@ -153,6 +163,9 @@ class AssetTransaction(models.Model):
     quantity         = models.PositiveIntegerField()
     date             = models.DateField(auto_now_add=True)
     remarks          = models.TextField(blank=True, null=True)
+    created_at         = models.DateTimeField(auto_now_add=True)
+    created_by         = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
 
     def __str__(self):
         return f"{self.transaction_type} - {self.asset.name} ({self.quantity})"
@@ -168,9 +181,11 @@ class AssetTransaction(models.Model):
         super().save(*args, **kwargs)
 
 class Asset_CustomFieldValue(models.Model):
-    asset_custom_field = models.CharField(max_length=100,null=True)
+    asset_custom_field = models.CharField(max_length=100)
     field_value      = models.TextField(null=True, blank=True)  # Field value provided by end user
     asset_master      = models.ForeignKey('AssetMaster', on_delete=models.CASCADE, related_name='custom_field_values',null=True)
+    created_at         = models.DateTimeField(auto_now_add=True)
+    created_by         = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
 
     def __str__(self):
         return f'{self.asset_custom_field.emp_custom_field}: {self.field_value}'
