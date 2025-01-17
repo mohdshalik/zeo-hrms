@@ -1091,7 +1091,7 @@ class LvRejectionReason(models.Model):
 class LeaveApprovalLevels(models.Model):
     level            = models.IntegerField()
     role             = models.CharField(max_length=50, null=True, blank=True)  # Use this for role-based approval like 'CEO' or 'Manager'
-    approver         = models.ForeignKey('UserManagement.CustomUser',on_delete=models.SET_NULL)  # Use this for user-based approval
+    approver         = models.ForeignKey('UserManagement.CustomUser',on_delete=models.SET_NULL,null=True, blank=True,)  # Use this for user-based approval
     request_type     = models.ForeignKey('leave_type', related_name='leave_approval_levels', on_delete=models.CASCADE, null=True, blank=True)  # Nullable for common workflow
     is_compensatory  = models.BooleanField(default=False)
     created_at       = models.DateTimeField(auto_now_add=True)
