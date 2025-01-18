@@ -26,8 +26,8 @@ from django.template import Context, Template
 from django.utils import timezone
 from django.core.mail import EmailMultiAlternatives,get_connection, send_mail
 from Core .models import LanguageSkill,MarketingSkill,ProgrammingLanguageSkill
-
-
+import logging
+logger = logging.getLogger((__name__))
 
 #EmpManagement
 class emp_master(models.Model):    
@@ -75,39 +75,73 @@ class emp_master(models.Model):
     users                    = models.ForeignKey('UserManagement.CustomUser', on_delete=models.CASCADE, related_name='employees',null=True,blank =True)
     created_at               = models.DateTimeField(auto_now_add=True)
     created_by               = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
-      
+    
+
     def save(self, *args, **kwargs):
-        from UserManagement.models import company
         created = not self.pk  # Check if the instance is being created for the first time
         super().save(*args, **kwargs)
 
-        if created and self.is_ess:  # Check if is_ess is True before creating the user
-            # Create a new user with default password
+        if created and self.is_ess:
+            from UserManagement.models import company
             user_model = get_user_model()
             username = self.emp_code
-            password = 'admin'  # You can set a default password here
+            password = 'admin'
             email = self.emp_personal_email
-            # Get the tenant_id from the request or context
+
             schema_name = connection.schema_name
-            # Fetch the company instance based on the schema name
             try:
                 company_instance = company.objects.get(name=schema_name)
             except company.DoesNotExist:
-            # Handle the case where company instance does not exist for the schema
                 company_instance = None
-            # Create the user
-            user = user_model.objects.create_user(username=username, email=email, password=password)
-            # Link the user to the employee
-            self.created_by = user
-            if company_instance:
-            # Set the tenant_id to the user using the set() method
-                user.tenants.set([company_instance])
-            else:
-            # Handle the case where company instance is not found
-                pass  # You can handle this according to your requirement
-            # Set is_ess to True
-            user.is_ess = True
-            user.save()
+                logger.error(f"No company found for schema: {schema_name}")
+
+            try:
+                user = user_model.objects.create_user(username=username, email=email, password=password)
+                self.created_by = user
+
+                if company_instance:
+                    user.tenants.set([company_instance])
+                    logger.info(f"User {user.username} assigned to tenants: {company_instance}")
+                else:
+                    logger.warning(f"User {user.username} not assigned to any tenant (no company found).")
+
+                user.is_ess = True
+                user.save()
+            except Exception as e:
+                logger.error(f"Error creating user for {self.emp_code}: {e}")
+                raise
+    # def save(self, *args, **kwargs):
+    #     from UserManagement.models import company
+    #     created = not self.pk  # Check if the instance is being created for the first time
+    #     super().save(*args, **kwargs)
+
+    #     if created and self.is_ess:  # Check if is_ess is True before creating the user
+    #         # Create a new user with default password
+    #         user_model = get_user_model()
+    #         username = self.emp_code
+    #         password = 'admin'  # You can set a default password here
+    #         email = self.emp_personal_email
+    #         # Get the tenant_id from the request or context
+    #         schema_name = connection.schema_name
+    #         # Fetch the company instance based on the schema name
+    #         try:
+    #             company_instance = company.objects.get(name=schema_name)
+    #         except company.DoesNotExist:
+    #         # Handle the case where company instance does not exist for the schema
+    #             company_instance = None
+    #         # Create the user
+    #         user = user_model.objects.create_user(username=username, email=email, password=password)
+    #         # Link the user to the employee
+    #         self.created_by = user
+    #         if company_instance:
+    #         # Set the tenant_id to the user using the set() method
+    #             user.tenants.set([company_instance])
+    #         else:
+    #         # Handle the case where company instance is not found
+    #             pass  # You can handle this according to your requirement
+    #         # Set is_ess to True
+    #         user.is_ess = True
+    #         user.save()
             
     def __str__(self):
         return self.emp_code

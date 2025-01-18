@@ -97,7 +97,6 @@ CORS_ALLOWED_ORIGINS = [
 CORS_ALLOW_HEADERS = [
     'content-type',
     'Authorization',  # Add this if you're using authorization headers
-    ...
 ]
 
 

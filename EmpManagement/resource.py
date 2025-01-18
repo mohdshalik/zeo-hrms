@@ -63,7 +63,7 @@ class EmployeeResource(resources.ModelResource):
     emp_present_address = fields.Field(attribute='emp_present_address', column_name='Employee Current Address')
     emp_status = fields.Field(attribute='emp_status', column_name='Employee Status(True/False)')
     emp_joined_date = fields.Field(attribute='emp_joined_date', column_name='Employee Joining Date(DD/MM/YYYY)')
-    emp_active_date = fields.Field(attribute='emp_active_date', column_name='Employee Confirmaton Date(DD/MM/YYYY)')
+    emp_date_of_confirmation = fields.Field(attribute='emp_date_of_confirmation', column_name='Employee Confirmaton Date(DD/MM/YYYY)')
     emp_relegion = fields.Field(attribute='emp_relegion', column_name='Employee Religion')
     emp_blood_group = fields.Field(attribute='emp_blood_group', column_name='Employee Blood Group')
     emp_nationality_id = fields.Field(attribute='emp_nationality_id', column_name='Employee Nationality',widget=ForeignKeyWidget(Nationality, 'N_name'))
@@ -98,7 +98,7 @@ class EmployeeResource(resources.ModelResource):
             'emp_present_address',
             'emp_status',
             'emp_joined_date',
-            'emp_active_date',
+            'emp_date_of_confirmation',
             'emp_relegion',
             'emp_blood_group',
             'emp_nationality_id',
