@@ -10,7 +10,7 @@ from tenant_users.tenants.models import TenantBase,UserProfile
 # from tenant_users.tenants.tasks import provision_tenant
 from django_tenants.models import TenantMixin, DomainMixin
 from tenant_users.tenants.models import UserTenantPermissions
-
+import re
 
 from django_tenants.utils import schema_context
 
@@ -28,8 +28,11 @@ class company(TenantBase):
         return self.country.timezone if self.country else 'UTC'
     
     def save(self, *args, **kwargs):
+        # if self.name:
+        #     self.schema_name = self.name.replace(' ', '_')
         if self.name:
-            self.schema_name = self.name.replace(' ', '_')
+        # Sanitize name to create a valid schema name
+            self.schema_name = re.sub(r'[^a-zA-Z0-9_]', '_', self.name.lower())  # Convert to lowercase and replace invalid characters with '_'
         super().save(*args, **kwargs)  # Save the company and create the schema
 
         # Check if Domain exists (optional, using a Manager)
