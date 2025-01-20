@@ -28,6 +28,8 @@ class company(TenantBase):
         return self.country.timezone if self.country else 'UTC'
     
     def save(self, *args, **kwargs):
+        if self.name:
+            self.schema_name = self.name.replace(' ', '_')
         super().save(*args, **kwargs)  # Save the company and create the schema
 
         # Check if Domain exists (optional, using a Manager)

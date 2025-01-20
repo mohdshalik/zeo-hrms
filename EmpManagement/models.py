@@ -90,7 +90,7 @@ class emp_master(models.Model):
 
             schema_name = connection.schema_name
             try:
-                company_instance = company.objects.get(name=schema_name)
+                company_instance = company.objects.get(schema_name=schema_name)
             except company.DoesNotExist:
                 company_instance = None
                 logger.error(f"No company found for schema: {schema_name}")
