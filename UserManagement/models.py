@@ -31,8 +31,10 @@ class company(TenantBase):
         # if self.name:
         #     self.schema_name = self.name.replace(' ', '_')
         if self.name:
-        # Sanitize name to create a valid schema name
-            self.schema_name = re.sub(r'[^a-zA-Z0-9_]', '_', self.name.lower())  # Convert to lowercase and replace invalid characters with '_'
+            # Sanitize name to create a valid schema name
+            sanitized_name = re.sub(r'[^a-zA-Z0-9]+', '_', self.name.lower())  # Replace invalid characters with '_'
+            self.schema_name = re.sub(r'_+', '_', sanitized_name).strip('_')  # Avoid continuous underscores and trim
+
         super().save(*args, **kwargs)  # Save the company and create the schema
 
         # Check if Domain exists (optional, using a Manager)
