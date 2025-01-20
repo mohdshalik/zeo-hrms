@@ -30,6 +30,7 @@ class DepartmentResource(resources.ModelResource):
     dept_code = fields.Field(attribute='dept_code', column_name='Department Code')
     dept_description = fields.Field(attribute='dept_description', column_name='Description')
     dept_is_active = fields.Field(attribute='dept_is_active', column_name='Active')
+    branch_id = fields.Field(attribute='branch_id', column_name='Branch',widget=ForeignKeyWidget(brnch_mstr, 'branch_name'))
     class Meta:
         model = dept_master
        
@@ -38,6 +39,7 @@ class DepartmentResource(resources.ModelResource):
                   'dept_code',
                   'dept_description',
                   'dept_is_active',
+                  'branch_id'
         ) 
         import_id_fields = ()
 
