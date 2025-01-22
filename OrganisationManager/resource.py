@@ -60,7 +60,7 @@ class DeptReportResource(resources.ModelResource):
                   'branch_id'
         ) 
 class DesignationResource(resources.ModelResource):
-    desgntn_job_title = fields.Field(attribute='desgntn_job_title', column_name='Designation')
+    desgntn_job_title = fields.Field(attribute='desgntn_job_title', column_name='Job Tittle')
     desgntn_code = fields.Field(attribute='desgntn_code', column_name='Designation Code')
     desgntn_description = fields.Field(attribute='desgntn_description', column_name='Description')
     desgntn_is_active = fields.Field(attribute='desgntn_is_active', column_name='Active')
@@ -76,9 +76,20 @@ class DesignationResource(resources.ModelResource):
                   'desgntn_is_active',
                   
         )  
-        import_id_fields = ()           
+        import_id_fields = () 
+    def before_import_row(self, row, **kwargs):
+        # Check for missing 'Designation' field
+        errors = []
+        if not row.get('Job Tittle'):
+            errors.append(f"Row {kwargs.get('row_number')}: 'Job Tittle' field cannot be blank.")
+        if not row.get('Designation Code'):
+            errors.append(f"Row {kwargs.get('row_number')}: 'Designation Code' field cannot be blank.")
+        if desgntn_master.objects.filter(desgntn_code=row['Designation Code']).exists():
+                errors.append(f"Designation Code '{row['Designation Code']}' Found Duplicate Designation Code - it must be unique .")
+        if errors:
+            raise ValueError(errors)          
 class DesgtnReportResource(resources.ModelResource):
-    desgntn_job_title = fields.Field(attribute='desgntn_job_title', column_name='Designation')
+    desgntn_job_title = fields.Field(attribute='desgntn_job_title', column_name='Job Tittle')
     desgntn_code = fields.Field(attribute='desgntn_code', column_name='Designation Code')
     desgntn_description = fields.Field(attribute='desgntn_description', column_name='Description')
     desgntn_is_active = fields.Field(attribute='desgntn_is_active', column_name='Active')

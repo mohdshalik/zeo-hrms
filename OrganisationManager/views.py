@@ -312,11 +312,29 @@ class DesignationBulkUploadViewSet(viewsets.ModelViewSet):
                     # Create a resource instance
                     resource = DesignationResource()
 
-                    # Import data into the model using the resource
+                    # Initialize a list to capture row-wise errors
+                    errors = []
+
+                    # Validate each row before importing
+                    for row_number, row in enumerate(dataset.dict, start=2):  # Start counting from row 2
+                        try:
+                            resource.before_import_row(row, row_number=row_number)
+                        except ValueError as e:
+                            # Append validation errors for this row
+                            errors.append(str(e))
+
+                    # If there are errors, return them in the response
+                    if errors:
+                        return Response({"validation_errors": errors}, status=400)
+
+                    # Import data if there are no errors
                     result = resource.import_data(dataset, dry_run=False, raise_errors=True)
 
+                    # Return success message
                     return Response({"message": f"{result.total_rows} records created successfully"})
+
                 except Exception as e:
+                    # Handle unexpected errors
                     return Response({"error": str(e)}, status=400)
             else:
                 return Response({"error": "Invalid file format. Only Excel files (.xlsx) are supported."}, status=400)
