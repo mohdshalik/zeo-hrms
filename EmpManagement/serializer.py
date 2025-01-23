@@ -93,7 +93,7 @@ class Emp_qf_Serializer(serializers.ModelSerializer):
 class DOC_CustomFieldValueSerializer(serializers.ModelSerializer):
     # content_type_name = serializers.SerializerMethodField()
     def to_representation(self, instance):
-        rep = super(Emp_CustomFieldValueSerializer, self).to_representation(instance)
+        rep = super(DOC_CustomFieldValueSerializer, self).to_representation(instance)
         if instance.emp_custom_field:  # Check if emp_state_id is not None
             rep['emp_custom_field'] = instance.emp_custom_field
         return rep
@@ -111,7 +111,7 @@ class EmpDocuments_Udf_Serializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class DocumentSerializer(serializers.ModelSerializer):
-    custom_fields = EmpDocuments_Udf_Serializer(many=True, read_only=True)
+    doc_custom_fields=DOC_CustomFieldValueSerializer(many=True, read_only=True, source='custom_field_values')
     created_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
     updated_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
     class Meta:
