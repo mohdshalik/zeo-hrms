@@ -19,7 +19,7 @@ from .models import (emp_family,EmpJobHistory,EmpQualification,Emp_Documents,Emp
                     notification,Report,Doc_Report,RequestType,
                     GeneralRequest,GeneralRequestReport,EmployeeMarketingSkill,EmployeeProgramSkill,EmployeeLangSkill,Approval,
                     ApprovalLevel,RequestNotification,Emp_CustomFieldValue,EmailTemplate,EmailConfiguration,SelectedEmpNotify,NotificationSettings,
-                    DocExpEmailTemplate,CommonWorkflow,
+                    DocExpEmailTemplate,CommonWorkflow,Doc_CustomFieldValue
                      )
 
 from OrganisationManager.serializer import CompanyPolicySerializer
@@ -90,6 +90,21 @@ class Emp_qf_Serializer(serializers.ModelSerializer):
  
 
 #EMPLOYEE DOCUMENT CREDENTIALS
+class DOC_CustomFieldValueSerializer(serializers.ModelSerializer):
+    # content_type_name = serializers.SerializerMethodField()
+    def to_representation(self, instance):
+        rep = super(Emp_CustomFieldValueSerializer, self).to_representation(instance)
+        if instance.emp_custom_field:  # Check if emp_state_id is not None
+            rep['emp_custom_field'] = instance.emp_custom_field
+        return rep
+    class Meta:
+        model = Doc_CustomFieldValue
+        fields = '__all__'
+    
+    def validate_field_name(self, value):
+        if not EmpDocuments_CustomField.objects.filter(field_name=value).exists():
+            raise serializers.ValidationError(f"Field name '{value}' does not exist in Document_CustomField.")
+        return value
 class EmpDocuments_Udf_Serializer(serializers.ModelSerializer):
     class Meta:
         model = EmpDocuments_CustomField

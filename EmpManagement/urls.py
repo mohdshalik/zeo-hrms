@@ -6,7 +6,7 @@ from .views import (EmpFamViewSet, EmpJobHistoryvSet, EmpViewSet,NotificationVie
                     Bulkupload_DocumentViewSet,ReportViewset,Doc_ReportViewset,GeneralReportViewset,
                     RequestTypeViewset,GeneralRequestViewset,EmpMarketSkillViewSet,EmpPrgrmSkillViewSet,
                     EmpLangSkillViewSet,ApprovalViewset,ApprovalLevelViewset,UserNotificationsViewSet,Emp_CustomFieldValueViewSet,EmailTemplateViewset,
-                    EmailConfigurationViewSet,UpdateESSUserView,ESSUserListView,NotificationSettingsViewSet,DocExpEmailTemplateViewset,CommonWorkflowViewSet,)
+                    EmailConfigurationViewSet,UpdateESSUserView,ESSUserListView,NotificationSettingsViewSet,DocExpEmailTemplateViewset,CommonWorkflowViewSet,Doc_CustomFieldValueViewSet)
 
 # Define the main router for top-level routes
 router = DefaultRouter()
@@ -27,6 +27,7 @@ router.register(r'empQualification-UDF', EmpQf_UdfViewset, basename='emp_qualifi
 router.register(r'emp-Documents', Emp_DocumentViewSet, basename='emp_document')
 router.register(r'Bulkupload-Documents', Bulkupload_DocumentViewSet, basename='bulk_upload_document')
 router.register(r'emp-Documents-UDF', EmpDoc_UdfViewset, basename='emp_document_udf')
+router.register(r'Documents-customfieldvalue', Doc_CustomFieldValueViewSet, basename='Documents-customfieldvalue')
 router.register(r'emp-leave-request', EmpLeaveRequestViewSet)
 router.register(r'notification', NotificationViewset, basename='employee-document-notification')
 

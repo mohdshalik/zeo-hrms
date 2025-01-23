@@ -7,7 +7,7 @@ from .models import (emp_family,Emp_Documents,EmpJobHistory,EmpLeaveRequest,EmpQ
                      emp_master,notification,EmpFamily_CustomField,EmpJobHistory_CustomField,
                      EmpQualification_CustomField,EmpDocuments_CustomField,LanguageSkill,MarketingSkill,ProgrammingLanguageSkill,Emp_CustomField,Report,Doc_Report,GeneralRequest,RequestType,GeneralRequestReport,EmployeeLangSkill,EmployeeProgramSkill,
                      EmployeeMarketingSkill,Approval,ApprovalLevel,RequestNotification,Emp_CustomFieldValue,
-                     EmailTemplate,EmailConfiguration,SelectedEmpNotify,NotificationSettings,DocExpEmailTemplate,CommonWorkflow,
+                     EmailTemplate,EmailConfiguration,SelectedEmpNotify,NotificationSettings,DocExpEmailTemplate,CommonWorkflow,Doc_CustomFieldValue
                      )
 from .serializer import (Emp_qf_Serializer,EmpFamSerializer,EmpSerializer,NotificationSerializer,RequestTypeSerializer,
                          EmpJobHistorySerializer,EmpLeaveRequestSerializer,DocumentSerializer,GeneralRequestSerializer,
@@ -15,7 +15,7 @@ from .serializer import (Emp_qf_Serializer,EmpFamSerializer,EmpSerializer,Notifi
                          EmpFam_CustomFieldSerializer,EmpJobHistory_Udf_Serializer,Emp_qf_udf_Serializer,EmpDocuments_Udf_Serializer,
                          DocBulkuploadSerializer,DocumentReportSerializer,EmpPrgrmSkillSerializer,EmpLangSkillSerializer,ApprovalSerializer,ApprovalLevelSerializer,
                          ReqNotifySerializer,Emp_CustomFieldValueSerializer,EmailTemplateSerializer,EmployeeFilterSerializer,EmailConfigurationSerializer,SelectedEmpNotifySerializer,
-                         NotificationSettingsSerializer,DocExpEmailTemplateSerializer,CommonWorkflowSerializer,)
+                         NotificationSettingsSerializer,DocExpEmailTemplateSerializer,CommonWorkflowSerializer,DOC_CustomFieldValueSerializer)
 
 from .resource import EmployeeResource,DocumentResource,EmpCustomFieldValueResource, MarketingSkillResource,ProLangSkillResource
 from .permissions import (IsSuperUserOrHasGeneralRequestPermission,IsSuperUserOrInSameBranch,EmpCustomFieldPermission,EmpCustomFieldValuePermission,
@@ -895,6 +895,31 @@ class EmpDoc_UdfViewset(viewsets.ModelViewSet):
             return Response({'error': error_message}, status=status.HTTP_400_BAD_REQUEST)
         
         return super().handle_exception(exc)
+    
+    def get_available_fields(self):
+        # Get the field names along with their data types
+        # emp_master_fields = [
+        #     {'name': field.name, 'type': field.get_internal_type()}
+        #     for field in emp_master._meta.get_fields()
+        #     if isinstance(field, Field)
+        # ]
+        # return emp_master_fields
+        emp_master_fields = [
+        {'name': field.name, 'type': field.__class__.__name__}
+        for field in Emp_Documents._meta.get_fields()
+        if isinstance(field, Field)
+        ]
+        return emp_master_fields
+    
+    @action(detail=False, methods=['get'])
+    def employee_fields(self, request, *args, **kwargs):
+        available_fields = self.get_available_fields()
+        return Response({'available_fields': available_fields})
+class Doc_CustomFieldValueViewSet(viewsets.ModelViewSet):
+    queryset = Doc_CustomFieldValue.objects.all()
+    serializer_class = DOC_CustomFieldValueSerializer
+    # permission_classes = [EmpCustomFieldValuePermission]
+
 
 
 class EmpbulkuploadViewSet(viewsets.ModelViewSet):

@@ -66,15 +66,22 @@ class Domain(DomainMixin):
 
 
 class CustomUser(UserProfile):
-    username = models.CharField(max_length=150,unique=True)
-    is_ess = models.BooleanField(default=False,null=True,blank =True)
+    username = models.CharField(max_length=150, unique=True)
+    email = models.EmailField(
+        ("Email Address"),
+        unique=True,
+        blank=True,  # Allow email to be optional
+        null=True,   # Allow email to be optional
+    )
+    is_ess = models.BooleanField(default=False, null=True, blank=True)
     is_staff = models.BooleanField(default=False)
     is_superuser = models.BooleanField(default=False)
-    
-    USERNAME_FIELD = 'username'  # Change USERNAME_FIELD to 'username'
-    REQUIRED_FIELDS = ['email']  # Remove 'username' from REQUIRED_FIELDS
+
+    USERNAME_FIELD = 'username'  # Authentication uses username
+    REQUIRED_FIELDS = []  # No required fields other than username
 
     objects = CustomUserManager()
+
     def save(self, *args, **kwargs):
         # Set is_active to True before saving
         self.is_active = True

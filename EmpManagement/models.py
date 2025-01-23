@@ -82,14 +82,14 @@ class emp_master(models.Model):
         super().save(*args, **kwargs)
 
         if created and self.is_ess:
-            from UserManagement.models import company
             user_model = get_user_model()
             username = self.emp_code
             password = 'admin'
             email = self.emp_personal_email
-
             schema_name = connection.schema_name
+
             try:
+                from UserManagement.models import company
                 company_instance = company.objects.get(schema_name=schema_name)
             except company.DoesNotExist:
                 company_instance = None
@@ -110,38 +110,6 @@ class emp_master(models.Model):
             except Exception as e:
                 logger.error(f"Error creating user for {self.emp_code}: {e}")
                 raise
-    # def save(self, *args, **kwargs):
-    #     from UserManagement.models import company
-    #     created = not self.pk  # Check if the instance is being created for the first time
-    #     super().save(*args, **kwargs)
-
-    #     if created and self.is_ess:  # Check if is_ess is True before creating the user
-    #         # Create a new user with default password
-    #         user_model = get_user_model()
-    #         username = self.emp_code
-    #         password = 'admin'  # You can set a default password here
-    #         email = self.emp_personal_email
-    #         # Get the tenant_id from the request or context
-    #         schema_name = connection.schema_name
-    #         # Fetch the company instance based on the schema name
-    #         try:
-    #             company_instance = company.objects.get(name=schema_name)
-    #         except company.DoesNotExist:
-    #         # Handle the case where company instance does not exist for the schema
-    #             company_instance = None
-    #         # Create the user
-    #         user = user_model.objects.create_user(username=username, email=email, password=password)
-    #         # Link the user to the employee
-    #         self.created_by = user
-    #         if company_instance:
-    #         # Set the tenant_id to the user using the set() method
-    #             user.tenants.set([company_instance])
-    #         else:
-    #         # Handle the case where company instance is not found
-    #             pass  # You can handle this according to your requirement
-    #         # Set is_ess to True
-    #         user.is_ess = True
-    #         user.save()
             
     def __str__(self):
         return self.emp_code
@@ -450,19 +418,130 @@ class Emp_Documents(models.Model):
 
 #Document UDF
 class EmpDocuments_CustomField(models.Model):
-    FIELD_TYPES = (
+    FIELD_TYPES = (   
         ('dropdown', 'DropdownField'),
         ('radio', 'RadioButtonField'),
-        )
-    emp_documents    = models.ForeignKey(Emp_Documents, on_delete=models.CASCADE,related_name='custom_fields')
-    field_name       = models.CharField(max_length=100)  # Field name provided by end user
-    field_value      = models.TextField(null=True, blank=True)  # Field value provided by end user
-    data_type        = models.CharField(max_length=20, choices=FIELD_TYPES,null=True,blank =True)
+        ('date', 'DateField'),
+        ('text', 'TextField'),
+        ('checkbox', 'CheckboxField'),
+    )
+    # emp_master = models.ForeignKey(emp_master, on_delete=models.CASCADE, related_name='custom_fields',null=True)
+    emp_custom_field = models.CharField(unique=True,max_length=100,null=True)  # Field name provided by end user
+    data_type        = models.CharField(max_length=20, choices=FIELD_TYPES, null=True, blank=True)
     dropdown_values  = models.JSONField(null=True, blank=True)
     radio_values     = models.JSONField(null=True, blank=True)
+    checkbox_values  = models.JSONField(null=True,blank=True)
     created_at       = models.DateTimeField(auto_now_add=True)
     created_by       = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
 
+    def __str__(self):
+        return self.emp_custom_field    
+    
+    def clean(self):
+        # Validate dropdown field values
+        if self.data_type == 'dropdown':
+            if self.dropdown_values:
+                options = self.dropdown_values
+                if  not  options:
+                    raise ValidationError({'field_value': 'Select a value from the dropdown options.'})
+            else:
+                raise ValidationError({'field_value': 'provide value to the dropdown options.'})
+        # Validate radio field values
+        elif self.data_type == 'radio':
+            if self.radio_values:
+                options = self.radio_values
+                if not  options:
+                    raise ValidationError({'field_value': 'Select a value from the radio options.'})
+            else:
+                raise ValidationError({'field_value': 'provide value to the radio options.'})
+        # Validate checkbox field values
+        elif self.data_type == 'checkbox':
+            if self.checkbox_values:
+                options = self.checkbox_values
+                if not  options:
+                    raise ValidationError({'field_value': 'Select a value from the checkbox options.'})
+            else:
+                raise ValidationError({'field_value': 'provide value to the checkbox options.'})
+    def save(self, *args, **kwargs):
+        self.clean()  # Call clean to perform validation
+        super().save(*args, **kwargs)
+    
+class Doc_CustomFieldValue(models.Model):
+    emp_custom_field = models.CharField(max_length=100)
+    field_value      = models.TextField(null=True, blank=True)  # Field value provided by end user
+    emp_documents       = models.ForeignKey('Emp_Documents', on_delete=models.CASCADE, related_name='custom_field_values')
+    created_at       = models.DateTimeField(auto_now_add=True)
+    created_by       = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+ 
+
+    def __str__(self):
+        return f'{self.emp_custom_field.emp_custom_field}: {self.field_value}'
+
+    def save(self, *args, **kwargs):
+        if not self.emp_custom_field:
+            raise ValueError("Field name cannot be None or empty.")
+        if not EmpDocuments_CustomField.objects.filter(emp_custom_field=self.emp_custom_field).exists():
+            raise ValueError(f"Field name '{self.emp_custom_field}' does not exist in Emp_CustomField.")
+
+        # Check if a custom field value already exists for the same emp_master and emp_custom_field
+        existing_value = Doc_CustomFieldValue.objects.filter(
+            emp_custom_field=self.emp_custom_field,
+            emp_documents=self.emp_documents
+        ).first()
+
+        if existing_value:
+            # If it exists, update the existing record instead of creating a new one
+            existing_value.field_value = self.field_value
+            # Use update() to avoid calling save() and prevent recursion
+            Doc_CustomFieldValue.objects.filter(
+                id=existing_value.id
+            ).update(field_value=self.field_value)
+        else:
+            # Call full_clean to ensure that the clean method is called
+            self.full_clean()
+            super().save(*args, **kwargs)
+
+    def clean(self):
+        # Retrieve the custom field object
+        custom_field = EmpDocuments_CustomField.objects.filter(emp_custom_field=self.emp_custom_field).first()
+
+        if not custom_field:
+            raise ValidationError(f"Field name '{self.emp_custom_field}' does not exist in Emp_CustomField.")
+        
+        field_value = self.field_value
+
+        if custom_field.data_type == 'dropdown':
+            if custom_field.dropdown_values:
+                options = custom_field.dropdown_values
+                if not field_value or field_value not in options:
+                    raise ValidationError({'field_value': 'Select a value from the dropdown options.'})
+        
+        elif custom_field.data_type == 'radio':
+            if custom_field.radio_values:
+                options = custom_field.radio_values
+                if not field_value or field_value not in options:
+                    raise ValidationError({'field_value': 'Select a value from the radio options.'})
+       
+        elif custom_field.data_type == 'checkbox':
+            if custom_field.checkbox_values:
+                options = custom_field.checkbox_values
+                if not field_value or field_value not in options:
+                    raise ValidationError({'field_value': 'Select a value from the checkbox options.'})
+
+
+        elif custom_field.data_type == 'date':
+            if field_value:
+                try:
+                    parts = field_value.split('-')
+                    if len(parts) != 3:
+                        raise ValueError
+                    day, month, year = parts
+                    formatted_date = f"{day.zfill(2)}-{month.zfill(2)}-{year}"
+                    datetime.strptime(formatted_date, '%d-%m-%Y')
+                except ValueError:
+                    raise ValidationError({'field_value': 'Invalid date format. Date should be in DD-MM-YYYY format.'})
+            else:
+                raise ValidationError({'field_value': 'Date value is required.'})
     
     
     
