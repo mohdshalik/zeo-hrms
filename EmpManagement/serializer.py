@@ -106,6 +106,7 @@ class DOC_CustomFieldValueSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(f"Field name '{value}' does not exist in Document_CustomField.")
         return value
 class EmpDocuments_Udf_Serializer(serializers.ModelSerializer):
+    field_values = DOC_CustomFieldValueSerializer(many=True, read_only=True)
     class Meta:
         model = EmpDocuments_CustomField
         fields = '__all__'
