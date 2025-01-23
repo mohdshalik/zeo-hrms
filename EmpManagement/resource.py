@@ -66,7 +66,7 @@ class EmployeeResource(resources.ModelResource):
     emp_date_of_confirmation = fields.Field(attribute='emp_date_of_confirmation', column_name='Employee Confirmaton Date(DD/MM/YYYY)')
     emp_relegion = fields.Field(attribute='emp_relegion', column_name='Employee Religion')
     emp_blood_group = fields.Field(attribute='emp_blood_group', column_name='Employee Blood Group')
-    emp_nationality_id = fields.Field(attribute='emp_nationality_id', column_name='Employee Nationality',widget=ForeignKeyWidget(Nationality, 'N_name'))
+    emp_nationality_id = fields.Field(attribute='emp_nationality_id', column_name='Employee Nationality')
     emp_marital_status = fields.Field(attribute='emp_marital_status', column_name='Employee Marital Status')
     emp_father_name = fields.Field(attribute='emp_father_name', column_name='Employee Father Name')
     emp_mother_name = fields.Field(attribute='emp_mother_name', column_name='Employee Mother Name')
@@ -118,43 +118,55 @@ class EmployeeResource(resources.ModelResource):
     def before_import_row(self, row, **kwargs):
         errors = []
         login_id = row.get('Employee Code')
-        mobile_number_1 = row.get('Employee Personal Mob No')
-        mobile_number_2 = row.get('Employee Company Mobile No')
         personal_email = row.get('Employee Personal Email ID')
        
         
         if emp_master.objects.filter(emp_code=login_id).exists():
             errors.append(f"Duplicate value found for Employee Code: {login_id}")
                
-            
-        # if emp_master.objects.filter(emp_mobile_number_1=mobile_number_1).exists():
-        #     errors.append(f"Duplicate value found for Employee Personal Mobile No: {mobile_number_1}")
-            
+        department_name = row.get('Employee Department Code')
+        branch_name = row.get('Employee Branch Code')
 
-        # if mobile_number_2 and emp_master.objects.filter(emp_mobile_number_2=mobile_number_2).exists():
-        #     errors.append(f"Duplicate value found for Employee Personal Email ID: {mobile_number_2}")
+        # Fetch the branch using branch name (or code if it exists)
+        matching_branch = brnch_mstr.objects.filter(branch_name=branch_name).first()
+
+        if matching_branch:
+            # Filter departments in the matching branch by department name
+            matching_dept = dept_master.objects.filter(branch_id=matching_branch.id, dept_name=department_name)
+            print("matching_dept",matching_dept)
+            # Check the number of departments found
+            dept_count = matching_dept.count()
+            print("dept_count",dept_count)
+
+            if dept_count == 1:
+                # If exactly one department matches, use it
+                dept = matching_dept.first()
+                print("dept",dept)
+                print(f"Department: {dept.dept_name} found for Employee in Branch: {matching_branch.branch_name}")
+                row['emp_dept_id'] = dept.id  # Set the department ID in the row
+            elif dept_count > 1:
+                # If multiple departments match, handle accordingly
+                print(f"Warning: Multiple matching departments found for Branch: {matching_branch.branch_name} and Department: {department_name}")
+                # You could select which department to use based on additional logic or let the user decide
+                # For now, we are picking the first one
+                dept = matching_dept.first()
+                row['emp_dept_id'] = dept.id  # Set the department ID in the row
+                print(f"Selected Department: {dept.dept_name} for Employee.")
+            else:
+                # If no department matches, log the error
+                print(f"No matching department found for Employee in Branch: {matching_branch.branch_name} and Department: {department_name}")
+                errors.append(f"No matching department found for Department: {department_name} in Branch: {matching_branch.branch_name}")
+ 
+        
 
         if emp_master.objects.filter(emp_personal_email=personal_email).exists():
             errors.append(f"Duplicate value found for Employee Personal Email ID: {personal_email}")
         
          # Validating gender field
         gender = row.get('Employee Gender')
-        if gender and gender not in ['Male', 'Female', 'Other']:
-            errors.append("Invalid value for Employee Gender field. Allowed values are 'Male', 'Female','Other'")
-        
-        mobile_number_1 = row.get('Employee Personal Mob No')
-        if mobile_number_1:
-            try:
-                NumericMobileNumberWidget().clean(mobile_number_1)
-            except ValidationError as e:
-                errors.append(f"Personal Mobile No: {str(e)}")
-
-        mobile_number_2 = row.get('Employee Company Mob No')
-        if mobile_number_2:
-            try:
-                NumericMobileNumberWidget().clean(mobile_number_2)
-            except ValidationError as e:
-                errors.append(f"Company Mobile No: {str(e)}")
+        if gender and gender not in ['Male', 'Female', 'Other','M','F','O']:
+            errors.append("Invalid value for Employee Gender field. Allowed values are 'Male', 'Female','Other','M','F','O'")
+              
 
         # Validate date fields format
         date_fields = ['Employee DOB(DD/MM/YYYY)', 'Employee Joining Date(DD/MM/YYYY)', 'Employee Confirmaton Date(DD/MM/YYYY)']
@@ -181,8 +193,8 @@ class EmployeeResource(resources.ModelResource):
         
         # Validating marital status field
         marital_status = row.get('Employee Marital Status')
-        if marital_status and marital_status not in ['Married', 'Single', 'Divorced', 'Widow']:
-            errors.append("Invalid value for marital status field. Allowed values are 'Married', 'Single', 'Divorced', 'Widow'")      
+        if marital_status and marital_status not in ['Married', 'Single', 'Divorced', 'Widow','SINGLE','DIVORCED','WIDOW']:
+            errors.append("Invalid value for marital status field. Allowed values are 'Married', 'Single', 'Divorced', 'Widow','SINGLE','DIVORCED','WIDOW'")      
 
         if errors:
             raise ValidationError(errors)
