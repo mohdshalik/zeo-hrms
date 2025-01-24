@@ -11,29 +11,35 @@ from tenant_users.tenants.models import TenantBase,UserProfile
 from django_tenants.models import TenantMixin, DomainMixin
 from tenant_users.tenants.models import UserTenantPermissions
 import re
+from django.utils.text import slugify
 
 from django_tenants.utils import schema_context
 
-class company(TenantBase):
+class company(TenantMixin):
     name = models.CharField(max_length=100)
-    paid_until =  models.DateField(auto_now_add=True)
+    schema_name = models.SlugField(unique=True, blank=True, null=True)  # Ensure unique schemas
+    paid_until = models.DateField(auto_now_add=True)
     created_on = models.DateField(auto_now_add=True)
-    country=models.ForeignKey('Core.cntry_mstr',on_delete=models.CASCADE)
-    logo= models.ImageField(null=True,blank =True )
+    country = models.ForeignKey('Core.cntry_mstr', on_delete=models.CASCADE)
+    logo = models.ImageField(null=True, blank=True)
 
-    # default true, schema will be automatically created and synced when it is saved
+    # Automatically create schema when saving
     auto_create_schema = True
 
-    def get_timezone(self):
-        return self.country.timezone if self.country else 'UTC'
-    
     def save(self, *args, **kwargs):
-        # if self.name:
-        #     self.schema_name = self.name.replace(' ', '_')
-        if self.name:
-            # Sanitize name to create a valid schema name
-            sanitized_name = re.sub(r'[^a-zA-Z0-9]+', '_', self.name.lower())  # Replace invalid characters with '_'
-            self.schema_name = re.sub(r'_+', '_', sanitized_name).strip('_')  # Avoid continuous underscores and trim
+        # Generate schema_name from name if not explicitly provided
+        if not self.schema_name:
+            # Remove special characters and convert to lowercase
+            cleaned_name = re.sub(r'[^a-zA-Z0-9]', '', self.name)
+            # Ensure schema_name is unique by slugifying and appending a number if needed
+            base_schema_name = slugify(cleaned_name)
+            self.schema_name = base_schema_name
+
+            # Check for uniqueness
+            existing_schemas = type(self).objects.filter(schema_name__startswith=base_schema_name)
+            if existing_schemas.exists():
+                count = existing_schemas.count()
+                self.schema_name = f"{base_schema_name}{count + 1}"
 
         super().save(*args, **kwargs)  # Save the company and create the schema
 
@@ -45,21 +51,20 @@ class company(TenantBase):
         with schema_context(self.schema_name):
             # Create the branch within the company's schema
             brnch_mstr.objects.create(
-        branch_name=self.name,
-        branch_logo=self.logo,
-        branch_code='BR001',  # Provide a default or unique branch code
-        notification_period_days=30,  # Provide a value for non-nullable field
-        # branc_logo=None,  # This can be optional
-        br_country_id=1,  # Set the country or use default ID
-        # br_state_id=1,  # Set the state or use default ID
-        br_city='Sample City',
-        br_pincode='123456',
-        br_branch_nmbr_1='BR-0001',  # Provide a unique branch number
-        br_branch_mail='branch@example.com',  # Provide a valid email
-    )
+                branch_name=self.name,
+                branch_logo=self.logo,
+                branch_code='BR001',  # Provide a default or unique branch code
+                notification_period_days=30,  # Provide a value for non-nullable field
+                br_country_id=1,  # Set the country or use default ID
+                br_city='Sample City',
+                br_pincode='123456',
+                br_branch_nmbr_1='BR-0001',  # Provide a unique branch number
+                br_branch_mail='branch@example.com',  # Provide a valid email
+            )
 
-    def __str__(self):
-        return self.schema_name
+    def str(self):
+        return self.name
+
     
 class Domain(DomainMixin):
     pass
