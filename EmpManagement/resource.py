@@ -233,8 +233,8 @@ class EmployeeResource(resources.ModelResource):
         
         # Validating marital status field
         marital_status = row.get('Employee Marital Status')
-        if marital_status and marital_status not in ['Married', 'Single', 'Divorced', 'Widow','SINGLE','DIVORCED','WIDOW']:
-            errors.append("Invalid value for marital status field. Allowed values are 'Married', 'Single', 'Divorced', 'Widow','SINGLE','DIVORCED','WIDOW'")      
+        if marital_status and marital_status not in ['Married', 'Single', 'Divorced', 'Widow','MARRIED','SINGLE','DIVORCED','WIDOW']:
+            errors.append("Invalid value for marital status field. Allowed values are 'Married', 'Single', 'Divorced', 'Widow','MARRIED','SINGLE','DIVORCED',WIDOW")      
 
         if errors:
             raise ValidationError(errors)
