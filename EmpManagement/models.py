@@ -54,7 +54,7 @@ class emp_master(models.Model):
     emp_date_of_confirmation = models.DateField(null=True,blank =True)
     emp_relegion             = models.CharField(max_length=50,null=True,blank =True)
     emp_profile_pic          = models.ImageField(upload_to="emp_profile_pic/",null=True,blank =True )
-    emp_blood_group          = models.CharField(max_length=50,blank=True)
+    emp_blood_group          = models.CharField(max_length=50,blank=True,null=True)
     emp_nationality          = models.CharField(null=True,blank =True)
     emp_marital_status       = models.CharField(max_length=10,choices=MARITAL_STATUS_CHOICES,null=True,blank =True)
     emp_father_name          = models.CharField(max_length=50,null=True,blank =True)
