@@ -78,7 +78,7 @@ class CustomUser(UserProfile):
     is_superuser = models.BooleanField(default=False)
 
     USERNAME_FIELD = 'username'  # Authentication uses username
-    REQUIRED_FIELDS = []  # No required fields other than username
+    REQUIRED_FIELDS = ['email']  # No required fields other than username
 
     objects = CustomUserManager()
 

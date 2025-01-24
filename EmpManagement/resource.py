@@ -13,6 +13,37 @@ import re
 from Core.models import document_type,state_mstr,cntry_mstr,Nationality
 from OrganisationManager.models import brnch_mstr,ctgry_master,dept_master,desgntn_master
 from import_export.widgets import ForeignKeyWidget
+from django.core.files.base import ContentFile
+import os
+from django.core.files.storage import default_storage
+
+
+class FileWidget(Widget):
+    def clean(self, value, row=None, *args, **kwargs):
+        """
+        Handles importing file names and linking them to the ImageField.
+        """
+        if value:
+            # Build the file path relative to MEDIA_ROOT
+            file_path = os.path.join('emp_profile_pic', value)  # Folder and file name
+
+            # Check if the file exists in the storage
+            if default_storage.exists(file_path):
+                # If file exists, open and return as ContentFile
+                with default_storage.open(file_path, 'rb') as file:
+                    return ContentFile(file.read(), name=value)
+            else:
+                # If file doesn't exist, handle accordingly (e.g., skip or raise error)
+                return None
+        return None
+
+    def render(self, value, obj=None):
+        """
+        Handles exporting file paths for file fields.
+        """
+        if value and hasattr(value, "url"):
+            return value.url  # Return the file's URL
+        return ""
 
 class NumericMobileNumberWidget(Widget):   
     def clean(self, value, row=None, *args, **kwargs):
@@ -23,6 +54,26 @@ class NumericMobileNumberWidget(Widget):
             except ValueError:
                 raise ValidationError("Mobile number must be numeric.")
         return None
+class CustomForeignKeyWidget(ForeignKeyWidget):
+    def clean(self, value, row=None, *args, **kwargs):
+        if not value:
+            return None
+
+        # Fetch branch based on branch name
+        branch_name = row.get('Employee Branch Code')
+        matching_branch = brnch_mstr.objects.filter(branch_name=branch_name).first()
+        if not matching_branch:
+            raise ValidationError(f"No matching branch found for Branch Name: {branch_name}")
+
+        # Filter department by branch and name
+        queryset = self.get_queryset(value, row, *args, **kwargs)
+        queryset = queryset.filter(branch_id=matching_branch.id, dept_name=value)
+        if queryset.count() == 1:
+            return queryset.first()
+        elif queryset.count() > 1:
+            raise ValidationError(f"Multiple departments found for '{value}' in branch '{branch_name}'")
+        else:
+            raise ValidationError(f"No department found for '{value}' in branch '{branch_name}'")
 
 # Custom Date Widget to handle the date format
 class MultiTypeWidget(Widget):
@@ -54,8 +105,8 @@ class EmployeeResource(resources.ModelResource):
     emp_personal_email = fields.Field(attribute='emp_personal_email', column_name='Employee Personal Email ID')
     emp_company_email= fields.Field(attribute='emp_company_email', column_name='Employee Company Email ID')
     is_ess = fields.Field(attribute='is_ess', column_name='Iss ESS (True/False)')
-    emp_mobile_number_1 = fields.Field(attribute='emp_mobile_number_1', column_name='Employee Personal Mob No',widget=NumericMobileNumberWidget())
-    emp_mobile_number_2 = fields.Field(attribute='emp_mobile_number_2', column_name='Employee Company Mobile No',widget=NumericMobileNumberWidget())
+    emp_mobile_number_1 = fields.Field(attribute='emp_mobile_number_1', column_name='Employee Personal Mob No')
+    emp_mobile_number_2 = fields.Field(attribute='emp_mobile_number_2', column_name='Employee Company Mobile No')
     emp_country_id = fields.Field(attribute='emp_country_id', column_name='Employee Country Code',widget=ForeignKeyWidget(cntry_mstr, 'country_name'))
     emp_state_id = fields.Field(attribute='emp_state_id', column_name='Employee State',widget=ForeignKeyWidget(state_mstr, 'state_name'))
     emp_city = fields.Field(attribute='emp_city', column_name='Employee City')
@@ -74,10 +125,11 @@ class EmployeeResource(resources.ModelResource):
     is_active = fields.Field(attribute='is_active', column_name='Employee Active(True/False)')
     epm_ot_applicable = fields.Field(attribute='epm_ot_applicable', column_name='Employee OT applicable(True/False)')
     emp_branch_id = fields.Field(attribute='emp_branch_id', column_name='Employee Branch Code',widget=ForeignKeyWidget(brnch_mstr, 'branch_name'))
-    emp_dept_id = fields.Field(attribute='emp_dept_id', column_name='Employee Department Code',widget=ForeignKeyWidget(dept_master, 'dept_name'))
+    emp_dept_id = fields.Field(attribute='emp_dept_id', column_name='Employee Department Code',widget=CustomForeignKeyWidget(dept_master, 'dept_name'))
     emp_desgntn_id = fields.Field(attribute='emp_desgntn_id', column_name='Employee Designation Code',widget=ForeignKeyWidget(desgntn_master, 'desgntn_job_title'))
     emp_ctgry_id = fields.Field(attribute='emp_ctgry_id', column_name='Employee Category Code',widget=ForeignKeyWidget(ctgry_master, 'ctgry_title'))
-       
+    emp_profile_pic = fields.Field(attribute='emp_profile_pic',
+        column_name='Employee Profile Picture',widget=FileWidget())
     class Meta:
         model = emp_master     
         fields = (
@@ -112,6 +164,7 @@ class EmployeeResource(resources.ModelResource):
             'emp_dept_id',
             'emp_desgntn_id',
             'emp_ctgry_id',
+            'emp_profile_pic'
         )
         import_id_fields = ()
 
@@ -124,43 +177,30 @@ class EmployeeResource(resources.ModelResource):
         if emp_master.objects.filter(emp_code=login_id).exists():
             errors.append(f"Duplicate value found for Employee Code: {login_id}")
                
-        department_name = row.get('Employee Department Code')
-        branch_name = row.get('Employee Branch Code')
-
-        # Fetch the branch using branch name (or code if it exists)
+        designation_name = row.get('Employee Designation Code', '').strip()  # Remove extra spaces
+        branch_name = row.get('Employee Branch Code', '')
+        department_name = row.get('Employee Department Code', '')
         matching_branch = brnch_mstr.objects.filter(branch_name=branch_name).first()
-
-        if matching_branch:
-            # Filter departments in the matching branch by department name
-            matching_dept = dept_master.objects.filter(branch_id=matching_branch.id, dept_name=department_name)
-            print("matching_dept",matching_dept)
-            # Check the number of departments found
-            dept_count = matching_dept.count()
-            print("dept_count",dept_count)
-
-            if dept_count == 1:
-                # If exactly one department matches, use it
-                dept = matching_dept.first()
-                print("dept",dept)
-                print(f"Department: {dept.dept_name} found for Employee in Branch: {matching_branch.branch_name}")
-                row['emp_dept_id'] = dept.id  # Set the department ID in the row
-            elif dept_count > 1:
-                # If multiple departments match, handle accordingly
-                print(f"Warning: Multiple matching departments found for Branch: {matching_branch.branch_name} and Department: {department_name}")
-                # You could select which department to use based on additional logic or let the user decide
-                # For now, we are picking the first one
-                dept = matching_dept.first()
-                row['emp_dept_id'] = dept.id  # Set the department ID in the row
-                print(f"Selected Department: {dept.dept_name} for Employee.")
+        if not matching_branch:
+            errors.append(f"No matching branch found for Branch Name: {branch_name}")
+        else:
+            # Department Validation
+            matching_department = dept_master.objects.filter(branch_id=matching_branch.id, dept_name=department_name).first()
+            if not matching_department:
+                errors.append(f"No matching department found for Department: {department_name} in Branch: {branch_name}")
             else:
-                # If no department matches, log the error
-                print(f"No matching department found for Employee in Branch: {matching_branch.branch_name} and Department: {department_name}")
-                errors.append(f"No matching department found for Department: {department_name} in Branch: {matching_branch.branch_name}")
- 
+                row['emp_dept_id'] = matching_department.id
+
+            # Designation Validation
+            matching_designation = desgntn_master.objects.filter(desgntn_job_title__iexact=designation_name).first()
+            if not matching_designation:
+                errors.append(f"No matching designation found for Designation: '{designation_name}'")
+            else:
+                row['emp_designation_id'] = matching_designation.id
         
 
-        if emp_master.objects.filter(emp_personal_email=personal_email).exists():
-            errors.append(f"Duplicate value found for Employee Personal Email ID: {personal_email}")
+        # if emp_master.objects.filter(emp_personal_email=personal_email).exists():
+        #     errors.append(f"Duplicate value found for Employee Personal Email ID: {personal_email}")
         
          # Validating gender field
         gender = row.get('Employee Gender')
@@ -211,15 +251,15 @@ class EmpCustomFieldValueResource(resources.ModelResource):
 
     def before_import_row(self, row, row_idx=None, **kwargs):
         emp_code = row.get('Employee Code')
-        field_name = row.get('Field Name')
+        field_name = row.get('Field Name' '').strip()
         field_value = row.get('Field Value')
-
-        if not emp_master.objects.filter(emp_code=emp_code).exists():
-            raise ValidationError(f"emp_master with emp_code {emp_code} does not exist.")
-
+        
         if not Emp_CustomField.objects.filter(emp_custom_field=field_name).exists():
             raise ValidationError(f"Emp_CustomField with field_name {field_name} does not exist.")
-
+        
+        # if not emp_master.objects.filter(emp_code=emp_code).exists():
+        #     raise ValidationError(f"emp_master with emp_code {emp_code} does not exist.")
+       
         custom_field = Emp_CustomField.objects.get(emp_custom_field=field_name)
 
         if custom_field.data_type == 'date':
