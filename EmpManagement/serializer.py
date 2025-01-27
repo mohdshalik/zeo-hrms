@@ -269,8 +269,7 @@ class GeneralRequestApprovalSerializer(serializers.ModelSerializer):
 class EmpSerializer(serializers.ModelSerializer):
     requests = GeneralRequestApprovalSerializer(many=True, read_only=True, source='generalrequest_set')
     leave_rqsts = LvRqstApprovalSerializer(many=True, read_only=True, source='employee_leave_request_set')
-    custom_fields = serializers.SerializerMethodField()
-    custom_fields = Emp_CustomFieldValueSerializer(many=True, read_only=True)
+    custom_fields = Emp_CustomFieldValueSerializer(many=True, read_only=True, source='custom_field_values')
     emp_family = EmpFamSerializer(many=True, read_only=True)
     emp_documents = DocumentSerializer(many=True, read_only=True)
     emp_qualification = Emp_qf_Serializer(many=True, read_only=True)
