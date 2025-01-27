@@ -256,7 +256,7 @@ class EmpCustomFieldValueResource(resources.ModelResource):
         
         if not Emp_CustomField.objects.filter(emp_custom_field=field_name).exists():
             raise ValidationError(f"Emp_CustomField with field_name {field_name} does not exist.")
-        
+    
         # if not emp_master.objects.filter(emp_code=emp_code).exists():
         #     raise ValidationError(f"emp_master with emp_code {emp_code} does not exist.")
        
