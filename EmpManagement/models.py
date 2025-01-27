@@ -184,7 +184,7 @@ class Emp_CustomField(models.Model):
     radio_values     = models.JSONField(null=True, blank=True)
     checkbox_values  = models.JSONField(null=True,blank=True)
     created_at       = models.DateTimeField(auto_now_add=True)
-    created_by       = models.ForeignKey('UserManagement.CustomUser',blank=True, on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+    created_by       = models.ForeignKey('UserManagement.CustomUser',on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
 
     def __str__(self):
         return self.emp_custom_field    
@@ -224,7 +224,7 @@ class Emp_CustomFieldValue(models.Model):
     field_value      = models.TextField(null=True, blank=True)  # Field value provided by end user
     emp_master       = models.ForeignKey('emp_master', on_delete=models.CASCADE, related_name='custom_field_values')
     created_at       = models.DateTimeField(auto_now_add=True)
-    created_by       = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+    created_by       = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True,blank=True, related_name='%(class)s_created_by')
  
 
     def __str__(self):
