@@ -81,6 +81,7 @@ class CustomUser(UserProfile):
     is_ess = models.BooleanField(default=False, null=True, blank=True)
     is_staff = models.BooleanField(default=False)
     is_superuser = models.BooleanField(default=False)
+    is_active=models.BooleanField(default=True)
 
     USERNAME_FIELD = 'username'  # Authentication uses username
     REQUIRED_FIELDS = ['email']  # No required fields other than username

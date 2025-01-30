@@ -77,8 +77,13 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             user = CustomUser.objects.filter(username=username_or_email).first()
 
         if user:
+            # Check if the user is active, if not, prevent login
+            if not user.is_active:
+                raise serializers.ValidationError("Your account is deactivated. Please contact support.")
+
             # Validate the user based on the is_ess field
-            if (user.is_ess and user.username == username_or_email) or (not user.is_ess and user.email == username_or_email):
+            if (user.is_ess and user.username == username_or_email) or (
+                    not user.is_ess and user.email == username_or_email):
                 if user.check_password(password):
                     self.user = user
                     data = super().validate(attrs)

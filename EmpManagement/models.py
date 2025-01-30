@@ -110,7 +110,27 @@ class emp_master(models.Model):
             except Exception as e:
                 logger.error(f"Error creating user for {self.emp_code}: {e}")
                 raise
-            
+    def delete(self, *args, **kwargs):
+        """
+        Instead of deleting, mark the employee as inactive.
+        Also, mark the associated user as inactive if it exists.
+        """
+        self.is_active = False
+        self.save()
+
+        # Deactivate the associated user if it exists
+        if self.users:
+            self.users.is_active = False
+            self.users.save()
+
+        # Deactivate the user with the same emp_code as username
+        user_model = get_user_model()
+        try:
+            user = user_model.objects.get(username=self.emp_code)
+            user.is_active = False
+            user.save()
+        except user_model.DoesNotExist:
+            pass  # No user found with the emp_code as username
     def __str__(self):
         return self.emp_code
     

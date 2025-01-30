@@ -87,21 +87,34 @@ class RegisterUserAPIView(viewsets.ModelViewSet):
         approvals = CompanyPolicy.objects.filter(specific_users=user.id).order_by('-created_at')
         serializer = CompanyPolicySerializer(approvals, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
-
+    @action(detail=True, methods=['post'])
+    def deactivate_user(self, request, pk=None):
+        user = self.get_object()
+        user.is_active = False
+        user.save()
+        # logger.info(f"User {user.username} has been deactivated by {request.user.username}")
+        return Response({"message": "User has been deactivated successfully"}, status=status.HTTP_200_OK)
 
 class TenantUserListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = UserListSerializer
 
     def get_queryset(self):
-        # Get the schema name from the middleware-processed request
+        # Get the schema name from the request parameters
         schema_name = self.request.GET.get('schema')
+
+        # Ensure the schema name is provided
         if not schema_name:
             raise ValidationError({"error": "Schema name is required"})
 
         # Use schema_context to access the correct tenant's users
         with schema_context(schema_name):
-            return CustomUser.objects.filter(tenants__schema_name=schema_name)
+            # Filter users based on schema_name and only show active users
+            return CustomUser.objects.filter(
+                tenants__schema_name=schema_name,
+                is_active=True  # Filter for users that are active
+            )
+
 from django.contrib.auth import login
 
 # from .authentication import CentralizedJWTAuthentication
