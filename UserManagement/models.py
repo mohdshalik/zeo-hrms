@@ -62,7 +62,7 @@ class company(TenantMixin):
                 br_branch_mail='branch@example.com',  # Provide a valid email
             )
 
-    def str(self):
+    def __str__(self):
         return self.name
 
     

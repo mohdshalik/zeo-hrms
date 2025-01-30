@@ -57,6 +57,13 @@ class BranchViewSet(viewsets.ModelViewSet):
         context['tenant_id'] = self.request.query_params.get('tenant_id')
         return context  
     
+    @action(detail=True, methods=['get'])
+    def departments(self, request, pk=None):
+        branch = self.get_object()
+        depts = branch.dept_master_set.all()  # Use the correct related_name
+        serializer = DeptSerializer(depts, many=True)
+        return Response(serializer.data)
+
     @action(detail=True, methods=['POST', 'GET'])
     def companypolicies(self, request, pk=None):
         employee = self.get_object()
