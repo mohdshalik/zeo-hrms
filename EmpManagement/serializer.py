@@ -125,8 +125,10 @@ class DocumentSerializer(serializers.ModelSerializer):
         return fields
     def to_representation(self, instance):
         rep = super(DocumentSerializer, self).to_representation(instance)
-        if instance.emp_id:  # Check if emp_state_id is not None
-            rep['emp_id'] = instance.emp_id.emp_first_name + " " + instance.emp_id.emp_last_name
+        if instance.emp_id:
+            rep['emp_id'] = f"{instance.emp_id.emp_first_name or ''} {instance.emp_id.emp_last_name or ''}".strip()
+        # if instance.emp_id:  # Check if emp_state_id is not None
+        #     rep['emp_id'] = instance.emp_id.emp_first_name + " " + instance.emp_id.emp_last_name
         if instance.document_type:
             rep['document_type'] = instance.document_type.type_name
         return rep
