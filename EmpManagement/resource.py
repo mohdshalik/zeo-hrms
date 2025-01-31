@@ -4,7 +4,7 @@ from phonenumbers import NumberParseException
 from datetime import timedelta,timezone
 from datetime import datetime,date
 from .models import (emp_master, Emp_CustomField,notification,Emp_Documents,LanguageSkill,MarketingSkill,ProgrammingLanguageSkill,Emp_CustomFieldValue,EmpDocuments_CustomField,
-                     Doc_CustomFieldValue)
+                     Doc_CustomFieldValue,EmployeeBankDetail)
 from import_export.widgets import DateWidget
 from datetime import datetime
 from import_export.widgets import Widget
@@ -431,5 +431,23 @@ class ProLangSkillResource(resources.ModelResource):
         fields = ('programming_language ')
         import_id_fields = ()
 
+class EmpBankDetailsResource(resources.ModelResource):
+    employee           = fields.Field(attribute='employee',column_name='Employee Code',widget=ForeignKeyWidget(emp_master, 'emp_code'))
+    bank_name          = fields.Field(attribute='bank_name', column_name='Bank Name')
+    branch_name        = fields.Field(attribute='branch_name', column_name='Branch Name')
+    account_number     = fields.Field(attribute='account_number', column_name='Account Number')
+    route_code         = fields.Field(attribute='route_code', column_name='Route Code')
+    iban_number        = fields.Field(attribute='iban_number', column_name='IBAN/Account')
+    class Meta:
+        model = EmployeeBankDetail
+        fields = ('employee', 'bank_name', 'branch_name','account_number','route_code','iban_number')
+        import_id_fields = ()
 
-    
+    def before_import_row(self, row, **kwargs):
+        errors = []  
+        emp_code = row.get('Employee Code')
+
+        if not emp_master.objects.filter(emp_code=emp_code).exists():
+            errors.append(f"emp_master matching query does not exist for ID: {emp_code}")
+        if errors:
+            raise ValidationError(errors)

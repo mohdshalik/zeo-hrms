@@ -6,7 +6,8 @@ from .views import (EmpFamViewSet, EmpJobHistoryvSet, EmpViewSet,NotificationVie
                     Bulkupload_DocumentViewSet,ReportViewset,Doc_ReportViewset,GeneralReportViewset,
                     RequestTypeViewset,GeneralRequestViewset,EmpMarketSkillViewSet,EmpPrgrmSkillViewSet,
                     EmpLangSkillViewSet,ApprovalViewset,ApprovalLevelViewset,UserNotificationsViewSet,Emp_CustomFieldValueViewSet,EmailTemplateViewset,
-                    EmailConfigurationViewSet,UpdateESSUserView,ESSUserListView,NotificationSettingsViewSet,DocExpEmailTemplateViewset,CommonWorkflowViewSet,Doc_CustomFieldValueViewSet)
+                    EmailConfigurationViewSet,UpdateESSUserView,ESSUserListView,NotificationSettingsViewSet,DocExpEmailTemplateViewset,CommonWorkflowViewSet,Doc_CustomFieldValueViewSet,EmployeeBankDetailViewset,
+                    EmpBankBulkuploadViewSet)
 
 # Define the main router for top-level routes
 router = DefaultRouter()
@@ -17,6 +18,8 @@ router.register(r'doc-report',Doc_ReportViewset, basename='doc_report')
 router.register(r'report-general-request', GeneralReportViewset, basename='report-general-request')
 router.register(r'emp-custom-field', CustomFieldViewset, basename='custom-field')
 router.register(r'custom-field-value', Emp_CustomFieldValueViewSet, basename='custom-field-value')
+router.register(r'emp-bank-details', EmployeeBankDetailViewset, basename='emp-bank-details')
+router.register(r'emp-bulkupload-bankdetails',EmpBankBulkuploadViewSet, basename='emp-bulkupload-bankdetails')
 
 router.register(r'emp-Family', EmpFamViewSet, basename='emp_family')
 router.register(r'empfamily-UDF', EmpFam_CustomFieldViewset, basename='emp_fam_udf')

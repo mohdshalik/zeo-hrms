@@ -7,7 +7,7 @@ from .models import (emp_family,Emp_Documents,EmpJobHistory,EmpLeaveRequest,EmpQ
                      emp_master,notification,EmpFamily_CustomField,EmpJobHistory_CustomField,
                      EmpQualification_CustomField,EmpDocuments_CustomField,LanguageSkill,MarketingSkill,ProgrammingLanguageSkill,Emp_CustomField,Report,Doc_Report,GeneralRequest,RequestType,GeneralRequestReport,EmployeeLangSkill,EmployeeProgramSkill,
                      EmployeeMarketingSkill,Approval,ApprovalLevel,RequestNotification,Emp_CustomFieldValue,
-                     EmailTemplate,EmailConfiguration,SelectedEmpNotify,NotificationSettings,DocExpEmailTemplate,CommonWorkflow,Doc_CustomFieldValue
+                     EmailTemplate,EmailConfiguration,SelectedEmpNotify,NotificationSettings,DocExpEmailTemplate,CommonWorkflow,Doc_CustomFieldValue,EmployeeBankDetail
                      )
 from .serializer import (Emp_qf_Serializer,EmpFamSerializer,EmpSerializer,NotificationSerializer,RequestTypeSerializer,
                          EmpJobHistorySerializer,EmpLeaveRequestSerializer,DocumentSerializer,GeneralRequestSerializer,
@@ -15,9 +15,9 @@ from .serializer import (Emp_qf_Serializer,EmpFamSerializer,EmpSerializer,Notifi
                          EmpFam_CustomFieldSerializer,EmpJobHistory_Udf_Serializer,Emp_qf_udf_Serializer,EmpDocuments_Udf_Serializer,
                          DocBulkuploadSerializer,DocumentReportSerializer,EmpPrgrmSkillSerializer,EmpLangSkillSerializer,ApprovalSerializer,ApprovalLevelSerializer,
                          ReqNotifySerializer,Emp_CustomFieldValueSerializer,EmailTemplateSerializer,EmployeeFilterSerializer,EmailConfigurationSerializer,SelectedEmpNotifySerializer,
-                         NotificationSettingsSerializer,DocExpEmailTemplateSerializer,CommonWorkflowSerializer,DOC_CustomFieldValueSerializer)
+                         NotificationSettingsSerializer,DocExpEmailTemplateSerializer,CommonWorkflowSerializer,DOC_CustomFieldValueSerializer,EmpBankDetailsSerializer,EmpBankBulkuploadSerializer)
 
-from .resource import EmployeeResource,DocumentResource,EmpCustomFieldValueResource,EmpDocumentCustomFieldValueResource, MarketingSkillResource,ProLangSkillResource
+from .resource import EmployeeResource,DocumentResource,EmpCustomFieldValueResource,EmpDocumentCustomFieldValueResource,EmpBankDetailsResource, MarketingSkillResource,ProLangSkillResource
 from .permissions import (IsSuperUserOrHasGeneralRequestPermission,IsSuperUserOrInSameBranch,EmpCustomFieldPermission,EmpCustomFieldValuePermission,
                         EmpFamilyCustomFieldPermission,EmpJobHistoryCustomFieldPermission,EmpQualificationCustomFieldPermission,ReportPermission,DocReportPermission,GeneralRequestReportPermission,
                         EmployeeMarketingSkillPermission,EmployeeProgramSkillPermission,EmployeeLangSkillPermission,NotificationPermission,ApprovalLevelPermission,EmployeeMarketingSkillPermission,RequestTypePermission)
@@ -2098,4 +2098,49 @@ class DocExpEmailTemplateViewset(viewsets.ModelViewSet):
     queryset = DocExpEmailTemplate.objects.all()
     serializer_class = DocExpEmailTemplateSerializer
 
+class EmployeeBankDetailViewset(viewsets.ModelViewSet):
+    queryset = EmployeeBankDetail.objects.all()
+    serializer_class = EmpBankDetailsSerializer
 
+
+class EmpBankBulkuploadViewSet(viewsets.ModelViewSet):
+    queryset = EmployeeBankDetail.objects.all()
+    serializer_class = EmpBankBulkuploadSerializer
+    parser_classes = (MultiPartParser, FormParser)
+    
+    @action(detail=False, methods=['post'], parser_classes=[MultiPartParser, FormParser])
+    def bulk_upload(self, request):
+        if request.method == 'POST' and request.FILES.get('file'):
+            excel_file = request.FILES['file']
+            if excel_file.name.endswith('.xlsx'):
+                try:
+                    dataset = Dataset()
+                    dataset.load(excel_file.read(), format='xlsx')
+                    resource = EmpBankDetailsResource()
+                    all_errors = []
+                    valid_rows = []
+                    with transaction.atomic():
+                        for row_idx, row in enumerate(dataset.dict, start=2):
+                            row_errors = []
+                            try:
+                                resource.before_import_row(row, row_idx=row_idx)
+                            except ValidationError as e:
+                                row_errors.extend([f"Row {row_idx}: {error}" for error in e.messages])
+                            if row_errors:
+                                all_errors.extend(row_errors)
+                            else:
+                                valid_rows.append(row)
+
+                    if all_errors:
+                        return Response({"errors": all_errors}, status=400)
+
+                    with transaction.atomic():
+                        result = resource.import_data(dataset, dry_run=False, raise_errors=True)
+
+                    return Response({"message": f"{result.total_rows} records created successfully"})
+                except Exception as e:
+                    return Response({"error": str(e)}, status=400)
+            else:
+                return Response({"error": "Invalid file format. Only Excel files (.xlsx) are supported."}, status=400)
+        else:
+            return Response({"error": "Please provide an Excel file."}, status=400)

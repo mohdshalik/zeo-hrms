@@ -1104,3 +1104,17 @@ class DocExpEmailTemplate(models.Model):
         
     def __str__(self):
         return self.template_name
+class EmployeeBankDetail(models.Model):
+    employee = models.OneToOneField(emp_master, on_delete=models.CASCADE, related_name="bank_details")
+    bank_name = models.CharField(max_length=255,blank=True, null=True)
+    branch_name = models.CharField(max_length=255,blank=True, null=True)
+    account_number = models.CharField(max_length=50, unique=True)
+    bank_address = models.TextField(blank=True, null=True)
+    route_code = models.CharField(max_length=20, blank=True, null=True)
+    iban_number = models.CharField(max_length=50, blank=True, null=True)  # For international banking
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.employee} - {self.bank_name} ({self.account_number})"

@@ -19,7 +19,7 @@ from .models import (emp_family,EmpJobHistory,EmpQualification,Emp_Documents,Emp
                     notification,Report,Doc_Report,RequestType,
                     GeneralRequest,GeneralRequestReport,EmployeeMarketingSkill,EmployeeProgramSkill,EmployeeLangSkill,Approval,
                     ApprovalLevel,RequestNotification,Emp_CustomFieldValue,EmailTemplate,EmailConfiguration,SelectedEmpNotify,NotificationSettings,
-                    DocExpEmailTemplate,CommonWorkflow,Doc_CustomFieldValue
+                    DocExpEmailTemplate,CommonWorkflow,Doc_CustomFieldValue,EmployeeBankDetail
                      )
 
 from OrganisationManager.serializer import CompanyPolicySerializer
@@ -185,7 +185,17 @@ class CustomFieldSerializer(serializers.ModelSerializer):
         fields = '__all__' 
     
     
+#emp bank details  
+class EmpBankDetailsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EmployeeBankDetail
+        fields = '__all__'
 
+class EmpBankBulkuploadSerializer(serializers.ModelSerializer):
+    file = serializers.FileField(write_only=True)
+    class Meta:
+        model = EmployeeBankDetail
+        fields = '__all__'
 #Employee Skills
 class EmpMarketSkillSerializer(serializers.ModelSerializer):
     class Meta:
