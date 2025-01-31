@@ -3,7 +3,8 @@ import phonenumbers
 from phonenumbers import NumberParseException
 from datetime import timedelta,timezone
 from datetime import datetime,date
-from .models import emp_master, Emp_CustomField,notification,Emp_Documents,LanguageSkill,MarketingSkill,ProgrammingLanguageSkill,Emp_CustomFieldValue
+from .models import (emp_master, Emp_CustomField,notification,Emp_Documents,LanguageSkill,MarketingSkill,ProgrammingLanguageSkill,Emp_CustomFieldValue,EmpDocuments_CustomField,
+                     Doc_CustomFieldValue)
 from import_export.widgets import DateWidget
 from datetime import datetime
 from import_export.widgets import Widget
@@ -368,6 +369,48 @@ class DocumentResource(resources.ModelResource):
                 # Handle cases where emp_id or emp_branch_id is not valid
                 print("Warning: Invalid emp_id or emp_branch_id detected. Cannot create notification.")   
 
+class EmpDocumentCustomFieldValueResource(resources.ModelResource):
+    emp_documents = fields.Field(attribute='emp_documents',column_name='Document Number',widget=ForeignKeyWidget(Emp_Documents, 'emp_doc_number'))
+    emp_custom_field = fields.Field(attribute='emp_custom_field',column_name='Field Name',widget=ForeignKeyWidget(EmpDocuments_CustomField, 'emp_custom_field'))
+    field_value = fields.Field(attribute='field_value',column_name='Field Value',widget=MultiTypeWidget())
+
+    class Meta:
+        model = Doc_CustomFieldValue
+        fields = ('emp_documents', 'emp_custom_field', 'field_value')
+        import_id_fields = ()
+
+    def before_import_row(self, row, row_idx=None, **kwargs):
+        emp_documents = row.get('Document Number')
+        field_name = row.get('Field Name' '').strip()
+        field_value = row.get('Field Value')
+        
+        if not EmpDocuments_CustomField.objects.filter(emp_custom_field=field_name).exists():
+            raise ValidationError(f"Emp_Document_CustomField with field_name {field_name} does not exist.")
+        
+        # if not emp_master.objects.filter(emp_code=emp_code).exists():
+        #     raise ValidationError(f"emp_master with emp_code {emp_code} does not exist.")
+       
+        custom_field = EmpDocuments_CustomField.objects.get(emp_custom_field=field_name)
+
+        if custom_field.data_type == 'date':
+            if isinstance(field_value, str):
+                field_value = field_value.strip()  # Remove leading and trailing spaces
+                
+                # Check if the string contains time information
+                if ' ' in field_value:
+                    # Extract the date part (YYYY-MM-DD) from datetime string
+                    field_value = field_value.split(' ')[0]
+                
+                try:
+                    # Attempt to parse the date from the extracted or provided string
+                    date_object = datetime.strptime(field_value, '%Y-%m-%d').date()
+                    # Reformat to DD-MM-YYYY
+                    field_value = date_object.strftime('%d-%m-%Y')
+                except ValueError:
+                    raise ValidationError(f"Invalid date format for field {field_name}. Date should be in DD-MM-YYYY format.")
+
+            # Replace the original row value with the correctly formatted date
+            row['Field Value'] = field_value  
     
 class LanguageSkillResource(resources.ModelResource):  
     class Meta:
