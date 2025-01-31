@@ -419,7 +419,7 @@ class Emp_Documents(models.Model):
     emp_id               =models.ForeignKey('emp_master',on_delete = models.CASCADE,related_name='emp_documents')
     emp_sl_no            = models.CharField(max_length=50, unique=True, null=True,blank =True,default=None)
     document_type        = models.ForeignKey('Core.document_type',on_delete = models.CASCADE)
-    emp_doc_number       = models.IntegerField(unique=True)#unique number
+    emp_doc_number       = models.CharField(max_length=50,unique=True)
     emp_doc_issued_date  = models.DateField()
     emp_doc_expiry_date  = models.DateField()
     emp_doc_document     = models.FileField()
