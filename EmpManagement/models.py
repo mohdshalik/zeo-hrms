@@ -118,18 +118,15 @@ class emp_master(models.Model):
         self.is_active = False
         self.save()
 
-        # Deactivate the associated user if it exists
-        if self.users:
-            self.users.is_active = False
-            self.users.save()
-
         # Deactivate the user with the same emp_code as username
         user_model = get_user_model()
         try:
             user = user_model.objects.get(username=self.emp_code)
             user.is_active = False
             user.save()
+            logger.info(f"User {user.username} deactivated successfully.")
         except user_model.DoesNotExist:
+            logger.warning(f"No user found with username: {self.emp_code}")
             pass  # No user found with the emp_code as username
     def __str__(self):
         return self.emp_code
@@ -491,7 +488,7 @@ class Doc_CustomFieldValue(models.Model):
     field_value      = models.TextField(null=True, blank=True)  # Field value provided by end user
     emp_documents       = models.ForeignKey('Emp_Documents', on_delete=models.CASCADE, related_name='custom_field_values')
     created_at       = models.DateTimeField(auto_now_add=True)
-    created_by       = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+    # created_by       = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
  
 
     def __str__(self):

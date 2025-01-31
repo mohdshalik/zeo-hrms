@@ -283,7 +283,7 @@ class EmpCustomFieldValueResource(resources.ModelResource):
             row['Field Value'] = field_value
 
 class DocumentResource(resources.ModelResource):
-    emp_id = fields.Field(attribute='emp_id', column_name='Employee ID', widget=ForeignKeyWidget(emp_master, 'emp_code'))
+    emp_id = fields.Field(attribute='emp_id', column_name='Employee code', widget=ForeignKeyWidget(emp_master, 'emp_code'))
     emp_sl_no = fields.Field(attribute='emp_sl_no', column_name='SerialNo')
     document_type = fields.Field(attribute='document_type', column_name='Document Type', widget=ForeignKeyWidget(document_type, 'type_name'))
     emp_doc_number = fields.Field(attribute='emp_doc_number', column_name='Document Number')
@@ -309,8 +309,8 @@ class DocumentResource(resources.ModelResource):
         doc_type = row.get('Document Type')
 
         # Validate emp_id and document_type
-        if Emp_Documents.objects.filter(emp_sl_no=emp_sl_no).exists():
-            errors.append(f"Duplicate value found for Employee Code: {emp_sl_no}")
+        # if Emp_Documents.objects.filter(emp_sl_no=emp_sl_no).exists():
+        #     errors.append(f"Duplicate value found for Employee Code: {emp_sl_no}")
 
         if not emp_master.objects.filter(emp_code=emp_code).exists():
             errors.append(f"emp_master matching query does not exist for ID: {emp_code}")
@@ -337,8 +337,8 @@ class DocumentResource(resources.ModelResource):
                     row[field] = parsed_date
                 except ValueError as e:
                     errors.append(f"Invalid date format for {field}: {e}")
-            else:
-                errors.append(f"Date value for {field} is empty")
+            # else:
+            #     errors.append(f"Date value for {field} is empty")
 
         if errors:
             raise ValidationError(errors)
