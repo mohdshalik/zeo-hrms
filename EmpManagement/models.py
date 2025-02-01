@@ -110,42 +110,25 @@ class emp_master(models.Model):
             except Exception as e:
                 logger.error(f"Error creating user for {self.emp_code}: {e}")
                 raise
-    def deactivate(self):
-        """Instead of deleting, mark the employee as inactive and deactivate the associated user."""
+    
+    def delete(self, *args, **kwargs):
+        """
+        Instead of deleting, mark the employee as inactive.
+        Also, mark the associated user as inactive if it exists.
+        """
         self.is_active = False
-        self.save(update_fields=['is_active'])
+        self.save()
 
-        # Deactivate associated user if it exists
+        # Deactivate the user with the same emp_code as username
         user_model = get_user_model()
         try:
             user = user_model.objects.get(username=self.emp_code)
             user.is_active = False
-            user.save(update_fields=['is_active'])
-            logger.info(f"User {user.username} marked as inactive.")
+            user.save()
+            logger.info(f"User {user.username} deactivated successfully.")
         except user_model.DoesNotExist:
-            logger.warning(f"No user found for employee {self.emp_code}.")
-
-    def delete(self, *args, **kwargs):
-        """Override delete to prevent actual deletion and mark inactive instead."""
-        self.deactivate()
-    # def delete(self, *args, **kwargs):
-    #     """
-    #     Instead of deleting, mark the employee as inactive.
-    #     Also, mark the associated user as inactive if it exists.
-    #     """
-    #     self.is_active = False
-    #     self.save()
-
-    #     # Deactivate the user with the same emp_code as username
-    #     user_model = get_user_model()
-    #     try:
-    #         user = user_model.objects.get(username=self.emp_code)
-    #         user.is_active = False
-    #         user.save()
-    #         logger.info(f"User {user.username} deactivated successfully.")
-    #     except user_model.DoesNotExist:
-    #         logger.warning(f"No user found with username: {self.emp_code}")
-    #         pass  # No user found with the emp_code as username
+            logger.warning(f"No user found with username: {self.emp_code}")
+            pass  # No user found with the emp_code as username
     def __str__(self):
         return self.emp_code
     
