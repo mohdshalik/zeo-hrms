@@ -116,19 +116,16 @@ class emp_master(models.Model):
         Instead of deleting, mark the employee as inactive.
         Also, mark the associated user as inactive if it exists.
         """
-        self.is_active = False
-        self.save()
+        self.__class__.objects.filter(pk=self.pk).update(is_active=False)  # Mark employee inactive
 
         # Deactivate the user with the same emp_code as username
         user_model = get_user_model()
         try:
-            user = user_model.objects.get(username=self.emp_code)
-            user.is_active = False
-            user.save()
-            logger.info(f"User {user.username} deactivated successfully.")
-        except user_model.DoesNotExist:
-            logger.warning(f"No user found with username: {self.emp_code}")
-            pass  # No user found with the emp_code as username
+            user_model.objects.filter(username=self.emp_code).update(is_active=False)  # Use update() instead of save()
+            logger.info(f"User {self.emp_code} deactivated successfully.")
+        except Exception as e:
+            logger.warning(f"Error deactivating user {self.emp_code}: {e}")
+    
     def __str__(self):
         return self.emp_code
     
