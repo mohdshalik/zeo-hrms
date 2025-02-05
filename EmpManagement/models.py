@@ -79,6 +79,9 @@ class emp_master(models.Model):
 
     def save(self, *args, **kwargs):
         created = not self.pk  # Check if the instance is being created for the first time
+        if self.emp_joined_date and self.emp_branch_id:
+            self.emp_date_of_confirmation = self.emp_joined_date + timedelta(days=self.emp_branch_id.probation_period_days)
+
         super().save(*args, **kwargs)
 
         if created and self.is_ess:
@@ -430,7 +433,38 @@ class Emp_Documents(models.Model):
    
     def __str__(self):
         return f"{self.document_type} - {self.emp_id}" 
+    def save(self, *args, **kwargs):
+        """Override save method to check expiry at the time of creation or update"""
+        
+        is_new = self.pk is None  # Check if the document is new
+        super().save(*args, **kwargs)  # Save the document first
 
+        # Only check expiry when a new document is created
+        if is_new:
+            check_document_expiry_and_notify(self)  # Call the notification function
+
+
+def check_document_expiry_and_notify(document):
+    """Check if the document is expired or about to expire, and send notifications."""
+    from .tasks import send_document_notification
+    today = timezone.now().date()
+    expiry_date = document.emp_doc_expiry_date
+
+    try:
+        branch = document.emp_id.emp_branch_id
+        notification_settings = NotificationSettings.objects.get(branch=branch)
+        days_before_expiry = notification_settings.days_before_expiry
+    except NotificationSettings.DoesNotExist:
+        days_before_expiry = 7  # Default reminder 7 days before expiry
+
+    days_until_expiry = (expiry_date - today).days
+
+    # Condition to check if expiry date is today or within before expiry period
+    if expiry_date <= today:
+        send_document_notification(document, expiry_date, 'expired or expiring today')
+
+    elif days_until_expiry <= days_before_expiry:
+        send_document_notification(document, expiry_date, f"expiring in {days_until_expiry} days")
 #Document UDF
 class EmpDocuments_CustomField(models.Model):
     FIELD_TYPES = (   

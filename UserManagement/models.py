@@ -54,7 +54,7 @@ class company(TenantMixin):
                 branch_name=self.name,
                 branch_logo=self.logo,
                 branch_code='BR001',  # Provide a default or unique branch code
-                notification_period_days=30,  # Provide a value for non-nullable field
+                probation_period_days = 30,  # Provide a value for non-nullable field
                 br_country_id=1,  # Set the country or use default ID
                 br_city='Sample City',
                 br_pincode='123456',

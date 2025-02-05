@@ -409,11 +409,15 @@ class leave_entitlement(models.Model):
     cf_max_limit                   = models.PositiveIntegerField()
     cf_expires_in_value            = models.PositiveIntegerField()
     cf_time_choice                 = models.CharField(max_length=20,choices=TIME_UNIT_CHOICES)
+    allow_cf                       = models.BooleanField(default=False)
+    
     encashment_value               = models.PositiveIntegerField(default=50)
     encashment_unit_or_percentage  = models.CharField(max_length=50,choices=UNIT_CHOICES)
     encashment_max_limit           = models.PositiveIntegerField()
+    allow_encashment               = models.BooleanField(default=False)
     prorate_accrual                = models.BooleanField(default=False, help_text="Enable prorate accrual for this leave type.")
     prorate_type                   = models.CharField(max_length=30, choices=PRORATE_CHOICES, null=True, blank=True, help_text="Prorate accrual type.")
+    
     created_at                     = models.DateTimeField(auto_now_add=True)
     created_by                     = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
 

@@ -9,7 +9,7 @@ class brnch_mstr(models.Model):
     branch_name               = models.CharField(max_length=100)
     branch_code               = models.CharField(max_length=50,unique=True)
     branch_logo               = models.ImageField(null=True)
-    notification_period_days  = models.IntegerField()
+    probation_period_days     = models.IntegerField(default=0)
     br_start_date             = models.DateField(null=True)
     branch_users              = models.ManyToManyField("UserManagement.CustomUser",related_name='branches')
     br_is_active              = models.BooleanField(default=True)

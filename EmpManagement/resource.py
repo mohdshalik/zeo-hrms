@@ -17,6 +17,8 @@ from import_export.widgets import ForeignKeyWidget
 from django.core.files.base import ContentFile
 import os
 from django.core.files.storage import default_storage
+from .models import NotificationSettings
+from .tasks import send_document_notification
 
 
 class FileWidget(Widget):
@@ -345,29 +347,25 @@ class DocumentResource(resources.ModelResource):
             raise ValidationError(errors)
 
     def after_import_instance(self, instance, new, **kwargs):
-        """
-        Handles the creation of notifications after the document instance is saved.
-        """
-        if new:
-            today = timezone.now().date()
-            expiry_date = instance.emp_doc_expiry_date
-            
-            # Check if emp_master exists and has a valid branch
-            if instance.emp_id and instance.emp_id.emp_branch_id:
-                branch_notification_days = instance.emp_id.emp_branch_id.notification_period_days
-                if branch_notification_days is not None:
-                    notification_delta = timedelta(days=branch_notification_days)  # Notify based on branch's notification period
-                    
-                    if expiry_date - today <= notification_delta:
-                        notification_message = f"The document '{instance.document_type}' of '{instance.emp_id}' is expiring on {expiry_date}."
-                        # Create notification for the newly created document
-                        notification.objects.create(
-                            message=notification_message,
-                            document_id=instance
-                        )
-            else:
-                # Handle cases where emp_id or emp_branch_id is not valid
-                print("Warning: Invalid emp_id or emp_branch_id detected. Cannot create notification.")   
+        """Check expiry after importing each document instance."""
+        today = timezone.now().date()
+        expiry_date = instance.emp_doc_expiry_date
+
+        try:
+            branch = instance.emp_id.emp_branch_id
+            notification_settings = NotificationSettings.objects.get(branch=branch)
+            days_before_expiry = notification_settings.days_before_expiry
+        except NotificationSettings.DoesNotExist:
+            days_before_expiry = 7  # Default reminder 7 days before expiry
+
+        days_until_expiry = (expiry_date - today).days
+
+        # Check document expiry and send notifications
+        if expiry_date <= today:
+            send_document_notification(instance, expiry_date, 'expired or expiring today')
+
+        elif days_until_expiry <= days_before_expiry:
+            send_document_notification(instance, expiry_date, f"expiring in {days_until_expiry} days")    
 
 class EmpDocumentCustomFieldValueResource(resources.ModelResource):
     emp_documents = fields.Field(attribute='emp_documents',column_name='Document Number',widget=ForeignKeyWidget(Emp_Documents, 'emp_doc_number'))
