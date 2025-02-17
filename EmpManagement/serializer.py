@@ -317,6 +317,11 @@ class EmpSerializer(serializers.ModelSerializer):
     def get_holidays(self, obj):
         holidays = holiday.objects.filter(holiday_calendar=obj.holiday_calendar)
         return HolidaySerializer(holidays, many=True).data
+class EmplistSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = emp_master
+        fields = ['emp_code', 'emp_first_name', 'emp_last_name', 'emp_profile_pic','id','is_active']
+
 class EmpBulkUploadSerializer(serializers.ModelSerializer):
     emp_custom_fields = CustomFieldSerializer(many=True, required=False)
     file = serializers.FileField(write_only=True) 

@@ -578,3 +578,37 @@ class ApprovalLevelPermission(permissions.BasePermission):
             for permission in group.permissions.all():  # Access permissions of each group
                 if permission.codename in required_permissions:
                     return True
+
+class EmployeeListPermission(permissions.BasePermission):
+    """
+    Custom permission to allow users with specific permissions for Emp_CustomField.
+    """
+
+    def has_permission(self, request, view):
+        # Check if the user is authenticated
+        if not request.user.is_authenticated:
+            return False
+        if request.user.is_superuser:
+            return True
+        # Attempt to retrieve user permissions
+        try:
+            user_permissions = UserTenantPermissions.objects.get(profile=request.user)
+        except UserTenantPermissions.DoesNotExist:
+            return False
+
+        # Define required permissions for Emp_CustomField model actions
+        required_permissions = [
+            'view_emp_customfield',
+            'add_emp_customfield',
+            'change_emp_customfield',
+            'delete_emp_customfield'
+        ]
+
+        # Retrieve user's permissions from their groups
+        user_group_permissions = [
+            p.codename for group in user_permissions.groups.all()
+            for p in group.permissions.all()
+        ]
+
+        # Check if any required permission is in user's group permissions
+        return any(permission in user_group_permissions for permission in required_permissions)
