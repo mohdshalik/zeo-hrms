@@ -362,10 +362,7 @@ class leave_entitlement(models.Model):
         ('1st', '1st Day of the Month'),
         ('last', 'Last Day of the Month'),
     ]
-    UNIT_CHOICES =[
-        ('percentage','percentage'),
-        ('unit','unit')
-    ]
+    
     MONTH_CHOICES = [
         ('Jan', 'January'),
         ('Feb', 'February'),
@@ -380,17 +377,14 @@ class leave_entitlement(models.Model):
         ('Nov', 'November'),
         ('Dec', 'December')
     ]
-    CARRY_CHOICE = [
-        ('carry_forward','carry forward'),
-        ('carry_forward_with_expiry','carry forward with expiry')
-    ]
+    
     PRORATE_CHOICES = [
         ('start_of_policy', 'Start of Policy'),
         ('start_and_end_of_policy', 'Start and End of Policy'),
         ('do_not_prorate', 'Do not Prorate')
     ]
     leave_type                     = models.ForeignKey('leave_type', on_delete=models.CASCADE)
-    effective_after                = models.PositiveIntegerField(default=0)
+    min_experience                 = models.PositiveIntegerField(default=0, help_text="Minimum experience required.")
     effective_after_unit           = models.CharField(max_length=10, choices=TIME_UNIT_CHOICES, default='months')
     effective_after_from           = models.CharField(max_length=20, choices=EFFECTIVE_AFTER_CHOICES)
     accrual                        = models.BooleanField(default=False)
@@ -399,30 +393,90 @@ class leave_entitlement(models.Model):
     accrual_month                  = models.CharField(max_length=3, choices=MONTH_CHOICES, default='Jan',null=True,blank=True)
     accrual_day                    = models.CharField(max_length=10, choices=DAY_CHOICES, default='1st')
     round_of                       = models.CharField(choices=ROUND_OF_TYPE,max_length=20)
-    reset                          = models.BooleanField(default=False)
-    frequency                      = models.CharField(max_length=20, choices=TIME_UNIT_CHOICES)
-    month                          = models.CharField(max_length=30, choices=MONTH_CHOICES, default='Dec')
-    day                            = models.CharField(max_length=20, choices=DAY_CHOICES)
-    carry_forward_choice           = models.CharField(max_length=100,choices=CARRY_CHOICE)
-    cf_value                       = models.PositiveIntegerField()
-    cf_unit_or_percentage          = models.CharField(max_length=50,choices=UNIT_CHOICES)
-    cf_max_limit                   = models.PositiveIntegerField()
-    cf_expires_in_value            = models.PositiveIntegerField()
-    cf_time_choice                 = models.CharField(max_length=20,choices=TIME_UNIT_CHOICES)
-    allow_cf                       = models.BooleanField(default=False)
     
-    encashment_value               = models.PositiveIntegerField(default=50)
-    encashment_unit_or_percentage  = models.CharField(max_length=50,choices=UNIT_CHOICES)
-    encashment_max_limit           = models.PositiveIntegerField()
-    allow_encashment               = models.BooleanField(default=False)
     prorate_accrual                = models.BooleanField(default=False, help_text="Enable prorate accrual for this leave type.")
     prorate_type                   = models.CharField(max_length=30, choices=PRORATE_CHOICES, null=True, blank=True, help_text="Prorate accrual type.")
-    
     created_at                     = models.DateTimeField(auto_now_add=True)
     created_by                     = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
 
     def __str__(self):
         return f"{self.leave_type.name} Entitlement"
+
+    def experience_to_months(self, value, unit):
+        """Convert experience value to months for uniform comparison."""
+        if unit == "years":
+            return value * 12
+        elif unit == "months":
+            return value
+        elif unit == "days":
+            return value / 30  # Approximate conversion of days to months
+        return 0
+
+    def clean(self):
+        """Ensure no overlapping entitlement criteria for the same leave type."""
+        self_min_months = self.experience_to_months(self.min_experience, self.effective_after_unit)
+
+        overlapping_entitlements = leave_entitlement.objects.filter(
+            leave_type=self.leave_type,
+            effective_after_from=self.effective_after_from
+        ).exclude(id=self.id)  # Exclude current record during updates
+
+        for entitlement in overlapping_entitlements:
+            other_min_months = entitlement.experience_to_months(entitlement.min_experience, entitlement.effective_after_unit)
+            
+            if self_min_months == other_min_months:
+                raise ValidationError(
+                    f"Conflicting entitlement exists with ID {entitlement.id}. "
+                    f"Min experience {self.min_experience} ({self.effective_after_unit}) overlaps."
+                )
+
+    def save(self, *args, **kwargs):
+        self.clean()  # Validate before saving
+        super().save(*args, **kwargs)
+
+class LeaveResetPolicy(models.Model):
+    TIME_UNIT_CHOICES = [
+        ('years', 'Years'),
+        ('months', 'Months'),
+        ('days', 'Days')
+    ]
+    
+    DAY_CHOICES = [
+        ('1st', '1st Day of the Month'),
+        ('last', 'Last Day of the Month'),
+    ]
+
+    MONTH_CHOICES = [
+        ('Jan', 'January'), ('Feb', 'February'), ('Mar', 'March'), ('Apr', 'April'),
+        ('May', 'May'), ('Jun', 'June'), ('Jul', 'July'), ('Aug', 'August'),
+        ('Sep', 'September'), ('Oct', 'October'), ('Nov', 'November'), ('Dec', 'December')
+    ]
+    UNIT_CHOICES =[
+        ('percentage','percentage'),
+        ('unit','unit')
+    ]
+    CARRY_CHOICE = [
+        ('carry_forward','carry forward'),
+        ('carry_forward_with_expiry','carry forward with expiry')
+    ]
+    leave_type                     = models.ForeignKey('leave_type', on_delete=models.CASCADE,related_name='reset_policy')
+    # leave_entitlement              = models.OneToOneField(leave_entitlement, on_delete=models.CASCADE, related_name='reset_policy')
+    reset                          = models.BooleanField(default=False)
+    frequency                      = models.CharField(max_length=20, choices=TIME_UNIT_CHOICES)
+    month                          = models.CharField(max_length=30, choices=MONTH_CHOICES, default='Dec')
+    day                            = models.CharField(max_length=20, choices=DAY_CHOICES)
+    allow_cf                       = models.BooleanField(default=False)
+    carry_forward_choice           = models.CharField(max_length=100,choices=CARRY_CHOICE)
+    cf_value                       = models.PositiveIntegerField()
+    cf_unit_or_percentage          = models.CharField(max_length=50,choices=UNIT_CHOICES)
+    cf_max_limit                   = models.PositiveIntegerField(null=True,blank=True)
+    cf_expires_in_value            = models.PositiveIntegerField(null=True,blank=True)
+    cf_time_choice                 = models.CharField(max_length=20,choices=TIME_UNIT_CHOICES)
+    allow_encashment               = models.BooleanField(default=False)
+    encashment_value               = models.PositiveIntegerField(default=50)
+    encashment_unit_or_percentage  = models.CharField(max_length=50,choices=UNIT_CHOICES)
+    encashment_max_limit           = models.PositiveIntegerField(null=True,blank=True)
+    
 # from django.db.models import Q
 
 class emp_leave_balance(models.Model):
@@ -493,19 +547,46 @@ class leave_accrual_transaction(models.Model):
 
 
 class leave_reset_transaction(models.Model):
-    employee              = models.ForeignKey('EmpManagement.emp_master', on_delete=models.CASCADE)
-    leave_type            = models.ForeignKey('leave_type',on_delete=models.CASCADE)
-    reset_date            = models.DateField()
-    carry_forward_amount  = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    encashment_amount     = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    reset_balance         = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    year                  = models.PositiveIntegerField(default=datetime.now().year) 
-    created_at            = models.DateTimeField(auto_now_add=True)
-    created_by            = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
-
+    employee = models.ForeignKey('EmpManagement.emp_master', on_delete=models.CASCADE)
+    leave_type = models.ForeignKey('leave_type', on_delete=models.CASCADE)
+    reset_date = models.DateField()
+    initial_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)  # Balance before reset
+    carry_forward_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    encashment_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    final_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)  # Balance after reset
+    year = models.PositiveIntegerField(default=datetime.now().year)
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        'UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='reset_created_by'
+    )
     def __str__(self):
         return f"{self.employee} - {self.leave_type} Reset on {self.reset_date}"
-    
+class LeaveCarryForwardTransaction(models.Model):
+    employee = models.ForeignKey('EmpManagement.emp_master', on_delete=models.CASCADE)
+    leave_type = models.ForeignKey('leave_type', on_delete=models.CASCADE)
+    reset_date = models.DateField()
+    carried_forward_units = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    carried_forward_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    max_limit = models.DecimalField(max_digits=10, decimal_places=2, default=0,null=True,blank=True)  # Maximum allowed carry forward
+    final_carry_forward = models.DecimalField(max_digits=10, decimal_places=2, default=0)  # Final applied value
+    year = models.PositiveIntegerField(default=datetime.now().year)
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        'UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='carry_forward_created_by'
+    )
+class LeaveEncashmentTransaction(models.Model):
+    employee = models.ForeignKey('EmpManagement.emp_master', on_delete=models.CASCADE)
+    leave_type = models.ForeignKey('leave_type', on_delete=models.CASCADE)
+    reset_date = models.DateField()
+    encashment_units = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    encashment_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    max_limit = models.DecimalField(max_digits=10, decimal_places=2, default=0,null=True,blank=True)  # Maximum allowed encashment
+    encashment_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)  # Final applied encashment
+    year = models.PositiveIntegerField(default=datetime.now().year)
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        'UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='encashment_created_by'
+    )    
 
 class applicablity_critirea(models.Model):
     GENDER_CHOICES = [

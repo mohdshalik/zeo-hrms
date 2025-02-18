@@ -1,10 +1,13 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from .models import applicablity_critirea, emp_leave_balance, leave_type,Attendance,employee_leave_request
+from .models import applicablity_critirea, emp_leave_balance, leave_type,Attendance,employee_leave_request,leave_entitlement
 from EmpManagement.models import emp_master
 from django.db import models  # Ensure models import is included
 from .models import EmployeeYearlyCalendar
 from datetime import timedelta
+from datetime import date
+from dateutil.relativedelta import relativedelta
+from django.utils import timezone
 
 import logging
 
@@ -141,3 +144,87 @@ def update_employee_calendar_for_approved_leave(sender, instance, **kwargs):
 
         # Save the updated or newly created employee calendar
         employee_calendar.save()
+
+@receiver(post_save, sender=emp_master)
+def update_leave_balance(sender, instance, created, **kwargs):
+    """
+    Updates or creates prorated leave balance in emp_leave_balance when a new employee is created.
+    Uses the same logic as accrue_leaves to determine entitlement.
+    """
+    if not created:  # Run only when a new employee is created
+        return
+
+    today = timezone.now().date()
+    join_date = instance.emp_joined_date
+
+    # Fetch entitlements where accrual and proration are enabled
+    entitlements = leave_entitlement.objects.filter(accrual=True, prorate_accrual=True).order_by("leave_type", "min_experience")
+
+    leave_type_entitlements = {}  # Store best entitlements per leave type
+
+    for entitlement in entitlements:
+        leave_type = entitlement.leave_type
+
+        # Determine base date (Joining Date or Confirmation Date)
+        base_date = (
+            instance.emp_joined_date
+            if entitlement.effective_after_from == "date_of_joining"
+            else instance.emp_date_of_confirmation
+        )
+
+        if not base_date:
+            continue  # Skip if no base date
+
+        # Calculate experience in months
+        experience = relativedelta(today, base_date)
+        experience_in_months = experience.years * 12 + experience.months
+
+        # Convert min_experience to months
+        min_experience_months = (
+            entitlement.min_experience * 12
+            if entitlement.effective_after_unit == "years"
+            else entitlement.min_experience
+        )
+
+        # Select the best entitlement for this leave type
+        if (
+            experience_in_months >= min_experience_months and
+            (leave_type not in leave_type_entitlements or min_experience_months > leave_type_entitlements[leave_type]['experience'])
+        ):
+            leave_type_entitlements[leave_type] = {
+                "entitlement": entitlement,
+                "experience": min_experience_months
+            }
+
+    # Process proration for each selected entitlement
+    for leave_type, data in leave_type_entitlements.items():
+        best_entitlement = data["entitlement"]
+        accrual_rate = best_entitlement.accrual_rate
+
+        # Calculate Prorated Accrual
+        if best_entitlement.accrual_frequency == "months":
+            # Monthly accrual: Prorate based on remaining days in the month
+            total_days_in_month = (date(join_date.year, join_date.month + 1, 1) - date(join_date.year, join_date.month, 1)).days
+            remaining_days = total_days_in_month - join_date.day + 1
+            prorated_accrual = (accrual_rate * remaining_days) / total_days_in_month
+
+        elif best_entitlement.accrual_frequency == "years":
+            # Yearly accrual: Prorate based on remaining months in the year
+            remaining_months = 12 - join_date.month + 1
+            prorated_accrual = (accrual_rate * remaining_months) / 12
+
+        else:
+            prorated_accrual = 0  # No proration for other frequencies
+
+        prorated_accrual = round(prorated_accrual, 2)  # Round to 2 decimals
+
+        # Update or create leave balance (Opening balance remains default 0)
+        balance_obj, created = emp_leave_balance.objects.get_or_create(
+            employee=instance,
+            leave_type=leave_type,
+            defaults={'balance': prorated_accrual}
+        )
+
+        if not created:
+            balance_obj.balance = prorated_accrual
+            balance_obj.save()

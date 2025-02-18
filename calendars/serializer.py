@@ -3,7 +3,9 @@ from .models import (weekend_calendar,assign_weekend,holiday_calendar,holiday,as
                      applicablity_critirea,leave_reset_transaction,Attendance,Shift,ShiftPattern,EmployeeShiftSchedule,
                     ShiftOverride,WeekPatternAssignment,EmployeeMachineMapping,LeaveReport,
                      LeaveApprovalLevels,LeaveApproval,LvApprovalNotify,LvEmailTemplate,LvCommonWorkflow,LvRejectionReason,LeaveApprovalReport,
-                    AttendanceReport,lvBalanceReport,CompensatoryLeaveRequest,CompensatoryLeaveBalance,CompensatoryLeaveTransaction,EmployeeYearlyCalendar
+                    AttendanceReport,lvBalanceReport,CompensatoryLeaveRequest,CompensatoryLeaveBalance,CompensatoryLeaveTransaction,EmployeeYearlyCalendar,LeaveResetPolicy,LeaveCarryForwardTransaction,
+                    LeaveEncashmentTransaction
+
 )
 from OrganisationManager.serializer import BranchSerializer,CtgrySerializer,DeptSerializer
 from OrganisationManager.models import brnch_mstr,dept_master,ctgry_master
@@ -157,6 +159,15 @@ class ResetSerializer(serializers.ModelSerializer):
         model = leave_reset_transaction
         fields = '__all__'
 
+class LeaveCarryForwardTransactionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LeaveCarryForwardTransaction
+        fields = '__all__'
+
+class LeaveEncashmentTransactionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LeaveEncashmentTransaction
+        fields = '__all__'
 
 class LeaveEntitlementSerializer(serializers.ModelSerializer):
     class Meta:
@@ -164,10 +175,10 @@ class LeaveEntitlementSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-# class LeavePolicySerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = emp_leave_balance
-#         fields = '__all__'
+class LeaveResetPolicySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LeaveResetPolicy
+        fields = '__all__'
 
 class LeaveRequestSerializer(serializers.ModelSerializer):
     document_numbering_details = serializers.SerializerMethodField()
@@ -216,6 +227,11 @@ class EmployeeLeaveBalanceSerializer(serializers.ModelSerializer):
     class Meta:
         model = emp_leave_balance
         fields = '__all__'
+    def to_representation(self, instance):
+        rep = super(EmployeeLeaveBalanceSerializer, self).to_representation(instance)
+        if instance.leave_type:  
+            rep['leave_type'] = instance.leave_type.name         
+        return rep
 #         extra_fields = ['applicable_leave_types']
 #     def __init__(self, *args, **kwargs):
 #         employee_id = kwargs.pop('employee_id', None)

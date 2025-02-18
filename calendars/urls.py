@@ -3,7 +3,7 @@ from .  views import (WeekendViewset,AssignWeekendViewset,HolidayViewset,Holiday
                     AttendanceViewSet,ShiftViewSet,ImportAttendanceViewSet,EmployeeMachineMappingViewset,Leave_ReportViewset,LvApprovalLevelViewset,
                     LvApprovalViewset,LvEmailTemplateviewset,LvApprovalNotifyviewset,LvCommonWorkflowViewset,LvRejectionViewset,Lv_Approval_ReportViewset,
                     AttendanceReportViewset,LvBalanceReportViewset,EmployeeYearlyCalendarViewset,ShiftPatternViewSet,EmployeeShiftScheduleViewSet,WeekPatternAssignmentVSet,
-                    ShiftOverrideViewSet
+                    ShiftOverrideViewSet,LeaveResetPolicyviewset,LeaveCarryForwardTransactionviewset,LeaveEncashmentTransactionviewset
                     )
 
 from rest_framework.routers import DefaultRouter
@@ -23,6 +23,9 @@ router.register(r'reset', Resetviewset, basename='reset')
 # router.register(r'enchash', Enchashviewset, basename='enchash')
 router.register(r'leave-type', LeaveTypeviewset, basename='leave_type')
 router.register(r'leave-entitlement', LeaveEntitlementviewset, basename='leave_entitlement')
+router.register(r'leave-reset-policy', LeaveResetPolicyviewset, basename='leave_reset_policy')
+router.register(r'leave-carry-forward-transaction', LeaveCarryForwardTransactionviewset, basename='leave_carry_forward_transaction')
+router.register(r'leave-encashment-tranaction',LeaveEncashmentTransactionviewset, basename='leave_encashment_transaction')
 # router.register(r'leave-policy', LeavePolicyviewset, basename='leave_policy')
 router.register(r'emp-leave-request', LeaveRequestviewset, basename='emp_leave-request')
 router.register(r'emp-foreign', LeaveTypeViewSet, basename='emp_foreign')

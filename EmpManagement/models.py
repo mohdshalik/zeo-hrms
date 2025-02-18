@@ -423,7 +423,7 @@ class Emp_Documents(models.Model):
     emp_doc_number       = models.CharField(max_length=50,unique=True)
     emp_doc_issued_date  = models.DateField()
     emp_doc_expiry_date  = models.DateField()
-    emp_doc_document     = models.FileField()
+    emp_doc_document     = models.FileField(upload_to="emp_documents/",null=True,blank=True)
     is_active            = models.BooleanField(default=True)
     created_at           = models.DateTimeField(auto_now_add=True)
     created_by           = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
