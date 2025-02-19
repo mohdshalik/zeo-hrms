@@ -253,7 +253,66 @@ def reset_leave_balances():
 
     logger.info("Reset leave balances task completed.")
 
+@shared_task
+def deduct_expired_carry_forward_leaves():
+    from django.db import transaction
+    from decimal import Decimal
 
+    tenants = get_all_tenant_schemas()
+    today = timezone.now().date()
+    logger.info(f"Reset leave balances task started on {today}")
+
+    for tenant_schema_name in tenants:
+        try:
+            with schema_context(tenant_schema_name):
+                logger.info(f"Processing expired_carry_forward_leaves: {tenant_schema_name}")
+
+                policies = LeaveResetPolicy.objects.filter(carry_forward_choice='carry_forward_with_expiry')
+
+                for policy in policies:
+                    time_unit = policy.cf_time_choice
+                    expires_in = policy.cf_expires_in_value
+
+                    # Determine expiry date based on policy settings
+                    if time_unit == 'days':
+                        expiry_threshold = today - timedelta(days=expires_in)
+                    elif time_unit == 'months':
+                        expiry_threshold = today.replace(month=today.month - expires_in) if today.month > expires_in else today.replace(year=today.year - 1, month=(12 - expires_in + today.month))
+                    elif time_unit == 'years':
+                        expiry_threshold = today.replace(year=today.year - expires_in)
+                    else:
+                        continue  
+
+                    # Fetch expired carry-forward transactions
+                    expired_transactions = LeaveCarryForwardTransaction.objects.filter(
+                        reset_date__lte=expiry_threshold,
+                        final_carry_forward__gt=0
+                    )
+
+                    with transaction.atomic():
+                        for leave_transaction in expired_transactions:
+                            emp_balance = emp_leave_balance.objects.filter(
+                                employee=leave_transaction.employee, 
+                                leave_type=leave_transaction.leave_type
+                            ).first()
+
+                            if emp_balance:
+                                # Convert both values to Decimal before subtraction
+                                emp_balance.balance = Decimal(str(emp_balance.balance))  
+                                leave_transaction.final_carry_forward = Decimal(str(leave_transaction.final_carry_forward))
+
+                                # Deduct expired carry-forward leave from employee leave balance
+                                deduction = min(emp_balance.balance, leave_transaction.final_carry_forward)
+                                emp_balance.balance -= deduction
+                                emp_balance.save()
+
+                                # Set carry-forward amount to 0 since it has expired
+                                leave_transaction.final_carry_forward = Decimal("0")
+                                leave_transaction.save()
+        except Exception as e:
+            logger.error(f"Error processing tenant {tenant_schema_name}: {e}")
+
+            
 def get_all_tenant_schemas(): 
     # Implement this function based on your tenant management system 
     TenantModel = get_tenant_model() 

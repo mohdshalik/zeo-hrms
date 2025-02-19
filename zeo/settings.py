@@ -292,7 +292,11 @@ CELERY_BEAT_SCHEDULE = {
     'reset-leave-month':{
         'task':'calendars.tasks.reset_leave_balances',
         'schedule':crontab(hour=12, minute=00)
-    }
+    },
+    'deduct_expired_carry_forward_leaves_daily': {
+        'task': 'calendars.tasks.deduct_expired_carry_forward_leaves',
+        'schedule': crontab(hour=12, minute=00),  # Runs daily at midnight
+    },
 }
 # CELERY_BEAT_SCHEDULE_FILENAME = 'celerybeat-schedule'  # Save Celery Beat schedule state
 

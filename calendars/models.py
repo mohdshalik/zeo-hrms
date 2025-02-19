@@ -973,8 +973,8 @@ class employee_leave_request(models.Model):
         # Check if the status changed to "approved"
         previous_instance = type(self).objects.filter(pk=self.pk).first()
         status_changed_to_approved = (
-            previous_instance is None or previous_instance.status != 'Approved'
-        ) and self.status == 'Approved'
+            previous_instance is None or previous_instance.status != 'approved'
+        ) and self.status == 'approved'
         print("s",status_changed_to_approved)
         with transaction.atomic():
             super().save(*args, **kwargs)
@@ -1025,6 +1025,7 @@ class employee_leave_request(models.Model):
 
         return leave_days
     def deduct_leave_balance(self):
+        from decimal import Decimal
         # Fetch or create the employee's leave balance for this leave type
         leave_balance, created = emp_leave_balance.objects.get_or_create(
             employee=self.employee,
@@ -1037,6 +1038,18 @@ class employee_leave_request(models.Model):
 
         leave_balance.balance -= self.number_of_days
         leave_balance.save()
+
+        leave_days_to_deduct = Decimal(str(self.number_of_days))
+        carry_forward_entry = LeaveCarryForwardTransaction.objects.filter(
+        employee=self.employee,
+        leave_type=self.leave_type,
+        final_carry_forward__gt=0  # Ensure there's a balance to deduct
+        ).order_by('-reset_date').first()  # Prioritize the oldest carry-forward balance
+
+        if carry_forward_entry:
+            # Deduct the same number of leave days from the carry forward balance
+            carry_forward_entry.final_carry_forward -= leave_days_to_deduct
+            carry_forward_entry.save()
 
    
     def __str__(self):
