@@ -323,7 +323,7 @@ class leave_type(models.Model):
     negative                      = models.BooleanField(default=False)
     description                   = models.CharField(max_length=200)  
     allow_half_day                = models.BooleanField(default=False)  # Allows half-day leave if set to True
-    valid_from                    = models.DateField()
+    valid_from                    = models.DateField(null=True,blank=True)
     valid_to                      = models.DateField(null=True,blank=True)
     include_weekend_and_holiday   = models.BooleanField(default=False)
     use_common_workflow           = models.BooleanField(default=False)
