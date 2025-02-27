@@ -5,7 +5,6 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from Core.serializer import Document_type
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
-from OrganisationManager.models import document_numbering
 from OrganisationManager.serializer import DocumentNumberingSerializer
 from django.contrib.contenttypes.models import ContentType
 import datetime
