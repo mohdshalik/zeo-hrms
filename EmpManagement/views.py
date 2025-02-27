@@ -1664,7 +1664,7 @@ from django.db import transaction
 class GeneralRequestViewset(viewsets.ModelViewSet):
     queryset = GeneralRequest.objects.all()
     serializer_class = GeneralRequestSerializer
-    # permission_classes =[IsSuperUserOrHasGeneralRequestPermission]
+    permission_classes =[IsSuperUserOrHasGeneralRequestPermission]
     def perform_create(self, serializer):
         with transaction.atomic():
             # Get employee from validated data

@@ -384,20 +384,19 @@ class CommonWorkflowSerializer(serializers.ModelSerializer):
 class GeneralRequestSerializer(serializers.ModelSerializer):
     approvals = ApprovalSerializer(many=True, read_only=True)
     document_numbering_details = serializers.SerializerMethodField()
+
     class Meta:
         model = GeneralRequest
         fields = '__all__'
+
     def get_document_numbering_details(self, obj):
-        # Fetch the document numbering details based on the selected branch
-        try:
-            doc_num = document_numbering.objects.get(branch_id=obj.branch,type='general_request')
-            return DocumentNumberingSerializer(doc_num).data
-        except document_numbering.DoesNotExist:
-            return None
+        return {
+            "document_number": obj.document_number,
+            "prefix": obj.document_number.split('-')[0] if obj.document_number else None,
+            "year": obj.document_number.split('-')[1] if obj.document_number else None,
+        }
     def to_representation(self, instance):
         rep = super(GeneralRequestSerializer, self).to_representation(instance)
-        if instance.branch:  
-            rep['branch'] = instance.branch.branch_name
         if instance.employee:  
             rep['employee'] = instance.employee.emp_first_name
         if instance.request_type:  
