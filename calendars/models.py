@@ -1408,82 +1408,50 @@ class ShiftPattern(models.Model):
         return f"Shift Pattern: {self.name}"
 
 class EmployeeShiftSchedule(models.Model):
-    """Handles shift assignments for employees and departments over a rotating schedule."""
-    employee             = models.ManyToManyField('EmpManagement.emp_master', blank=True)
-    departments          = models.ManyToManyField('OrganisationManager.dept_master', blank=True)
-    week_patterns        = models.ManyToManyField(ShiftPattern, through='WeekPatternAssignment', blank=True,related_name='week_pattern_schedules')
-    rotation_cycle_weeks = models.IntegerField(default=4)  # Total weeks in the rotation cycle
-    start_date           = models.DateField(default=timezone.now, blank=True)
-    is_rotating          = models.BooleanField(default=True)  # Flag for rotating schedule or not
-    single_shift_pattern = models.ForeignKey(ShiftPattern, null=True, blank=True, on_delete=models.SET_NULL,related_name='single_shift_schedules')
-    created_at           = models.DateTimeField(auto_now_add=True)
-    created_by           = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+    """Defines shift schedules for employees or departments."""
+    SHIFT_TYPES = (
+        ("rotating", "Rotating Shift"),
+        ("fixed", "Fixed Shift"),
+    )
+    schedule_name = models.CharField(max_length=50,null=True,blank=True)
+    employee = models.ManyToManyField('EmpManagement.emp_master', blank=True, related_name="shift_schedules")
+    departments = models.ManyToManyField('OrganisationManager.dept_master', blank=True, related_name="shift_schedules")
+    shift_type = models.CharField(max_length=10, choices=SHIFT_TYPES, default="rotating")
+    rotation_cycle_weeks = models.IntegerField(default=4,null=True,blank=True)  # Used only if rotating
+    start_date = models.DateField(default=timezone.now)
+    single_shift_pattern = models.ForeignKey(ShiftPattern, null=True, blank=True, on_delete=models.SET_NULL)  # For fixed shifts
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True)
 
-    def get_shift_for_date(self, employee, date):
-        """Determine the shift for a given date."""
-        if not self.is_rotating:  # If not rotating, use a single shift pattern
-            if self.single_shift_pattern:
-                weekday = date.weekday()
-                return self.single_shift_pattern.get_shift_for_day(weekday)
-            return None
+    def get_shift_for_date(self, date):
+        """Determine the shift for a given date based on the schedule type."""
+        if self.shift_type == "fixed" and self.single_shift_pattern:
+            return self.single_shift_pattern.get_shift_for_day(date.weekday())
 
-        # Check if there's an override shift for the specific date
-        override = ShiftOverride.objects.filter(employee=employee, date=date).first()
-        if override:
-            return override.override_shift
-
-        # Ensure date is in date format
-        if isinstance(date, datetime):
-            date = date.date()
-
-        # Get the schedule start date for the employee
-        start_date = self.get_schedule_start_date(employee)
-
-        # Calculate the week number within the month
-        month_start_date = date.replace(day=1)
-        days_since_month_start = (date - month_start_date).days
-        week_number_in_month = (days_since_month_start // 7) + 1
-
-        # Calculate week number in the rotation cycle based on month-based calculation
-        week_number = ((week_number_in_month - 1) % self.rotation_cycle_weeks) + 1
-
-        print(f"Start Date: {start_date}")
-        print(f"Month Start Date: {month_start_date}")
-        print(f"Days Since Month Start: {days_since_month_start}")
-        print(f"Week Number in Month: {week_number_in_month}")
-        print(f"Week Number in Rotation Cycle: {week_number}")
-
-        # Retrieve the shift pattern template for the calculated week
+        # Handle rotating shifts
+        week_number = self.calculate_week_number(date)
         assignment = WeekPatternAssignment.objects.filter(schedule=self, week_number=week_number).first()
-        if assignment and assignment.template:
-            weekday = date.weekday()
-            return assignment.template.get_shift_for_day(weekday)
-        return None
-    
-    
-    def get_schedule_start_date(self, employee):
-        # Get the current year for calculation
-        current_year = timezone.now().year
-        # Set January 1st of the current year as the start date for schedule
-        return timezone.datetime(current_year, 1, 1).date()
-    
+        return assignment.shift_pattern.get_shift_for_day(date.weekday()) if assignment else None
+
+    def calculate_week_number(self, date):
+        """Calculates week number in the rotation cycle from start_date."""
+        delta_weeks = (date - self.start_date).days // 7
+        return (delta_weeks % self.rotation_cycle_weeks) + 1
 
     def __str__(self):
-        return f"Rotating Shift Schedule for {self.departments} "
-class WeekPatternAssignment(models.Model):
-    """Assigns a shift pattern template to a specific week in the rotation."""
-    schedule    = models.ForeignKey(EmployeeShiftSchedule, on_delete=models.CASCADE)
-    week_number = models.IntegerField()  # Week number in the cycle
-    template    = models.ForeignKey(ShiftPattern, on_delete=models.SET_NULL, null=True)
-    created_at  = models.DateTimeField(auto_now_add=True)
-    created_by  = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+        return f"Shift Schedule {self.schedule_name}"
 
+class WeekPatternAssignment(models.Model):
+    """Assigns a shift pattern to a specific week in the rotation cycle."""
+    schedule = models.ForeignKey(EmployeeShiftSchedule, on_delete=models.CASCADE,limit_choices_to={'shift_type': 'rotating'})
+    week_number = models.IntegerField()  # Week number in the cycle
+    shift_pattern = models.ForeignKey(ShiftPattern, on_delete=models.CASCADE,null=True,blank=True)  # Direct reference to shift pattern
 
     class Meta:
-        unique_together = ('schedule', 'week_number')  # Ensure unique assignment per week in a schedule
+        unique_together = ('schedule', 'week_number')  # Ensure one pattern per week
 
     def __str__(self):
-        return f"Week {self.week_number} using {self.template.name} in {self.schedule}"
+        return f"Week {self.week_number} using {self.shift_pattern} in {self.schedule}"
 
 class ShiftOverride(models.Model):
     employee       = models.ForeignKey('EmpManagement.emp_master', on_delete=models.CASCADE)

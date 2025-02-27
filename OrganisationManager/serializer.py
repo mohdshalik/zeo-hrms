@@ -1,4 +1,4 @@
-from .models import (brnch_mstr,dept_master,desgntn_master,document_numbering,
+from .models import (brnch_mstr,dept_master,desgntn_master,DocumentNumbering,
                      ctgry_master,FiscalPeriod,FiscalYear,CompanyPolicy,AssetMaster,AssetMaster, AssetTransaction,Asset_CustomFieldValue)
 from rest_framework import serializers
 from tenant_users.tenants.models import UserTenantPermissions
@@ -128,14 +128,14 @@ class PermissionSerializer(serializers.ModelSerializer):
 class DocumentNumberingSerializer(serializers.ModelSerializer):
     
     class Meta:
-        model = document_numbering
+        model = DocumentNumbering
         fields = '__all__'
     def to_representation(self, instance):
         rep = super(DocumentNumberingSerializer, self).to_representation(instance)
         if instance.branch_id:  # Check if emp_state_id is not None
             rep['branch_id'] = instance.branch_id.branch_name
-        if instance.category:  # Check if emp_state_id is not None
-            rep['category'] = instance.category.ctgry_title
+        # if instance.category:  # Check if emp_state_id is not None
+        #     rep['category'] = instance.category.ctgry_title
         return rep
     
 class CompanyPolicySerializer(serializers.ModelSerializer):

@@ -287,7 +287,6 @@ class EmpCustomFieldValueResource(resources.ModelResource):
 
 class DocumentResource(resources.ModelResource):
     emp_id = fields.Field(attribute='emp_id', column_name='Employee Code', widget=ForeignKeyWidget(emp_master, 'emp_code'))
-    emp_sl_no = fields.Field(attribute='emp_sl_no', column_name='SerialNo')
     document_type = fields.Field(attribute='document_type', column_name='Document Type', widget=ForeignKeyWidget(document_type, 'type_name'))
     emp_doc_number = fields.Field(attribute='emp_doc_number', column_name='Document Number')
     emp_doc_issued_date = fields.Field(attribute='emp_doc_issued_date', column_name='Document Issued Date')
@@ -297,17 +296,15 @@ class DocumentResource(resources.ModelResource):
         model = Emp_Documents
         fields = (
             'emp_id',
-            'emp_sl_no',
             'document_type',
             'emp_doc_number',
             'emp_doc_issued_date',
             'emp_doc_expiry_date',
         )
-        import_id_fields = ('emp_sl_no',)
+        import_id_fields = ()
 
     def before_import_row(self, row, **kwargs):
         errors = []  
-        emp_sl_no = row.get('SerialNo')
         emp_code = row.get('Employee Code')
         doc_type = row.get('Document Type')
 

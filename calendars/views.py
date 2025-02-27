@@ -40,10 +40,11 @@ from rest_framework import viewsets,filters, status
 from django.views.decorators.csrf import csrf_exempt
 from datetime import datetime, timedelta
 from django.db.models import Field
-from OrganisationManager.models import document_numbering
-from OrganisationManager.serializer import DocumentNumberingSerializer
 from django.db import transaction
-
+from django.db.models import Q
+from OrganisationManager.models import DocumentNumbering
+from OrganisationManager.serializer import DocumentNumberingSerializer
+from rest_framework.exceptions import NotFound
 # Create your views here.
 
 class WeekendDetailsViewset(viewsets.ModelViewSet):
@@ -254,65 +255,30 @@ class LeaveRequestviewset(viewsets.ModelViewSet):
             # Return only requests related to the ESS user's employee record
             return self.queryset.filter(employee__emp_code=self.request.user.username)
         return super().get_queryset()  # Non-ESS users can access as per their permissions
-    def create(self, request, *args, **kwargs):
-        data = request.data.copy()  # Make a mutable copy of request data
-
-        branch = data.get('branch')
-        try:
-            doc_numbering = document_numbering.objects.get(branch_id=branch ,type='leave_request')
-        except document_numbering.DoesNotExist:
-            return Response({"error": "Document numbering not found for this branch and type"}, status=status.HTTP_400_BAD_REQUEST)
-
-        if doc_numbering.automatic_numbering:
-            # Generate the document number if automatic numbering is enabled
-            doc_number = f"{doc_numbering.preffix}{doc_numbering.suffix}{doc_numbering.year.year}{doc_numbering.start_number}{doc_numbering.current_number}"
-
-            # Update current_number
-            with transaction.atomic():
-                doc_numbering.current_number += 1
-                doc_numbering.save()
-
-            # Add the generated document number to the data
-            data['doc_number'] = doc_number
-        else:
-            # If automatic numbering is disabled, check if 'doc_number' is provided in the request data
-            if 'doc_number' not in data or not data['doc_number']:
-                # Generate the document number automatically if 'doc_number' is not provided or empty
-                doc_number = f"{doc_numbering.preffix}{doc_numbering.year.year}{doc_numbering.start_number}{doc_numbering.current_number}{doc_numbering.suffix}"
-                # Update current_number
-                with transaction.atomic():
-                    doc_numbering.current_number += 1
-                    doc_numbering.save()
-                # Add the generated document number to the data
-                data['doc_number'] = doc_number
-
-        # Proceed to create the GeneralRequest
-        serializer = self.get_serializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
-        headers = self.get_success_headers(serializer.data)
-        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
-    
-    @action(detail=False, methods=['get'])
-    def document_numbering_by_branch(self, request):
-        branch_id = request.query_params.get('branch_id')
-        if not branch_id:
-            return Response({"error": "Branch ID is required"}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            doc_numbering = document_numbering.objects.get(branch_id=branch_id,type='leave_request')
-        except document_numbering.DoesNotExist:
-            return Response({"error": "Document numbering not found for this branch and type"}, status=status.HTTP_404_NOT_FOUND)
-
-        serializer = DocumentNumberingSerializer(doc_numbering)
-        return Response(serializer.data, status=status.HTTP_200_OK)
     def perform_create(self, serializer):
-        if self.request.user.is_ess:
-            # Set the employee field to the ESS user's employee record
-            employee = self.request.user.emp_master  # Assuming a OneToOne relationship or similar
-            serializer.save(employee=employee, created_by=self.request.user)
-        else:
-            serializer.save(created_by=self.request.user)
+        with transaction.atomic():
+            # Get employee from validated data (or set it for ESS users)
+            employee = serializer.validated_data.get('employee')
+            if self.request.user.is_ess:
+                # For ESS users, set employee to the user's employee record
+                employee = self.request.user.emp_master  # Adjust if emp_master relation differs
+                serializer.validated_data['employee'] = employee
+
+            # Derive branch_id from employee's branch (adjust field name as needed)
+            branch_id = employee.emp_branch_id.id  # Assuming emp_branch_id is the ForeignKey to brnch_mstr
+            leave_type = serializer.validated_data['leave_type']
+
+            try:
+                doc_config = DocumentNumbering.objects.get(
+                    branch_id=branch_id,
+                    type='leave_request',
+                    leave_type=leave_type
+                )
+            except DocumentNumbering.DoesNotExist:
+                raise NotFound(f"No document numbering configuration found for branch {branch_id} and leave type {leave_type}.")
+
+            document_number = doc_config.get_next_number()
+            serializer.save(document_number=document_number)
 
     @action(detail=False, methods=['get'], url_path='leave-request-history')
     def employee_leave_request(self, request):
@@ -402,7 +368,6 @@ class EmployeeShiftScheduleViewSet(viewsets.ModelViewSet):
     queryset = EmployeeShiftSchedule.objects.all()
     serializer_class = EmployeeShiftScheduleSerializer
     permission_classes = [EmployeeShiftSchedulePermission]
-    
     def get_shift_for_day(self, request, *args, **kwargs):
         """
         Get shift for a given employee and date.
@@ -416,7 +381,8 @@ class EmployeeShiftScheduleViewSet(viewsets.ModelViewSet):
                 employee = emp_master.objects.get(id=employee_id)
                 date = timezone.datetime.strptime(date_str, '%Y-%m-%d').date()
                 schedule = self.get_object()  # Assume the schedule is retrieved by URL ID
-                shift = schedule.get_shift_for_date(employee, date)
+                # Removed extra employee argument:
+                shift = schedule.get_shift_for_date(date)
                 
                 if shift:
                     return Response({"shift": str(shift)}, status=status.HTTP_200_OK)
@@ -428,50 +394,73 @@ class EmployeeShiftScheduleViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'])
     def get_shifts_for_year(self, request):
-        #get_shifts_for_year/?schedule_id=2&employee=1&year=2024
         """
-        Get shifts for a given employee for every day in a specified year.
-        URL parameters should include schedule_id, employee_id, and year.
+        Get shifts for all employees in a given schedule for every day in a specified year.
+        Supports optional month-wise pagination via `month` parameter.
         """
         schedule_id = request.query_params.get('schedule_id')
-        employee_id = request.query_params.get('employee')
         year = request.query_params.get('year')
+        month = request.query_params.get('month')  # Optional: Get shifts only for a specific month
 
-        if schedule_id and employee_id and year:
-            try:
-                schedule = get_object_or_404(EmployeeShiftSchedule, id=schedule_id)
-                employee = emp_master.objects.get(id=employee_id)
-                year = int(year)
+        if not (schedule_id and year):
+            return Response({"error": "Missing required parameters"}, status=status.HTTP_400_BAD_REQUEST)
 
-                # Initialize the start and end dates for the year,all employees in the notepad
+        try:
+            schedule = get_object_or_404(EmployeeShiftSchedule, id=schedule_id)
+            year = int(year)
+
+            # Determine date range (full year or specific month)
+            if month:
+                month = int(month)
+                start_date = datetime(year, month, 1).date()
+                end_date = (datetime(year, month + 1, 1) - timedelta(days=1)).date() if month < 12 else datetime(year, 12, 31).date()
+            else:
                 start_date = datetime(year, 1, 1).date()
                 end_date = datetime(year, 12, 31).date()
 
-                # Prepare a dictionary to store shifts with date keys
-                shifts_calendar = {}
+            # **Efficiently fetch all assigned employees**
+            assigned_employees = set(schedule.employee.all())  # Direct employees
+            assigned_departments = set(schedule.departments.all())  # Departments assigned to schedule
+            
+            # Fetch employees in assigned departments
+            department_employees = emp_master.objects.filter(emp_dept_id__in=assigned_departments)
 
-                # Iterate through each day of the year
-                current_date = start_date
-                while current_date <= end_date:
-                    shift = schedule.get_shift_for_date(employee, current_date)
+            # Merge both sets to get all employees under this schedule
+            all_valid_employees = list(assigned_employees.union(set(department_employees)))
 
-                    # Format date as "DD-MM-YYYY"
-                    date_str = current_date.strftime("%d-%m-%Y")
+            if not all_valid_employees:
+                return Response({"error": "No employees assigned to this schedule"}, status=status.HTTP_404_NOT_FOUND)
 
-                    # Store shift information for the date
-                    shifts_calendar[date_str] = str(shift) if shift else "No shift"
+            # **Precompute shifts in bulk**
+            shifts_calendar = {}
 
-                    # Move to the next day
-                    current_date += timedelta(days=1)
+            all_dates = [start_date + timedelta(days=i) for i in range((end_date - start_date).days + 1)]
+            
+            for employee in all_valid_employees:
+                shifts_calendar[employee.emp_code] = {
+                    date.strftime("%d-%m-%Y"): None for date in all_dates
+                }
 
-                return Response({"year": year, "shifts": shifts_calendar}, status=status.HTTP_200_OK)
-                
-            except emp_master.DoesNotExist:
-                return Response({"error": "Employee not found"}, status=status.HTTP_404_NOT_FOUND)
-            except ValueError:
-                return Response({"error": "Invalid year"}, status=status.HTTP_400_BAD_REQUEST)
-        return Response({"error": "Invalid parameters"}, status=status.HTTP_400_BAD_REQUEST)
+            # **Bulk fetch shifts for all dates**
+            shift_data = {date: schedule.get_shift_for_date(date) for date in all_dates}
 
+            # Assign shifts to employees in bulk
+            for employee in all_valid_employees:
+                for date, shift in shift_data.items():
+                    date_str = date.strftime("%d-%m-%Y")
+                    shifts_calendar[employee.emp_code][date_str] = str(shift) if shift else "No shift"
+
+            return Response({
+                "year": year,
+                "month": month if month else "Full Year",
+                "shifts": shifts_calendar
+            }, status=status.HTTP_200_OK)
+
+        except ValueError:
+            return Response({"error": "Invalid year or month format"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
 class AttendanceViewSet(viewsets.ModelViewSet):
     queryset = Attendance.objects.all()
     serializer_class = AttendanceSerializer
@@ -484,7 +473,6 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             return datetime.strptime(date_string, "%Y-%m-%d").date()
         except (ValueError, TypeError):
             return None
-
     @action(detail=False, methods=['post'])
     def check_in(self, request):
         emp_id = request.data.get("employee")
@@ -499,19 +487,24 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         attendance, created = Attendance.objects.get_or_create(employee=employee, date=date)
         if attendance.check_in_time:
             return Response({"detail": "Already checked in"}, status=status.HTTP_400_BAD_REQUEST)
-         # Determine the shift for the provided date
-        schedule = EmployeeShiftSchedule.objects.filter(employee=employee).first()
-        shift = schedule.get_shift_for_date(employee, date) if schedule else None
+
+        #  Get shift schedules where the employee is directly assigned OR belongs to a department with an assigned shift
+        schedule = EmployeeShiftSchedule.objects.filter(
+            Q(employee=employee) | Q(departments=employee.emp_dept_id)
+        ).first()  # Fetch the first matching schedule
+
+        shift = schedule.get_shift_for_date(date) if schedule else None  #  Fixed this line
 
         # Get the current time in the tenant's timezone and store only the time
-        tenant_time = localtime(now()).time()  # Get the current time in the active timezone
+        tenant_time = localtime(now()).time()
         attendance.check_in_time = tenant_time
         attendance.shift = shift
         attendance.save()
-        
 
-        return Response({"status": "Check-in recorded successfully","shift": shift.name if shift else None}, status=status.HTTP_200_OK)
-
+        return Response(
+            {"status": "Check-in recorded successfully", "shift": shift.name if shift else None},
+            status=status.HTTP_200_OK
+        )
     @action(detail=False, methods=['post'])
     def check_out(self, request):
         emp_id = request.data.get("employee")

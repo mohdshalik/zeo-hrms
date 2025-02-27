@@ -10,7 +10,7 @@ from docx import Document
 from django_tenants.utils import schema_context
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
-from .models import (brnch_mstr,dept_master,document_numbering,
+from .models import (brnch_mstr,dept_master,DocumentNumbering,
                      desgntn_master,ctgry_master,FiscalPeriod,FiscalYear,CompanyPolicy,AssetMaster, AssetTransaction,Asset_CustomFieldValue)
 
 from . serializer import (BranchSerializer,PermissionSerializer,GroupSerializer,permserializer,DocumentNumberingSerializer,
@@ -464,17 +464,9 @@ class permviewset(viewsets.ModelViewSet):
     serializer_class=permserializer
 
 class DocNumberingviewset(viewsets.ModelViewSet):
-    queryset = document_numbering.objects.all()
+    queryset = DocumentNumbering.objects.all()
     serializer_class = DocumentNumberingSerializer
     permission_classes = [DocumentNumberingPermission]
-    def create(self, request, *args, **kwargs):
-        branch_id = request.data.get('branch_id')
-        category = request.data.get('category')
-
-        if document_numbering.objects.filter(branch_id=branch_id, category=category).exists():
-            raise ValidationError({'error': 'A document numbering record already exists for this branch and category.'})
-
-        return super().create(request, *args, **kwargs)
 
 
 from django.shortcuts import get_object_or_404

@@ -418,7 +418,6 @@ from django.dispatch import receiver
 #EMPLOYEE DOCUMENTS
 class Emp_Documents(models.Model):
     emp_id               =models.ForeignKey('emp_master',on_delete = models.CASCADE,related_name='emp_documents')
-    emp_sl_no            = models.CharField(max_length=50, unique=True, null=True,blank =True,default=None)
     document_type        = models.ForeignKey('Core.document_type',on_delete = models.CASCADE)
     emp_doc_number       = models.CharField(max_length=50,unique=True)
     emp_doc_issued_date  = models.DateField()
@@ -854,7 +853,6 @@ class CommonWorkflow(models.Model):
 class GeneralRequest(models.Model):
     doc_number       =  models.CharField(max_length=120,unique=True)
     reason           =  models. CharField(max_length=200)
-    branch           =  models.ForeignKey('OrganisationManager.brnch_mstr',on_delete = models.CASCADE)
     request_type     =  models.ForeignKey('RequestType',on_delete = models.CASCADE)
     employee         =  models.ForeignKey('emp_master',on_delete = models.CASCADE)
     total            =  models.IntegerField(null=True)

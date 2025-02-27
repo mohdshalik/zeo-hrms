@@ -38,7 +38,7 @@ from openpyxl.styles import PatternFill,Alignment,Font,NamedStyle
 from rest_framework import status,generics,viewsets,permissions
 from .permissions import EmployeePermission
 from datetime import datetime, timedelta
-from OrganisationManager.models import document_numbering
+from OrganisationManager.models import DocumentNumbering
 from OrganisationManager.serializer import DocumentNumberingSerializer
 # from rest_framework.authentication import SessionAuthentication,TokenAuthentication
 from rest_framework.permissions import IsAuthenticated,AllowAny,IsAuthenticatedOrReadOnly,IsAdminUser
@@ -57,6 +57,7 @@ from django.core.cache import cache
 import redis
 import json
 from calendars .serializer import AttendanceSerializer
+from rest_framework.exceptions import NotFound
 
 r = redis.StrictRedis(host='localhost', port=6379, db=0)
 
@@ -1663,59 +1664,48 @@ from django.db import transaction
 class GeneralRequestViewset(viewsets.ModelViewSet):
     queryset = GeneralRequest.objects.all()
     serializer_class = GeneralRequestSerializer
-    permission_classes =[IsSuperUserOrHasGeneralRequestPermission]
-    def create(self, request, *args, **kwargs):
-        data = request.data.copy()  # Make a mutable copy of request data
+    # permission_classes =[IsSuperUserOrHasGeneralRequestPermission]
+    def perform_create(self, serializer):
+        with transaction.atomic():
+            # Get employee from validated data
+            employee = serializer.validated_data.get('employee')
 
-        branch = data.get('branch')
-        try:
-            doc_numbering = document_numbering.objects.get(branch_id=branch ,type='general_request')
-        except document_numbering.DoesNotExist:
-            return Response({"error": "Document numbering not found for this branch and type"}, status=status.HTTP_400_BAD_REQUEST)
+            # Derive branch_id from employee's branch (adjust field name as needed)
+            branch_id = employee.emp_branch_id.id  # Assuming emp_branch_id is the ForeignKey to brnch_mstr
 
-        if doc_numbering.automatic_numbering:
-            # Generate the document number if automatic numbering is enabled
-            doc_number = f"{doc_numbering.preffix}{doc_numbering.suffix}{doc_numbering.year.year}{doc_numbering.start_number}{doc_numbering.current_number}"
+            try:
+                doc_config = DocumentNumbering.objects.get(
+                    branch_id=branch_id,
+                    type='general_request',
+                    leave_type__isnull=True
+                )
+            except DocumentNumbering.DoesNotExist:
+                raise NotFound(f"No document numbering configuration found for branch {branch_id} and general request.")
 
-            # Update current_number
-            with transaction.atomic():
-                doc_numbering.current_number += 1
-                doc_numbering.save()
+            document_number = doc_config.get_next_number()
+            serializer.save(document_number=document_number)
 
-            # Add the generated document number to the data
-            data['doc_number'] = doc_number
-        else:
-            # If automatic numbering is disabled, check if 'doc_number' is provided in the request data
-            if 'doc_number' not in data or not data['doc_number']:
-                # Generate the document number automatically if 'doc_number' is not provided or empty
-                doc_number = f"{doc_numbering.preffix}{doc_numbering.year.year}{doc_numbering.start_number}{doc_numbering.current_number}{doc_numbering.suffix}"
-                # Update current_number
-                with transaction.atomic():
-                    doc_numbering.current_number += 1
-                    doc_numbering.save()
-                # Add the generated document number to the data
-                data['doc_number'] = doc_number
-
-        # Proceed to create the GeneralRequest
-        serializer = self.get_serializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
-        headers = self.get_success_headers(serializer.data)
-        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
-    
     @action(detail=False, methods=['get'])
-    def document_numbering_by_branch(self, request):
-        branch_id = request.query_params.get('branch_id')
-        if not branch_id:
-            return Response({"error": "Branch ID is required"}, status=status.HTTP_400_BAD_REQUEST)
+    def employee_request_history(self, request):
+        employee_id = request.query_params.get('employee_id')
+        if not employee_id:
+            return Response({'error': 'Employee ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        requests = GeneralRequest.get_employee_requests(employee_id)
 
-        try:
-            doc_numbering = document_numbering.objects.get(branch_id=branch_id,type='general_request')
-        except document_numbering.DoesNotExist:
-            return Response({"error": "Document numbering not found for this branch and type"}, status=status.HTTP_404_NOT_FOUND)
+        # Manually serialize the fields you want
+        history_data = []
+        for request in requests:
+            history_data.append({
+                'doc_number': request.doc_number,
+                'reason': request.reason,
+                'branch': request.branch.branch_name if request.branch else None,
+                'request_type': request.request_type.name if request.request_type else None,
+                'status': request.status,
+                'created_at_date': request.created_at_date,
+            })
 
-        serializer = DocumentNumberingSerializer(doc_numbering)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(history_data, status=status.HTTP_200_OK)
     
 
     @action(detail=False, methods=['get'])

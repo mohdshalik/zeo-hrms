@@ -2,7 +2,9 @@ from django.db import models
 from EmpManagement.models import emp_master
 from datetime import datetime, timedelta
 from EmpManagement .models import Emp_CustomField
-
+from django.utils import timezone
+from django.core.exceptions import ValidationError
+from django.db import transaction
 
 #branch model
 class brnch_mstr(models.Model):
@@ -93,30 +95,62 @@ class FiscalPeriod(models.Model):
     class Meta:
         unique_together = ('fiscal_year', 'period_number')
 
-class document_numbering(models.Model):
+class DocumentNumbering(models.Model):
     DOCUMENT_TYPES = [
         ('general_request', 'General Request'),
         ('leave_request', 'Leave Request'),
-        # Add other types as needed
     ]
-    branch_id              = models.ForeignKey('brnch_mstr',on_delete=models.CASCADE)
-    category               = models.ForeignKey('ctgry_master',on_delete=models.CASCADE)
-    type                   = models.CharField(max_length=50, choices=DOCUMENT_TYPES)
-    user                   = models.ForeignKey('UserManagement.CustomUser',on_delete=models.CASCADE)
-    automatic_numbering    = models.BooleanField()
-    preffix                = models.CharField(unique=True,max_length=50)
-    suffix                 = models.CharField(max_length=50)
-    year                   = models.DateField()
-    start_number           = models.IntegerField()
-    current_number         = models.IntegerField()
-    end_number             = models.IntegerField()
-    created_at             = models.DateTimeField(auto_now_add=True)
-    created_by             = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+
+    branch_id = models.ForeignKey('brnch_mstr', on_delete=models.CASCADE)
+    type = models.CharField(max_length=50, choices=DOCUMENT_TYPES)
+    user = models.ForeignKey('UserManagement.CustomUser', on_delete=models.CASCADE, related_name='document_numbering_user')
+
+    leave_type = models.ForeignKey('calendars.leave_type', on_delete=models.CASCADE, null=True, blank=True)
+
+    automatic_numbering = models.BooleanField(default=True)
+    prefix = models.CharField(max_length=50)
+    suffix = models.CharField(max_length=50, blank=True, null=True)
+    year = models.IntegerField(default=timezone.now().year)
+    current_number = models.IntegerField(default=0)  # Tracks the last used number
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        'UserManagement.CustomUser',
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='document_numbering_created_by'
+    )
 
     class Meta:
-        unique_together = ('branch_id', 'category', 'type')
-    def str(self):
-        return f"{self.branch_id.branch_name} - {self.category.ctgry_title} - {self.type}"
+        unique_together = ('branch_id', 'type', 'leave_type')
+
+    def __str__(self):
+        return f"{self.branch_id.branch_name} - {self.type}"
+
+    def clean(self):
+        if self.type == 'leave_request' and not self.leave_type:
+            raise ValidationError({'leave_type': "Leave type is required for leave requests."})
+        if self.type == 'general_request' and self.leave_type:
+            raise ValidationError({'leave_type': "Leave type should not be set for general requests."})
+
+    def get_next_number(self):
+        """Generate the next document number and update current_number."""
+        if not self.automatic_numbering:
+            raise ValueError("Automatic numbering is disabled for this configuration.")
+
+        with transaction.atomic():
+            # Lock the row to prevent race conditions
+            doc_numbering = DocumentNumbering.objects.select_for_update().get(id=self.id)
+            if doc_numbering.year != timezone.now().year:
+                # Reset numbering if the year has changed
+                doc_numbering.year = timezone.now().year
+                doc_numbering.current_number = 0
+
+            next_number = doc_numbering.current_number + 1
+            doc_numbering.current_number = next_number
+            doc_numbering.save()
+
+            suffix = f"-{doc_numbering.suffix}" if doc_numbering.suffix else ""
+            return f"{doc_numbering.prefix}-{doc_numbering.year}-{next_number:04d}{suffix}"
     
 
 class CompanyPolicy(models.Model):

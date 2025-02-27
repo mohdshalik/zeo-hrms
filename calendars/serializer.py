@@ -181,18 +181,9 @@ class LeaveResetPolicySerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class LeaveRequestSerializer(serializers.ModelSerializer):
-    document_numbering_details = serializers.SerializerMethodField()
-    
     class Meta:
         model = employee_leave_request
         fields = '__all__'
-    def get_document_numbering_details(self, obj):
-        # Fetch the document numbering details based on the selected branch
-        try:
-            doc_num = document_numbering.objects.get(branch_id=obj.branch,type='leave_request')
-            return DocumentNumberingSerializer(doc_num).data
-        except document_numbering.DoesNotExist:
-            return None
     def to_representation(self, instance):
         rep = super(LeaveRequestSerializer, self).to_representation(instance)
         if instance.employee:  
