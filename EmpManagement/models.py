@@ -741,8 +741,8 @@ class RequestNotification(models.Model):
                 email_template = common_templates.first()  # Use the common template
             else:
                 # Handle the case where no template is found
-                raise ValueError(f"No email template found for template type '{template_type}' and request type '{request_type.name}', and no common template found.")
-
+                # raise ValueError(f"No email template found for template type '{template_type}' and request type '{request_type.name}', and no common template found.")
+                return {"status": "warning", "message": f"No email template found for '{template_type}'."}
         # Proceed with sending the email using the selected template
         subject = email_template.subject
         template = Template(email_template.body)
@@ -851,8 +851,9 @@ class CommonWorkflow(models.Model):
 
 
 class GeneralRequest(models.Model):
-    doc_number       =  models.CharField(max_length=120,unique=True)
+    document_number  = models.CharField(max_length=50, unique=True, blank=True)
     reason           =  models. CharField(max_length=200)
+    # branch           =  models.ForeignKey('OrganisationManager.brnch_mstr',on_delete = models.CASCADE)
     request_type     =  models.ForeignKey('RequestType',on_delete = models.CASCADE)
     employee         =  models.ForeignKey('emp_master',on_delete = models.CASCADE)
     total            =  models.IntegerField(null=True)
@@ -860,7 +861,7 @@ class GeneralRequest(models.Model):
     created_by       =  models.ForeignKey('UserManagement.CustomUser',on_delete=models.CASCADE,null=True,blank=True)
     created_at_date  =  models.DateField(auto_now_add=True)
     def __str__(self):
-        return f"{self.doc_number}-{self.request_type.name}"
+        return f"{self.document_number}-{self.request_type.name}"
     
     def get_employee_requests(employee_id):
         return GeneralRequest.objects.filter(employee_id=employee_id).order_by('-created_at_date')
@@ -873,10 +874,10 @@ class GeneralRequest(models.Model):
             # Notify rejection
             notification = RequestNotification.objects.create(
                 recipient_user=self.created_by,
-                message=f"Your request {self.doc_number} has been rejected."
+                message=f"Your request {self.document_number} has been rejected."
             )
             notification.send_email_notification('request_rejected', {
-                'doc_number': self.doc_number,
+                'doc_number': self.document_number,
                 'request_type': self.request_type.name,
                 'rejection_reason': 'Reason for rejection...',
                 'emp_gender': self.employee.emp_gender,
@@ -891,10 +892,10 @@ class GeneralRequest(models.Model):
             if self.employee:
                 notification = RequestNotification.objects.create(
                     recipient_employee=self.employee,
-                    message=f"Request {self.doc_number} has been rejected."
+                    message=f"Request {self.document_number} has been rejected."
                 )
                 notification.send_email_notification('request_rejected', {
-                    'doc_number': self.doc_number,
+                    'doc_number': self.document_number,
                     'request_type': self.request_type.name,
                     'rejection_reason': 'Reason for rejection...',
                     'emp_gender': self.employee.emp_gender,
@@ -928,10 +929,10 @@ class GeneralRequest(models.Model):
             # Notify next approver
             notification = RequestNotification.objects.create(
                 recipient_user=next_level.approver,
-                message=f"New request for approval: {self.doc_number}, employee: {self.employee}"
+                message=f"New request for approval: {self.document_number}, employee: {self.employee}"
             )
             notification.send_email_notification('request_created', {
-                'doc_number': self.doc_number,
+                'doc_number': self.document_number,
                 'request_type': self.request_type.name,
                 'employee_name': self.employee.emp_first_name,
                 'reason': self.reason,
@@ -951,10 +952,10 @@ class GeneralRequest(models.Model):
             # Notify the creator about approval
             notification = RequestNotification.objects.create(
                 recipient_user=self.created_by,
-                message=f"Your request {self.doc_number} has been approved."
+                message=f"Your request {self.document_number} has been approved."
             )
             notification.send_email_notification('request_approved', {
-                'doc_number': self.doc_number,
+                'doc_number': self.document_number,
                 'request_type': self.request_type.name,
                 'emp_gender': self.employee.emp_gender,
                 'emp_date_of_birth': self.employee.emp_date_of_birth,
@@ -968,10 +969,10 @@ class GeneralRequest(models.Model):
             if self.employee:
                 notification = RequestNotification.objects.create(
                     recipient_employee=self.employee,
-                    message=f"Request {self.doc_number} has been approved."
+                    message=f"Request {self.document_number} has been approved."
                 )
                 notification.send_email_notification('request_approved', {
-                    'doc_number': self.doc_number,
+                    'doc_number': self.document_number,
                     'request_type': self.request_type.name,
                     'emp_gender': self.employee.emp_gender,
                     'emp_date_of_birth': self.employee.emp_date_of_birth,
@@ -1030,10 +1031,10 @@ class Approval(models.Model):
 
         notification = RequestNotification.objects.create(
             recipient_user=self.general_request.created_by,
-            message=f"Your request {self.general_request.doc_number} has been rejected."
+            message=f"Your request {self.general_request.document_number} has been rejected."
         )
         notification.send_email_notification('request_rejected', {
-            'doc_number': self.general_request.doc_number,
+            'doc_number': self.general_request.document_number,
             'request_type': self.general_request.request_type.name,
             'rejection_reason': 'Reason for rejection...',  # Add actual reason if available
             'emp_gender': self.general_request.employee.emp_gender,
@@ -1050,10 +1051,10 @@ class Approval(models.Model):
         if self.general_request.employee:
             notification = RequestNotification.objects.create(
                 recipient_employee=self.general_request.employee,
-                message=f"Request {self.general_request.doc_number} has been rejected."
+                message=f"Request {self.general_request.document_number} has been rejected."
             )
             notification.send_email_notification('request_rejected', {
-                'doc_number': self.general_request.doc_number,
+                'doc_number': self.general_request.document_number,
                 'request_type': self.general_request.request_type.name,
                 'rejection_reason': 'Reason for rejection...', # Add actual reason if available
                 'emp_gender': self.general_request.employee.emp_gender,
@@ -1085,10 +1086,10 @@ def create_initial_approval(sender, instance, created, **kwargs):
             # Notify first approver
             notification = RequestNotification.objects.create(
                 recipient_user=first_level.approver,
-                message=f"New request for approval: {instance.doc_number}, employee: {instance.employee}"
+                message=f"New request for approval: {instance.document_number}, employee: {instance.employee}"
             )
             notification.send_email_notification('request_created', {
-                'doc_number': instance.doc_number,
+                'doc_number': instance.document_number,
                 'request_type': instance.request_type.name,
                 'employee_name': instance.employee.emp_first_name,
                 'reason': instance.reason,
