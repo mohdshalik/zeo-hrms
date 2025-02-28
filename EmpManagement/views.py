@@ -1118,7 +1118,7 @@ class Emp_DocumentViewSet(viewsets.ModelViewSet):
 class Doc_ReportViewset(viewsets.ModelViewSet):
     queryset = Doc_Report.objects.all()
     serializer_class = DocumentReportSerializer
-    # permission_classes = [DocReportPermission]
+    permission_classes = [DocReportPermission]
     def __init__(self, *args, **kwargs):
         super(Doc_ReportViewset, self).__init__(*args, **kwargs)
         self.ensure_standard_report_exists()
@@ -1796,7 +1796,7 @@ class EmailConfigurationViewSet(viewsets.ModelViewSet):
 class GeneralReportViewset(viewsets.ModelViewSet):
     queryset = GeneralRequestReport.objects.all()
     serializer_class = GeneralReportSerializer
-    # permission_classes = [GeneralRequestReportPermission]
+    permission_classes = [GeneralRequestReportPermission]
     
     def __init__(self, *args, **kwargs):
         super(GeneralReportViewset, self).__init__(*args, **kwargs)
