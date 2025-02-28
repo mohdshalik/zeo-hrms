@@ -284,17 +284,17 @@ CELERY_ENABLE_UTC = True  # Ensure UTC is enabled if needed
 CELERY_BEAT_SCHEDULE = {
     'schedule-document-expiry-notifications-for-all-tenants': {
         'task': 'EmpManagement.tasks.send_document_expiry_notifications_for_all_tenants',
-        'schedule': crontab(hour=17, minute=44) 
-        # 'schedule': timedelta(days=1),
+        'schedule': crontab(hour=12, minute=00) 
+        # 'schedule': timedelta(days=1)1744,
 
     },
     'accrue-leaves-every-day': {
         'task': 'calendars.tasks.accrue_leaves',  # Use the correct path to your task
-        'schedule': crontab(hour=12, minute=00),  
+        'schedule': crontab(hour=17, minute=45),  
     },
     'reset-leave-month':{
         'task':'calendars.tasks.reset_leave_balances',
-        'schedule':crontab(hour=12, minute=00)
+        'schedule':crontab(hour=17, minute=55)
     },
     'deduct_expired_carry_forward_leaves_daily': {
         'task': 'calendars.tasks.deduct_expired_carry_forward_leaves',

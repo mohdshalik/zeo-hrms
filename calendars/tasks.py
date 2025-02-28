@@ -81,7 +81,7 @@ def accrue_leaves():
 
                         # **Monthly Accrual**
                         elif best_entitlement.accrual_frequency == 'months':
-                            if best_entitlement.accrual_day == '1st' and today.day == 18:
+                            if best_entitlement.accrual_day == '1st' and today.day == 1:
                                 accrue_today = True
                             elif best_entitlement.accrual_day == 'last':
                                 last_day_of_month = (today.replace(day=1) + timedelta(days=32)).replace(day=1) - timedelta(days=1)
@@ -90,7 +90,7 @@ def accrue_leaves():
 
                         # **Yearly Accrual**
                         elif best_entitlement.accrual_frequency == 'years':
-                            if best_entitlement.accrual_month and today.month == month_name_to_number(best_entitlement.accrual_month) and today.day == 18:
+                            if best_entitlement.accrual_month and today.month == month_name_to_number(best_entitlement.accrual_month) and today.day == 1:
                                 accrue_today = True
 
                         if accrue_today and accrual_amount > 0:
@@ -146,7 +146,7 @@ def reset_leave_balances():
 
                 for reset in resets:
                     reset_month = month_name_to_number(reset.month)
-                    reset_day = 18 if reset.day == '1st' else calendar.monthrange(today.year, today.month)[1]
+                    reset_day = 1 if reset.day == '1st' else calendar.monthrange(today.year, today.month)[1]
 
                     # Check reset condition based on frequency
                     if reset.frequency == 'years':
