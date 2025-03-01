@@ -117,7 +117,11 @@ class CompanySerializer(serializers.ModelSerializer):
         model = company
         fields = '__all__'
         
-    
+class Non_EssUserListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomUser
+        fields = ['id', 'username', 'email', 'is_ess', 'is_staff', 'is_superuser', 'tenants']
+
 class UserListSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser

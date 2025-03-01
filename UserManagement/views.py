@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from django.contrib.auth.models import User,Group,Permission
-from .serializers import CustomUserSerializer,CustomTokenObtainPairSerializer,CompanySerializer,DomainSerializer,UserListSerializer
+from .serializers import CustomUserSerializer,CustomTokenObtainPairSerializer,CompanySerializer,DomainSerializer,UserListSerializer,Non_EssUserListSerializer
 from . models import CustomUser,company,Domain
 from . permissions import (IsOwnerOrReadOnly,
                            IsSuperUser,IsEssUserOrReadOnly)
@@ -155,3 +155,22 @@ class UserDetailView(APIView):
         serializer = CustomUserSerializer(user)
         return Response(serializer.data)
 
+class NoEssUerListView(generics.ListAPIView):
+    # permission_classes = [IsAuthenticated]
+    serializer_class = Non_EssUserListSerializer
+
+    def get_queryset(self):
+        # Get the schema name from the request parameters
+        schema_name = self.request.GET.get('schema')
+
+        # Ensure the schema name is provided
+        if not schema_name:
+            raise ValidationError({"error": "Schema name is required"})
+
+        # Use schema_context to access the correct tenant's users
+        with schema_context(schema_name):
+            # Filter users based on schema_name and only show active users
+            return CustomUser.objects.filter(
+                tenants__schema_name=schema_name,
+                is_active=True,is_ess=False  # Filter for users that are active
+            )
