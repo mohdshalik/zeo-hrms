@@ -251,7 +251,7 @@ class ApprovalSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         rep = super(ApprovalSerializer, self).to_representation(instance)
         if instance.general_request:  
-            rep['general_request'] = instance.general_request.doc_number
+            rep['general_request'] = instance.general_request.document_number
         if instance.approver:  
             rep['approver'] = instance.approver.username       
         return rep       
