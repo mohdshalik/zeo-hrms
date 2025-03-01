@@ -948,7 +948,7 @@ class employee_leave_request(models.Model):
     reason            = models.TextField()
     status            = models.CharField(max_length=10, choices=LEAVE_STATUS_CHOICES, default='pending')
     applied_on        = models.DateField(auto_now_add=True)
-    doc_number        = models.CharField(max_length=120, unique=True, null=True, blank=True)
+    document_number   = models.CharField(max_length=120, unique=True, null=True, blank=True)
     dis_half_day      = models.BooleanField(default=False)  # True if it's a half-day leave
     half_day_period   = models.CharField(max_length=20, choices=HALF_DAY_CHOICES, null=True, blank=True)  # First Half / Second Half
     created_by        = models.ForeignKey('UserManagement.CustomUser',on_delete=models.CASCADE,null=True,blank=True)

@@ -180,7 +180,7 @@ class LeaveResetPolicySerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class LeaveRequestSerializer(serializers.ModelSerializer):
-    document_numbering_details = serializers.SerializerMethodField()
+    # document_numbering_details = serializers.SerializerMethodField()
     class Meta:
         model = employee_leave_request
         fields = '__all__'
