@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework_simplejwt.views import TokenObtainPairView
 # from . import views
-from .views import RegisterUserAPIView, CompanyViewSet, DomainViewset, TenantUserListView, CustomTokenObtainPairView, UserDetailView
+from .views import RegisterUserAPIView, CompanyViewSet, DomainViewset, TenantUserListView, CustomTokenObtainPairView, UserDetailView,NoEssUerListView
 from . import views
 router = DefaultRouter()
 
@@ -19,5 +19,6 @@ urlpatterns = [
     path("token/", CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path('tenant-users/', TenantUserListView.as_view(), name='tenant-user-list'),
+    path('tenant-non-ess-users/', NoEssUerListView.as_view(), name='tenant-user-list'),
     
 ]
