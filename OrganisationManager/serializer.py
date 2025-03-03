@@ -14,17 +14,17 @@ class BranchSerializer(serializers.ModelSerializer):
         model = brnch_mstr
         fields = '__all__'
 
-    # def get_holidays(self, obj):
-    #     from calendars.serializer import HolidaySerializer
-    #     assigned_holidays = assign_holiday.objects.filter(branch=obj).values_list('holiday_model__holiday', flat=True)
-    #     holidays = holiday.objects.filter(id__in=assigned_holidays)
-    #     return HolidaySerializer(holidays, many=True).data
+    def get_holidays(self, obj):
+        from calendars.serializer import HolidaySerializer
+        assigned_holidays = assign_holiday.objects.filter(branch=obj).values_list('holiday_model__holiday', flat=True)
+        holidays = holiday.objects.filter(id__in=assigned_holidays)
+        return HolidaySerializer(holidays, many=True).data
 
-    # def get_policies(self, obj):
-    #     """Fetch company policies assigned to this branch."""
-    #     from OrganisationManager.serializer import CompanyPolicySerializer  # Import the serializer
-    #     policies = obj.policies.all()  # Using related_name='policies' from CompanyPolicy model
-    #     return CompanyPolicySerializer(policies, many=True).data
+    def get_policies(self, obj):
+        """Fetch company policies assigned to this branch."""
+        from OrganisationManager.serializer import CompanyPolicySerializer  # Import the serializer
+        policies = obj.policies.all()  # Using related_name='policies' from CompanyPolicy model
+        return CompanyPolicySerializer(policies, many=True).data
 
     
     # def to_representation(self, instance):
