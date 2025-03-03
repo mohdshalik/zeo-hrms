@@ -7,7 +7,7 @@ from .models import (emp_family,Emp_Documents,EmpJobHistory,EmpLeaveRequest,EmpQ
                      emp_master,notification,EmpFamily_CustomField,EmpJobHistory_CustomField,
                      EmpQualification_CustomField,EmpDocuments_CustomField,LanguageSkill,MarketingSkill,ProgrammingLanguageSkill,Emp_CustomField,Report,Doc_Report,GeneralRequest,RequestType,GeneralRequestReport,EmployeeLangSkill,EmployeeProgramSkill,
                      EmployeeMarketingSkill,Approval,ApprovalLevel,RequestNotification,Emp_CustomFieldValue,
-                     EmailTemplate,EmailConfiguration,SelectedEmpNotify,NotificationSettings,DocExpEmailTemplate,CommonWorkflow,Doc_CustomFieldValue,EmployeeBankDetail
+                     EmailTemplate,EmailConfiguration,SelectedEmpNotify,NotificationSettings,DocExpEmailTemplate,CommonWorkflow,Doc_CustomFieldValue,EmployeeBankDetail,Fam_CustomFieldValue,Qualification_CustomFieldValue,JobHistory_CustomFieldValue
                      )
 from .serializer import (Emp_qf_Serializer,EmpFamSerializer,EmpSerializer,NotificationSerializer,RequestTypeSerializer,
                          EmpJobHistorySerializer,EmpLeaveRequestSerializer,DocumentSerializer,GeneralRequestSerializer,
@@ -15,7 +15,8 @@ from .serializer import (Emp_qf_Serializer,EmpFamSerializer,EmpSerializer,Notifi
                          EmpFam_CustomFieldSerializer,EmpJobHistory_Udf_Serializer,Emp_qf_udf_Serializer,EmpDocuments_Udf_Serializer,
                          DocBulkuploadSerializer,DocumentReportSerializer,EmpPrgrmSkillSerializer,EmpLangSkillSerializer,ApprovalSerializer,ApprovalLevelSerializer,
                          ReqNotifySerializer,Emp_CustomFieldValueSerializer,EmailTemplateSerializer,EmployeeFilterSerializer,EmailConfigurationSerializer,SelectedEmpNotifySerializer,
-                         NotificationSettingsSerializer,DocExpEmailTemplateSerializer,CommonWorkflowSerializer,DOC_CustomFieldValueSerializer,EmpBankDetailsSerializer,EmpBankBulkuploadSerializer,EmplistSerializer)
+                         NotificationSettingsSerializer,DocExpEmailTemplateSerializer,CommonWorkflowSerializer,DOC_CustomFieldValueSerializer,EmpBankDetailsSerializer,EmpBankBulkuploadSerializer,EmplistSerializer,Fam_CustomFieldValueSerializer,
+                         Qualification_CustomFieldValueSerializer,JobHistory_CustomFieldValueSerializer)
 
 from .resource import EmployeeResource,DocumentResource,EmpCustomFieldValueResource,EmpDocumentCustomFieldValueResource,EmpBankDetailsResource, MarketingSkillResource,ProLangSkillResource
 from .permissions import (IsSuperUserOrHasGeneralRequestPermission,IsSuperUserOrInSameBranch,EmpCustomFieldPermission,EmpCustomFieldValuePermission,
@@ -844,7 +845,7 @@ class Emp_CustomFieldValueViewSet(viewsets.ModelViewSet):
 class EmpFam_CustomFieldViewset(viewsets.ModelViewSet):
     queryset = EmpFamily_CustomField.objects.all()
     serializer_class = EmpFam_CustomFieldSerializer
-    permission_classes = [EmpFamilyCustomFieldPermission]
+    # permission_classes = [EmpFamilyCustomFieldPermission]
 
     def handle_exception(self, exc):
         if isinstance(exc, ValidationError):
@@ -853,12 +854,35 @@ class EmpFam_CustomFieldViewset(viewsets.ModelViewSet):
             return Response({'error': error_message}, status=status.HTTP_400_BAD_REQUEST)
         
         return super().handle_exception(exc)
+    
+    def get_available_fields(self):
+        # Get the field names along with their data types
+        # emp_master_fields = [
+        #     {'name': field.name, 'type': field.get_internal_type()}
+        #     for field in emp_master._meta.get_fields()
+        #     if isinstance(field, Field)
+        # ]
+        # return emp_master_fields
+        emp_master_fields = [
+        {'name': field.name, 'type': field.__class__.__name__}
+        for field in emp_family._meta.get_fields()
+        if isinstance(field, Field)
+        ]
+        return emp_master_fields
+    
+    @action(detail=False, methods=['get'])
+    def employee_fields(self, request, *args, **kwargs):
+        available_fields = self.get_available_fields()
+        return Response({'available_fields': available_fields})
+class Fam_CustomFieldValueViewSet(viewsets.ModelViewSet):
+    queryset = Fam_CustomFieldValue.objects.all()
+    serializer_class = Fam_CustomFieldValueSerializer
 
 
 class EmpJobHistory_UdfViewset(viewsets.ModelViewSet):
     queryset = EmpJobHistory_CustomField.objects.all()
     serializer_class = EmpJobHistory_Udf_Serializer
-    permission_classes = [EmpJobHistoryCustomFieldPermission]
+    # permission_classes = [EmpJobHistoryCustomFieldPermission]
 
     def handle_exception(self, exc):
         if isinstance(exc, ValidationError):
@@ -867,12 +891,35 @@ class EmpJobHistory_UdfViewset(viewsets.ModelViewSet):
             return Response({'error': error_message}, status=status.HTTP_400_BAD_REQUEST)
         
         return super().handle_exception(exc)
+    
+    def get_available_fields(self):
+        # Get the field names along with their data types
+        # emp_master_fields = [
+        #     {'name': field.name, 'type': field.get_internal_type()}
+        #     for field in emp_master._meta.get_fields()
+        #     if isinstance(field, Field)
+        # ]
+        # return emp_master_fields
+        emp_master_fields = [
+        {'name': field.name, 'type': field.__class__.__name__}
+        for field in EmpJobHistory._meta.get_fields()
+        if isinstance(field, Field)
+        ]
+        return emp_master_fields
+    
+    @action(detail=False, methods=['get'])
+    def employee_fields(self, request, *args, **kwargs):
+        available_fields = self.get_available_fields()
+        return Response({'available_fields': available_fields})
 
+class JobHistory_CustomFieldValueViewSet(viewsets.ModelViewSet):
+    queryset = JobHistory_CustomFieldValue.objects.all()
+    serializer_class = JobHistory_CustomFieldValueSerializer
 
 class EmpQf_UdfViewset(viewsets.ModelViewSet):
     queryset = EmpQualification_CustomField.objects.all()
     serializer_class = Emp_qf_udf_Serializer
-    permission_classes = [EmpQualificationCustomFieldPermission]
+    # permission_classes = [EmpQualificationCustomFieldPermission]
 
     def handle_exception(self, exc):
         if isinstance(exc, ValidationError):
@@ -881,6 +928,30 @@ class EmpQf_UdfViewset(viewsets.ModelViewSet):
             return Response({'error': error_message}, status=status.HTTP_400_BAD_REQUEST)
         
         return super().handle_exception(exc)
+    
+    def get_available_fields(self):
+        # Get the field names along with their data types
+        # emp_master_fields = [
+        #     {'name': field.name, 'type': field.get_internal_type()}
+        #     for field in emp_master._meta.get_fields()
+        #     if isinstance(field, Field)
+        # ]
+        # return emp_master_fields
+        emp_master_fields = [
+        {'name': field.name, 'type': field.__class__.__name__}
+        for field in EmpQualification._meta.get_fields()
+        if isinstance(field, Field)
+        ]
+        return emp_master_fields
+    
+    @action(detail=False, methods=['get'])
+    def employee_fields(self, request, *args, **kwargs):
+        available_fields = self.get_available_fields()
+        return Response({'available_fields': available_fields})
+
+class Qf_CustomFieldValueViewSet(viewsets.ModelViewSet):
+    queryset = Qualification_CustomFieldValue.objects.all()
+    serializer_class = Qualification_CustomFieldValueSerializer
 
 
 

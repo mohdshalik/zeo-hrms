@@ -7,7 +7,7 @@ from .views import (EmpFamViewSet, EmpJobHistoryvSet, EmpViewSet,NotificationVie
                     RequestTypeViewset,GeneralRequestViewset,EmpMarketSkillViewSet,EmpPrgrmSkillViewSet,
                     EmpLangSkillViewSet,ApprovalViewset,ApprovalLevelViewset,UserNotificationsViewSet,Emp_CustomFieldValueViewSet,EmailTemplateViewset,
                     EmailConfigurationViewSet,UpdateESSUserView,ESSUserListView,NotificationSettingsViewSet,DocExpEmailTemplateViewset,CommonWorkflowViewSet,Doc_CustomFieldValueViewSet,EmployeeBankDetailViewset,
-                    EmpBankBulkuploadViewSet,EmplistViewSet)
+                    EmpBankBulkuploadViewSet,EmplistViewSet,Fam_CustomFieldValueViewSet,JobHistory_CustomFieldValueViewSet,Qf_CustomFieldValueViewSet)
 
 # Define the main router for top-level routes
 router = DefaultRouter()
@@ -25,10 +25,13 @@ router.register(r'emplist', EmplistViewSet, basename='emplist')
 
 router.register(r'emp-Family', EmpFamViewSet, basename='emp_family')
 router.register(r'empfamily-UDF', EmpFam_CustomFieldViewset, basename='emp_fam_udf')
+router.register(r'empfamily-customfieldvalue', Fam_CustomFieldValueViewSet, basename='empfamily-customfieldvalue')
 router.register(r'emp-JobHistory', EmpJobHistoryvSet, basename='emp_job_history')
 router.register(r'empjob-history-UDF', EmpJobHistory_UdfViewset, basename='emp_job_history_udf')
+router.register(r'empjob-history-customfieldvalue', JobHistory_CustomFieldValueViewSet, basename='empjob-history-customfieldvalue')
 router.register(r'emp-Qualification', Emp_QualificationViewSet, basename='emp_qualification')
 router.register(r'empQualification-UDF', EmpQf_UdfViewset, basename='emp_qualification_udf')
+router.register(r'empQualification-customfieldvalue', Qf_CustomFieldValueViewSet, basename='empQualification_customfieldvalue')
 router.register(r'emp-Documents', Emp_DocumentViewSet, basename='emp_document')
 router.register(r'Bulkupload-Documents', Bulkupload_DocumentViewSet, basename='bulk_upload_document')
 router.register(r'emp-Documents-UDF', EmpDoc_UdfViewset, basename='emp_document_udf')

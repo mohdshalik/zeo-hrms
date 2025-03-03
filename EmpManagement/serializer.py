@@ -18,7 +18,8 @@ from .models import (emp_family,EmpJobHistory,EmpQualification,Emp_Documents,Emp
                     notification,Report,Doc_Report,RequestType,
                     GeneralRequest,GeneralRequestReport,EmployeeMarketingSkill,EmployeeProgramSkill,EmployeeLangSkill,Approval,
                     ApprovalLevel,RequestNotification,Emp_CustomFieldValue,EmailTemplate,EmailConfiguration,SelectedEmpNotify,NotificationSettings,
-                    DocExpEmailTemplate,CommonWorkflow,Doc_CustomFieldValue,EmployeeBankDetail
+                    DocExpEmailTemplate,CommonWorkflow,Doc_CustomFieldValue,EmployeeBankDetail,Fam_CustomFieldValue,Qualification_CustomFieldValue,
+                    JobHistory_CustomFieldValue
                      )
 
 from OrganisationManager.serializer import CompanyPolicySerializer
@@ -28,13 +29,28 @@ from UserManagement .models import CustomUser
 
 '''employee set'''
 #EMPLOYEE FAMILY
+class Fam_CustomFieldValueSerializer(serializers.ModelSerializer):
+    def to_representation(self, instance):
+        rep = super(Fam_CustomFieldValueSerializer, self).to_representation(instance)
+        if instance.emp_custom_field:  # Check if emp_state_id is not None
+            rep['emp_custom_field'] = instance.emp_custom_field
+        return rep
+    class Meta:
+        model = Fam_CustomFieldValue
+        fields = '__all__'
+    
+    def validate_field_name(self, value):
+        if not EmpFamily_CustomField.objects.filter(field_name=value).exists():
+            raise serializers.ValidationError(f"Field name '{value}' does not exist in Document_CustomField.")
+        return value
 class EmpFam_CustomFieldSerializer(serializers.ModelSerializer):
+    field_values = Fam_CustomFieldValueSerializer(many=True, read_only=True)
     class Meta:
         model = EmpFamily_CustomField
         fields = '__all__'
 
 class EmpFamSerializer(serializers.ModelSerializer):
-    fam_custom_fields = EmpFam_CustomFieldSerializer(many=True, read_only=True)
+    fam_custom_fields=Fam_CustomFieldValueSerializer(many=True, read_only=True, source='custom_field_values')
     created_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
     updated_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
     
@@ -48,14 +64,30 @@ class EmpFamSerializer(serializers.ModelSerializer):
         return rep
     
 #experiance
+class JobHistory_CustomFieldValueSerializer(serializers.ModelSerializer):
+    def to_representation(self, instance):
+        rep = super(JobHistory_CustomFieldValueSerializer, self).to_representation(instance)
+        if instance.emp_custom_field:  # Check if emp_state_id is not None
+            rep['emp_custom_field'] = instance.emp_custom_field
+        return rep
+    class Meta:
+        model = JobHistory_CustomFieldValue
+        fields = '__all__'
+    
+    def validate_field_name(self, value):
+        if not EmpJobHistory_CustomField.objects.filter(field_name=value).exists():
+            raise serializers.ValidationError(f"Field name '{value}' does not exist in Document_CustomField.")
+        return value
+
 class EmpJobHistory_Udf_Serializer(serializers.ModelSerializer):
+    field_values = JobHistory_CustomFieldValueSerializer(many=True, read_only=True)
     class Meta:
         model = EmpJobHistory_CustomField
         fields = '__all__' 
 
 
 class EmpJobHistorySerializer(serializers.ModelSerializer):
-    jobhistory_customfields = EmpJobHistory_Udf_Serializer(many=True, read_only=True)
+    job_history_custom_fields=JobHistory_CustomFieldValueSerializer(many=True, read_only=True, source='custom_field_values')
     created_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
     updated_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
     class Meta:
@@ -63,6 +95,42 @@ class EmpJobHistorySerializer(serializers.ModelSerializer):
         fields = '__all__' 
     def to_representation(self, instance):
         rep = super(EmpJobHistorySerializer, self).to_representation(instance)
+        if instance.emp_id:  # Check if emp_state_id is not None
+            rep['emp_id'] = instance.emp_id.emp_first_name + " " + instance.emp_id.emp_last_name
+        return rep
+ 
+
+#EMPLOYEE QUALIFICATION CREDENTIALS
+class Qualification_CustomFieldValueSerializer(serializers.ModelSerializer):
+    def to_representation(self, instance):
+        rep = super(Qualification_CustomFieldValueSerializer, self).to_representation(instance)
+        if instance.emp_custom_field:  # Check if emp_state_id is not None
+            rep['emp_custom_field'] = instance.emp_custom_field
+        return rep
+    class Meta:
+        model = Qualification_CustomFieldValue
+        fields = '__all__'
+    
+    def validate_field_name(self, value):
+        if not EmpQualification_CustomField.objects.filter(field_name=value).exists():
+            raise serializers.ValidationError(f"Field name '{value}' does not exist in Document_CustomField.")
+        return value
+    
+class Emp_qf_udf_Serializer(serializers.ModelSerializer):
+    field_values = Qualification_CustomFieldValueSerializer(many=True, read_only=True)
+    class Meta:
+        model = EmpQualification_CustomField
+        fields = '__all__' 
+
+class Emp_qf_Serializer(serializers.ModelSerializer):
+    qualification_fields=Qualification_CustomFieldValueSerializer(many=True, read_only=True, source='custom_field_values')
+    created_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
+    updated_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
+    class Meta:
+        model = EmpQualification
+        fields = '__all__' 
+    def to_representation(self, instance):
+        rep = super(Emp_qf_Serializer, self).to_representation(instance)
         if instance.emp_id:  # Check if emp_state_id is not None
             rep['emp_id'] = instance.emp_id.emp_first_name + " " + instance.emp_id.emp_last_name
         return rep
