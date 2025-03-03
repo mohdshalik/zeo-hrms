@@ -54,39 +54,39 @@ class RegisterUserAPIView(viewsets.ModelViewSet):
         tenants = user_profile.tenants.all()
         serializer = CompanySerializer(tenants, many=True)
         return Response(serializer.data)
-    @action(detail=True, methods=['get'])
-    def approvals(self, request, pk=None):
-        user = self.get_object()
-        approvals = Approval.objects.filter(approver=user).order_by('-created_at')
-        serializer = ApprovalSerializer(approvals, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+    # @action(detail=True, methods=['get'])
+    # def approvals(self, request, pk=None):
+    #     user = self.get_object()
+    #     approvals = Approval.objects.filter(approver=user).order_by('-created_at')
+    #     serializer = ApprovalSerializer(approvals, many=True)
+    #     return Response(serializer.data, status=status.HTTP_200_OK)
     
-    @action(detail=True, methods=['get'])
-    def approvalnotification(self, request, pk=None):
-        user = self.get_object()
-        approvals = RequestNotification.objects.filter(recipient_user=user).order_by('-created_at')
-        serializer = ReqNotifySerializer(approvals, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+    # @action(detail=True, methods=['get'])
+    # def approvalnotification(self, request, pk=None):
+    #     user = self.get_object()
+    #     approvals = RequestNotification.objects.filter(recipient_user=user).order_by('-created_at')
+    #     serializer = ReqNotifySerializer(approvals, many=True)
+    #     return Response(serializer.data, status=status.HTTP_200_OK)
     
-    @action(detail=True, methods=['get'])
-    def lvapprovals(self, request, pk=None):
-        user = self.get_object()  # Assuming this gets the user object
-        approvals = LeaveApproval.objects.filter(approver=user).order_by('-created_at')  
-        serializer = LvApprovalSerializer(approvals, many=True)  
-        return Response(serializer.data, status=status.HTTP_200_OK)
+    # @action(detail=True, methods=['get'])
+    # def lvapprovals(self, request, pk=None):
+    #     user = self.get_object()  # Assuming this gets the user object
+    #     approvals = LeaveApproval.objects.filter(approver=user).order_by('-created_at')  
+    #     serializer = LvApprovalSerializer(approvals, many=True)  
+    #     return Response(serializer.data, status=status.HTTP_200_OK)
     
-    @action(detail=True, methods=['get'])
-    def lvapprovalnotification(self, request, pk=None):
-        user = self.get_object()
-        approvals = LvApprovalNotify.objects.filter(recipient_user=user).order_by('-created_at')
-        serializer = LvApprovalNotifySerializer(approvals, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-    @action(detail=True, methods=['get'])
-    def companypolicy(self, request, pk=None):
-        user = self.get_object()
-        approvals = CompanyPolicy.objects.filter(specific_users=user.id).order_by('-created_at')
-        serializer = CompanyPolicySerializer(approvals, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+    # @action(detail=True, methods=['get'])
+    # def lvapprovalnotification(self, request, pk=None):
+    #     user = self.get_object()
+    #     approvals = LvApprovalNotify.objects.filter(recipient_user=user).order_by('-created_at')
+    #     serializer = LvApprovalNotifySerializer(approvals, many=True)
+    #     return Response(serializer.data, status=status.HTTP_200_OK)
+    # @action(detail=True, methods=['get'])
+    # def companypolicy(self, request, pk=None):
+    #     user = self.get_object()
+    #     approvals = CompanyPolicy.objects.filter(specific_users=user.id).order_by('-created_at')
+    #     serializer = CompanyPolicySerializer(approvals, many=True)
+    #     return Response(serializer.data, status=status.HTTP_200_OK)
     @action(detail=True, methods=['post'])
     def deactivate_user(self, request, pk=None):
         user = self.get_object()
