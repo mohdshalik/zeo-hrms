@@ -24,44 +24,14 @@ class BranchSerializer(serializers.ModelSerializer):
     #     holidays = holiday.objects.filter(id__in=assigned_holidays)
     #     return HolidaySerializer(holidays, many=True).data
 
-    # def get_policies(self, obj):
-    #     """Fetch company policies assigned to this branch."""
-    #     # from OrganisationManager.serializer import CompanyPolicySerializer  # Import the serializer
-    #     policies = obj.policies.all()  # Using related_name='policies' from CompanyPolicy model
-    #     return CompanyPolicySerializer(policies, many=True).data
-    def get_holidays(self, obj):
-        from calendars.serializer import HolidaySerializer
-        """Fetch assigned holidays for the branch."""
-        assigned_holidays = assign_holiday.objects.filter(branch=obj).values_list('holiday_model__id', flat=True)
-        holidays = holiday.objects.filter(id__in=assigned_holidays).distinct()
-        return HolidaySerializer(holidays, many=True).data
-
     def get_policies(self, obj):
         """Fetch company policies assigned to this branch."""
-        if hasattr(obj, 'policies'):  # Ensure the related field exists
-            policies = obj.policies.all()
-            return CompanyPolicySerializer(policies, many=True).data
-        return []
+        # from OrganisationManager.serializer import CompanyPolicySerializer  # Import the serializer
+        policies = obj.policies.all()  # Using related_name='policies' from CompanyPolicy model
+        return CompanyPolicySerializer(policies, many=True).data
     
-    # def to_representation(self, instance):
-    #     rep = super(BranchSerializer, self).to_representation(instance)
-    #     rep['br_state_id'] = instance.br_state_id.state_name
-    #     rep['br_country'] = instance.br_country.country_name
-    #     rep['br_company_id'] = instance.br_company_id.cmpny_name
-    #     return rep
-# class CompanySerializer(serializers.ModelSerializer):
-#     cmpny_created_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
-#     cmpny_updated_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
-#     branches = BranchSerializer(many=True, read_only=True)
-#     class Meta:
-#         model = cmpny_mastr
-#         fields = '__all__'
-#     def to_representation(self, instance):
-#         rep = super(CompanySerializer, self).to_representation(instance)
-#         rep['cmpny_state_id'] = instance.cmpny_state_id.state_name
-#         rep['cmpny_country'] = instance.cmpny_country.country_name
-#         return rep
-
+    
+    
 #DEPARTMENT SERIALIZER
 class DeptSerializer(serializers.ModelSerializer):
     # dept_created_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
