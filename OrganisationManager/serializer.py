@@ -23,7 +23,13 @@ class BranchSerializer(serializers.ModelSerializer):
     #     assigned_holidays = assign_holiday.objects.filter(branch=obj).values_list('holiday_model__holiday', flat=True)
     #     holidays = holiday.objects.filter(id__in=assigned_holidays)
     #     return HolidaySerializer(holidays, many=True).data
-
+    def get_holidays(self, obj):
+        from calendars.serializer import HolidaySerializer  # Ensure correct import path
+        # Fetch assigned holiday calendars for this branch
+        assigned_holiday_calendars = assign_holiday.objects.filter(branch__in=[obj]).values_list('holiday_model', flat=True)
+        holidays = holiday.objects.filter(calendar__in=assigned_holiday_calendars)
+        return HolidaySerializer(holidays, many=True).data
+    
     def get_policies(self, obj):
         """Fetch company policies assigned to this branch."""
         # from OrganisationManager.serializer import CompanyPolicySerializer  # Import the serializer
