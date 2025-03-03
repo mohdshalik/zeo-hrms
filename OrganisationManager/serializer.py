@@ -5,6 +5,10 @@ from tenant_users.tenants.models import UserTenantPermissions
 from django.contrib.auth.models import Permission,Group
 from calendars .models import assign_holiday,holiday,holiday_calendar
 
+class CompanyPolicySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CompanyPolicy
+        fields = '__all__'
 
 class BranchSerializer(serializers.ModelSerializer):
     holidays = serializers.SerializerMethodField()
@@ -22,7 +26,7 @@ class BranchSerializer(serializers.ModelSerializer):
 
     def get_policies(self, obj):
         """Fetch company policies assigned to this branch."""
-        from OrganisationManager.serializer import CompanyPolicySerializer  # Import the serializer
+        # from OrganisationManager.serializer import CompanyPolicySerializer  # Import the serializer
         policies = obj.policies.all()  # Using related_name='policies' from CompanyPolicy model
         return CompanyPolicySerializer(policies, many=True).data
 
@@ -147,10 +151,6 @@ class DocumentNumberingSerializer(serializers.ModelSerializer):
         #     rep['category'] = instance.category.ctgry_title
         return rep
     
-class CompanyPolicySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = CompanyPolicy
-        fields = '__all__'
 
 class AssetMasterSerializer(serializers.ModelSerializer):
     class Meta:
