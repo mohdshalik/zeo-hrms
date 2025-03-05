@@ -121,8 +121,11 @@ class DocumentNumbering(models.Model):
     )
 
     class Meta:
-        unique_together = ('branch_id', 'type', 'leave_type')
-
+        # unique_together = ('branch_id', 'type', 'leave_type')
+        constraints = [
+            models.UniqueConstraint(fields=['branch_id', 'type'],name='unique_general_request_per_branch',condition=models.Q(type='general_request')),
+            models.UniqueConstraint(fields=['branch_id', 'leave_type'],name='unique_leave_request_per_branch_leave_type',condition=models.Q(type='leave_request')),
+        ]
     def __str__(self):
         return f"{self.branch_id.branch_name} - {self.type}"
 
@@ -131,7 +134,15 @@ class DocumentNumbering(models.Model):
             raise ValidationError({'leave_type': "Leave type is required for leave requests."})
         if self.type == 'general_request' and self.leave_type:
             raise ValidationError({'leave_type': "Leave type should not be set for general requests."})
+        # Check for duplicates before saving
+        if self.type == 'general_request':
+            if DocumentNumbering.objects.filter(branch_id=self.branch_id, type='general_request').exclude(id=self.id).exists():
+                raise ValidationError("A general request document numbering already exists for this branch.")
 
+        if self.type == 'leave_request':
+            if DocumentNumbering.objects.filter(branch_id=self.branch_id, leave_type=self.leave_type, type='leave_request').exclude(id=self.id).exists():
+                raise ValidationError("A leave request document numbering already exists for this branch and leave type.")
+    
     def get_next_number(self):
         """Generate the next document number and update current_number."""
         if not self.automatic_numbering:

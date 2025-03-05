@@ -1753,8 +1753,13 @@ class GeneralRequestViewset(viewsets.ModelViewSet):
             except DocumentNumbering.DoesNotExist:
                 raise NotFound(f"No document numbering configuration found for branch {branch_id} and general request.")
 
-            document_number = doc_config.get_next_number()
-            serializer.save(document_number=document_number)
+            # Check if automatic numbering is enabled
+            if doc_config.automatic_numbering:
+                document_number = doc_config.get_next_number()
+            else:
+                document_number = serializer.validated_data.get('document_number')
+                if not document_number:
+                    raise ValidationError("Document number is required when automatic numbering is disabled.")
 
     @action(detail=False, methods=['get'])
     def employee_request_history(self, request):

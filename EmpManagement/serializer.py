@@ -136,26 +136,6 @@ class Emp_qf_Serializer(serializers.ModelSerializer):
         return rep
  
 
-#EMPLOYEE QUALIFICATION CREDENTIALS
-class Emp_qf_udf_Serializer(serializers.ModelSerializer):
-    class Meta:
-        model = EmpQualification_CustomField
-        fields = '__all__' 
-
-class Emp_qf_Serializer(serializers.ModelSerializer):
-    custom_fields = Emp_qf_udf_Serializer(many=True, read_only=True)
-    created_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
-    updated_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
-    class Meta:
-        model = EmpQualification
-        fields = '__all__' 
-    def to_representation(self, instance):
-        rep = super(Emp_qf_Serializer, self).to_representation(instance)
-        if instance.emp_id:  # Check if emp_state_id is not None
-            rep['emp_id'] = instance.emp_id.emp_first_name + " " + instance.emp_id.emp_last_name
-        return rep
- 
-
 #EMPLOYEE DOCUMENT CREDENTIALS
 class DOC_CustomFieldValueSerializer(serializers.ModelSerializer):
     # content_type_name = serializers.SerializerMethodField()
