@@ -107,7 +107,7 @@ class DocumentNumbering(models.Model):
 
     leave_type = models.ForeignKey('calendars.leave_type', on_delete=models.CASCADE, null=True, blank=True)
 
-    automatic_numbering = models.BooleanField(default=True)
+    # automatic_numbering =  models.BooleanField(default=True)
     prefix = models.CharField(max_length=50)
     suffix = models.CharField(max_length=50, blank=True, null=True)
     year = models.IntegerField(default=timezone.now().year)
@@ -145,8 +145,8 @@ class DocumentNumbering(models.Model):
     
     def get_next_number(self):
         """Generate the next document number and update current_number."""
-        if not self.automatic_numbering:
-            raise ValueError("Automatic numbering is disabled for this configuration.")
+        # if not self.automatic_numbering:
+        #     raise ValueError("Automatic numbering is disabled for this configuration.")
 
         with transaction.atomic():
             # Lock the row to prevent race conditions
