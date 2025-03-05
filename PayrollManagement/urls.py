@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import (SalaryComponentViewSet,EmployeeSalaryStructureViewSet,PayrollViewSet,PayslipViewSet,PayrollSettingsViewSet,LoanTypeviewset,LoanApplicationviewset,LoanRepaymentviewset,LoanApprovalviewset,LoanApprovalLevelsviewset,
+from .views import (SalaryComponentViewSet,EmployeeSalaryStructureViewSet,PayslipViewSet,PayrollTransactionViewSet,PayrollFormulaViewSet,PayslipComponentViewSet,LoanTypeviewset,LoanApplicationviewset,LoanRepaymentviewset,LoanApprovalviewset,LoanApprovalLevelsviewset,
                     
                     )
 
@@ -8,9 +8,10 @@ from .views import (SalaryComponentViewSet,EmployeeSalaryStructureViewSet,Payrol
 router = DefaultRouter()
 router.register(r'salarycomponent', SalaryComponentViewSet)
 router.register(r'employeesalary', EmployeeSalaryStructureViewSet)
-router.register(r'PayrollSettings', PayrollSettingsViewSet)
-router.register(r'payroll', PayrollViewSet)
+router.register(r'PayrollTransaction', PayrollTransactionViewSet)
+router.register(r'PayrollFormula', PayrollFormulaViewSet)
 router.register(r'payslip', PayslipViewSet)
+router.register(r'PayslipComponent', PayslipComponentViewSet)
 router.register(r'loan-type', LoanTypeviewset, basename='loan-type')
 router.register(r'loan-application', LoanApplicationviewset, basename='loan-application')
 router.register(r'loan-repayment', LoanRepaymentviewset, basename='loan-repayment')

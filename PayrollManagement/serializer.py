@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import (SalaryComponent,EmployeeSalaryStructure,Payroll,Payslip,PayrollSettings,LoanType,LoanApplication,
+from .models import (SalaryComponent,EmployeeSalaryStructure,PayrollTransaction,Payslip,PayrollFormula,PaySlipComponent,LoanType,LoanApplication,
                     LoanRepayment,LoanApprovalLevels,LoanApproval)
 
 
@@ -15,10 +15,27 @@ class EmployeeSalaryStructureSerializer(serializers.ModelSerializer):
         model = EmployeeSalaryStructure
         fields = '__all__'
 
-class PayrollSerializer(serializers.ModelSerializer):
+class PayrollFormulaSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Payroll
+        model = PayrollFormula
         fields = '__all__'
+class PayrollTransactionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PayrollTransaction
+        fields = ['transaction_id', 'employee', 'pay_period_start', 'pay_period_end',
+                  'gross_pay', 'net_pay', 'payment_date', 'status']
+        read_only_fields = ['transaction_id', 'gross_pay', 'net_pay']
+        extra_kwargs = {
+            'pay_period_start': {'style': {'placeholder': 'YYYY-MM-DD', 'autofocus': True}},
+            'pay_period_end': {'style': {'placeholder': 'YYYY-MM-DD'}},
+            'payment_date': {'style': {'placeholder': 'YYYY-MM-DD'}},
+        }
+class PaySlipComponentSerializer(serializers.ModelSerializer):
+    component_name = serializers.CharField(source='salary_component.name')
+    
+    class Meta:
+        model = PaySlipComponent
+        fields = ['component_name', 'amount']
 
 
 class PayslipSerializer(serializers.ModelSerializer):
@@ -27,10 +44,6 @@ class PayslipSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class PayrollSettingsSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = PayrollSettings
-        fields = '__all__'
 
 class LoanTypeSerializer(serializers.ModelSerializer):
     class Meta:

@@ -8,6 +8,7 @@ from django.core.exceptions import ValidationError
 from decimal import Decimal
 from datetime import date
 from dateutil.relativedelta import relativedelta
+import re
 # from calendars .models import LeaveApproval
 
 # Create your models here.
@@ -30,25 +31,9 @@ class SalaryComponent(models.Model):
                                                    help_text="Is this component affected by unpaid leave?")
     affected_by_halfpaid_leave = models.BooleanField(default=False,
                                                      help_text="Is this component affected by half-paid leave?")
-    # affected_by_maternity_leave = models.BooleanField(default=False,
-    #                                                   help_text="Is this component affected by maternity leave?")
-    prorata_calculation = models.BooleanField(default=False, help_text="Should this component use prorata calculation?")
-    is_emi_deduction = models.BooleanField(default=False, help_text="Is this component used for EMI deduction from loan?")
-    # rounding_off_rules = models.CharField(
-    #     max_length=20,
-    #     choices=[
-    #         ('closest', 'Closest'),
-    #         ('up', 'Round Up'),
-    #         ('down', 'Round Down'),
-    #     ],
-    #     default='closest',
-    #     help_text="Rounding off rules for this component."
-    # )
-    # rounding_off_value = models.DecimalField(
-    #     max_digits=5, decimal_places=2, default=1,
-    #     help_text="Rounding off value (e.g., 1 for nearest integer)."
-    # )
-    #
+    # prorata_calculation = models.BooleanField(default=False, help_text="Should this component use prorata calculation?")
+    # is_emi_deduction = models.BooleanField(default=False, help_text="Is this component used for EMI deduction from loan?")
+
 
     def __str__(self):
         return f"{self.name} ({self.get_component_type_display()})"
@@ -67,95 +52,58 @@ class EmployeeSalaryStructure(models.Model):
     def __str__(self):
         return f"{self.employee} - {self.component.name} ({self.amount})"
 
-class PayrollSettings(models.Model):
-    payroll_frequency_choices = [
-        ('monthly', 'Monthly'),
-        ('bi-weekly', 'Bi-Weekly'),
-        ('weekly', 'Weekly'),
-    ]
 
-    payroll_frequency = models.CharField(max_length=20, choices=payroll_frequency_choices, default='monthly')
-    next_run_date = models.DateField(help_text="Date when the next payroll will be processed.")
-    pay_period_start_date = models.DateField()
-    pay_period_end_date = models.DateField()
-    category = models.ManyToManyField('OrganisationManager.ctgry_master',  null=True, blank=True,
-                                 help_text="Category for payroll processing")
-    created_at         = models.DateTimeField(auto_now_add=True)
-    created_by         = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
 
-    def update_next_run_date(self):
-        if self.payroll_frequency == 'monthly':
-            self.next_run_date += timedelta(days=30)
-        elif self.payroll_frequency == 'bi-weekly':
-            self.next_run_date += timedelta(days=14)
-        elif self.payroll_frequency == 'weekly':
-            self.next_run_date += timedelta(days=7)
-        self.save()
+class PayrollFormula(models.Model):
+    name = models.CharField(max_length=100, unique=True, help_text="Name of the formula (e.g., 'Net Salary')")
+    formula_text = models.TextField(
+        help_text="Formula using component names (e.g., 'Basic + HRA - PF'). Use component names as variables."
+    )
+    description = models.TextField(blank=True, null=True)
+    is_active = models.BooleanField(default=True)
 
     def __str__(self):
-        return f"Payroll Settings - {self.payroll_frequency}"
+        return self.name
 
-class Payroll(models.Model):
-    employee = models.ForeignKey('EmpManagement.emp_master',on_delete=models.CASCADE,related_name='payroll_records' )
-    pay_period_start = models.DateField()
-    pay_period_end = models.DateField()
-    total_earnings = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    total_deductions = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    net_salary = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    is_paid = models.BooleanField(default=False)
-    created_at         = models.DateTimeField(auto_now_add=True)
-    created_by         = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
-
-    def calculate_net_salary(self):
-        self.net_salary = self.total_earnings - self.total_deductions
-        return self.net_salary
-    def calculate_deductions(self):
-        """
-        Calculate total deductions, including EMI.
-        """
-        emi_deduction = Decimal(0)  # Initialize as Decimal
-
-        # Fetch approved and active loans for the employee
-        approved_loans = LoanApplication.objects.filter(
-            employee=self.employee,
-            status__in=['Approved', 'In Progress'],  # Only include active loans
-            disbursement_date__lte=date.today()
+    def validate_formula(self):
+        """Basic validation to ensure formula references valid components."""
+        component_names = set(
+            SalaryComponent.objects.values_list('name', flat=True)
         )
+        # Extract variables from formula (assume simple words for now)
+        variables = re.findall(r'[a-zA-Z_]+', self.formula_text)
+        invalid_vars = [var for var in variables if var not in component_names and var not in ['+', '-', '*', '/', '(', ')']]
+        if invalid_vars:
+            raise ValueError(f"Invalid variables in formula: {invalid_vars}")
+        return True
 
-        for loan in approved_loans:
-            if loan.remaining_balance > Decimal(0):
-                emi_amount = Decimal(loan.emi_amount)  # Ensure EMI is Decimal
-                emi_deduction += emi_amount
 
-                # Record EMI repayment
-                repayment = LoanRepayment(
-                    loan=loan,
-                    repayment_date=self.pay_period_end,
-                    amount_paid=emi_amount,
-                    remaining_balance=max(Decimal(0), loan.remaining_balance - emi_amount)
-                )
-                repayment.save()
 
-                # Update remaining balance of the loan
-                loan.remaining_balance -= emi_amount
-                if loan.remaining_balance <= Decimal(0):
-                    loan.status = 'Closed'  # Mark loan as closed if fully repaid
-                loan.save()
+class PayrollTransaction(models.Model):
+    transaction_id = models.AutoField(primary_key=True)
+    employee = models.ForeignKey('EmpManagement.emp_master', on_delete=models.CASCADE)
+    pay_period_start = models.DateField()  # From Calendar model
+    pay_period_end = models.DateField()    # From Calendar model
+    gross_pay = models.DecimalField(max_digits=10, decimal_places=2)
+    net_pay = models.DecimalField(max_digits=10, decimal_places=2)
+    payment_date = models.DateField()
+    status = models.CharField(
+        max_length=20,
+        choices=[("pending", "Pending"), ("approved", "Approved"), ("processed", "Processed")],
+        default="pending"
+    )
 
-        # Convert total_deductions to Decimal for arithmetic operations
-        self.total_deductions = Decimal(self.total_deductions) + emi_deduction
-        self.net_salary = Decimal(self.total_earnings) - self.total_deductions
-    
-    def save(self, *args, **kwargs):
-        """
-        Override save to calculate deductions before saving.
-        """
-        self.calculate_deductions()
-        super().save(*args, **kwargs)
+    def __str__(self):
+        return f"Payroll {self.transaction_id} for {self.employee}"
+
+    class Meta:
+        verbose_name = "Payroll Transaction"
+        verbose_name_plural = "Payroll Transactions"
+
     
 
 class Payslip(models.Model):
-    payroll = models.OneToOneField(Payroll, on_delete=models.CASCADE, related_name='payslip')
+    payroll = models.OneToOneField(PayrollTransaction, on_delete=models.CASCADE, related_name='payslip')
     issued_date = models.DateTimeField(auto_now_add=True)
     payslip_pdf = models.FileField(upload_to='payslips/', blank=True, null=True, help_text="Generated Payslip PDF")
     created_at         = models.DateTimeField(auto_now_add=True)
@@ -163,6 +111,16 @@ class Payslip(models.Model):
 
     def __str__(self):
         return f"Payslip for {self.payroll.employee} - {self.payroll.period.name}"
+
+
+class PaySlipComponent(models.Model):
+    payslip = models.ForeignKey(Payslip, on_delete=models.CASCADE, related_name='components')
+    salary_component = models.ForeignKey(SalaryComponent, on_delete=models.CASCADE)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    
+    def __str__(self):
+        return f"{self.payslip} - {self.salary_component.name}"
+
 
 
 class SalaryFormula(models.Model):
@@ -350,7 +308,7 @@ class LoanApprovalLevels(models.Model):
     level            = models.IntegerField()
     role             = models.CharField(max_length=50, null=True, blank=True)  # Use this for role-based approval like 'CEO' or 'Manager'
     approver         = models.ForeignKey('UserManagement.CustomUser', null=True, blank=True, on_delete=models.SET_NULL)  # Use this for user-based approval
-    loan_type     = models.ForeignKey('LoanType', related_name='loan_approval_levels', on_delete=models.CASCADE, null=True, blank=True)  # Nullable for common workflow
+    loan_type        = models.ForeignKey('LoanType', related_name='loan_approval_levels', on_delete=models.CASCADE, null=True, blank=True)  # Nullable for common workflow
     class Meta:
         unique_together = ('level', 'loan_type')
 
