@@ -9,19 +9,12 @@ from OrganisationManager.serializer import PermissionSerializer,GroupSerializer
 from rest_framework.response import Response
 from rest_framework import status,generics,viewsets,permissions
 from rest_framework.permissions import IsAuthenticated,AllowAny,IsAuthenticatedOrReadOnly,IsAdminUser
-
 from rest_framework.decorators import action
-from EmpManagement .serializer import ApprovalSerializer,ReqNotifySerializer
-from calendars.serializer import LvApprovalSerializer,LvApprovalNotifySerializer
-from calendars.models import LeaveApproval,LvApprovalNotify
-from EmpManagement.models import Approval,RequestNotification
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.views import APIView
 from rest_framework import viewsets, filters
 from .signals import add_company_to_superusers
 from tenant_users.tenants.models import UserTenantPermissions
-from OrganisationManager .models import CompanyPolicy
-from OrganisationManager .serializer import CompanyPolicySerializer
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 from django_tenants.utils import schema_context

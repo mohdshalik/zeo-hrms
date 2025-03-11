@@ -965,11 +965,24 @@ class employee_leave_request(models.Model):
         # If half-day leave is chosen, ensure the date range is correct
         if self.dis_half_day and self.start_date != self.end_date:
             raise ValidationError("Half-day leave should be on the same day.")
+        # Calculate number of leave days
+        leave_days_requested = self.calculate_leave_days()
+
+        # Fetch or create leave balance for the employee
+        leave_balance, created = emp_leave_balance.objects.get_or_create(
+            employee=self.employee,
+            leave_type=self.leave_type
+        )
+
+        # Check if leave type does not allow negative balance and employee has insufficient balance
+        if not self.leave_type.negative and leave_balance.balance < leave_days_requested:
+            raise ValidationError("Insufficient leave balance for this leave type.")
 
 
     def save(self, *args, **kwargs):
         # Calculate leave days based on start and end date
         self.number_of_days = self.calculate_leave_days()
+        self.clean()
         # Check if the status changed to "approved"
         previous_instance = type(self).objects.filter(pk=self.pk).first()
         status_changed_to_approved = (
