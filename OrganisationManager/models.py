@@ -20,7 +20,7 @@ class brnch_mstr(models.Model):
     br_pincode                = models.CharField(max_length=20)
     br_branch_nmbr_1          = models.CharField(max_length=20,unique=True)
     br_branch_nmbr_2          = models.CharField(max_length=20,blank=True, null=True)
-    br_branch_mail            = models.EmailField(unique=True)
+    br_branch_mail            = models.EmailField()
     br_country                = models.ForeignKey("Core.cntry_mstr",on_delete=models.SET_DEFAULT, default="1", null=True) 
     br_created_at             = models.DateTimeField(auto_now_add=True)
     br_created_by             = models.ForeignKey('UserManagement.CustomUser', on_delete=models.CASCADE, null=True, related_name='%(class)s_created_by')
@@ -112,6 +112,8 @@ class DocumentNumbering(models.Model):
     suffix = models.CharField(max_length=50, blank=True, null=True)
     year = models.IntegerField(default=timezone.now().year)
     current_number = models.IntegerField(default=0)  # Tracks the last used number
+    start_date = models.DateField(blank=True, null=True)  # New field
+    end_date = models.DateField(blank=True, null=True)  # New field
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(
         'UserManagement.CustomUser',
@@ -143,16 +145,21 @@ class DocumentNumbering(models.Model):
             if DocumentNumbering.objects.filter(branch_id=self.branch_id, leave_type=self.leave_type, type='leave_request').exclude(id=self.id).exists():
                 raise ValidationError("A leave request document numbering already exists for this branch and leave type.")
     
+    # Validate start and end dates
+        if self.start_date >= self.end_date:
+            raise ValidationError({'end_date': "End date must be greater than start date."})
+
     def get_next_number(self):
-        """Generate the next document number and update current_number."""
-        # if not self.automatic_numbering:
-        #     raise ValueError("Automatic numbering is disabled for this configuration.")
+        """Generate the next document number within the valid date range."""
+        current_date = timezone.now().date()
+        
+        if not (self.start_date <= current_date <= self.end_date):
+            raise ValidationError("Document number cannot be generated outside the valid date range.")
 
         with transaction.atomic():
-            # Lock the row to prevent race conditions
             doc_numbering = DocumentNumbering.objects.select_for_update().get(id=self.id)
+            
             if doc_numbering.year != timezone.now().year:
-                # Reset numbering if the year has changed
                 doc_numbering.year = timezone.now().year
                 doc_numbering.current_number = 0
 

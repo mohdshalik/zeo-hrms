@@ -172,7 +172,11 @@ class LeaveEntitlementSerializer(serializers.ModelSerializer):
     class Meta:
         model = leave_entitlement
         fields = '__all__'
-
+    def to_representation(self, instance):
+        rep = super(LeaveEntitlementSerializer, self).to_representation(instance)
+        if instance.leave_type:  
+            rep['leave_type'] = instance.leave_type.name
+        return rep
 
 class LeaveResetPolicySerializer(serializers.ModelSerializer):
     class Meta:
