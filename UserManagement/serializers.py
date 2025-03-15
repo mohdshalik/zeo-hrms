@@ -122,23 +122,23 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         return super().validate(attrs)
     
 class CompanySerializer(serializers.ModelSerializer):
-    tax_details = serializers.SerializerMethodField()
-    currency_details = serializers.SerializerMethodField()
+    # tax_details = serializers.SerializerMethodField()
+    # currency_details = serializers.SerializerMethodField()
     class Meta:
         model = company 
         fields = '__all__'
-    def get_tax_details(self, obj):
-        """Fetch tax details dynamically from the TaxSystem model"""
-        tax = TaxSystem.objects.filter(country=obj.country, is_active=True).first()
-        if tax:
-            return {"tax_name": tax.tax_name, "tax_percentage": tax.tax_percentage}
-        return None  # If no tax is found  
-    def get_currency_details(self, obj):
-        """Fetch currency details dynamically from the TaxSystem model"""
-        currency = crncy_mstr.objects.filter(country=obj.country).first()
-        if currency:
-            return {"currency_name": currency.currency_name, "currency_code": currency.currency_code,"symbol": currency.symbol}
-        return None  # If no currency is found
+    # def get_tax_details(self, obj):
+    #     """Fetch tax details dynamically from the TaxSystem model"""
+    #     tax = TaxSystem.objects.filter(country=obj.country, is_active=True).first()
+    #     if tax:
+    #         return {"tax_name": tax.tax_name, "tax_percentage": tax.tax_percentage}
+    #     return None  # If no tax is found  
+    # def get_currency_details(self, obj):
+    #     """Fetch currency details dynamically from the TaxSystem model"""
+    #     currency = crncy_mstr.objects.filter(country=obj.country).first()
+    #     if currency:
+    #         return {"currency_name": currency.currency_name, "currency_code": currency.currency_code,"symbol": currency.symbol}
+    #     return None  # If no currency is found
         
 class Non_EssUserListSerializer(serializers.ModelSerializer):
     class Meta:
