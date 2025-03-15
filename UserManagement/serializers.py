@@ -10,6 +10,7 @@ from EmpManagement.models import emp_master
 # from .models import company
 from django.contrib.contenttypes.models import ContentType
 from django_tenants.utils import schema_context
+from Core .models import TaxSystem,crncy_mstr
        
 class CustomUserSerializer(serializers.ModelSerializer):
     tenants = serializers.PrimaryKeyRelatedField(queryset=company.objects.all(), many=True, write_only=True)
@@ -18,41 +19,50 @@ class CustomUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
         fields = '__all__'
-        extra_kwargs = {'password': {'write_only': True}}
+        extra_kwargs = {
+            'password': {'write_only': True, 'required': False, 'allow_null': True, 'default': None}
+        }
 
     def get_allocated_tenants(self, obj):
         tenants = obj.tenants.all()
         return CompanySerializer(tenants, many=True).data
 
     def to_representation(self, instance):
-        rep = super(CustomUserSerializer, self).to_representation(instance)
+        rep = super().to_representation(instance)
         rep['allocated_tenants'] = self.get_allocated_tenants(instance)
         return rep
 
     def create(self, validated_data):
         tenants_data = validated_data.pop('tenants', [])
-        password = validated_data.pop('password')
+        password = validated_data.pop('password', None)
         user = super().create(validated_data)
-        user.set_password(password)
+        if password:  # Only set password if provided
+            user.set_password(password)
         user.save()
         
         # Add tenants to user
         user.tenants.set(tenants_data)
-
         return user
 
     def update(self, instance, validated_data):
+        # Pop optional fields
         tenants_data = validated_data.pop('tenants', None)
         password = validated_data.pop('password', None)
-        if password:
+
+        # Update password only if provided and not None
+        if password is not None:
             instance.set_password(password)
+
+        # Update other fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
         
-        instance = super().update(instance, validated_data)
-        
-        # Update tenants
+        instance.save()
+
+        # Update tenants if provided
         if tenants_data is not None:
             instance.tenants.set(tenants_data)
-
+        
         return instance
     
 # class CustomUserSerializer(UserSerializer):
@@ -112,10 +122,23 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         return super().validate(attrs)
     
 class CompanySerializer(serializers.ModelSerializer):
-
+    tax_details = serializers.SerializerMethodField()
+    currency_details = serializers.SerializerMethodField()
     class Meta:
-        model = company
+        model = company 
         fields = '__all__'
+    def get_tax_details(self, obj):
+        """Fetch tax details dynamically from the TaxSystem model"""
+        tax = TaxSystem.objects.filter(country=obj.country, is_active=True).first()
+        if tax:
+            return {"tax_name": tax.tax_name, "tax_percentage": tax.tax_percentage}
+        return None  # If no tax is found  
+    def get_currency_details(self, obj):
+        """Fetch currency details dynamically from the TaxSystem model"""
+        currency = crncy_mstr.objects.filter(country=obj.country).first()
+        if currency:
+            return {"currency_name": currency.currency_name, "currency_code": currency.currency_code,"symbol": currency.symbol}
+        return None  # If no currency is found
         
 class Non_EssUserListSerializer(serializers.ModelSerializer):
     class Meta:

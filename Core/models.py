@@ -23,7 +23,8 @@ class crncy_mstr(models.Model):
     currency_name    = models.CharField(max_length=50,unique=True)
     currency_code    = models.CharField(max_length=3, unique=True)
     symbol           = models.CharField(max_length=5, blank=True, null=True)
-    # countries = models.ManyToManyField(cntry_mstr)  # Many-to-many relationship with Country model
+    country = models.OneToOneField(cntry_mstr, on_delete=models.CASCADE, related_name='currency')
+    
     def __str__(self):
         return self.currency_name
 
@@ -64,3 +65,12 @@ class ProgrammingLanguageSkill(models.Model):
 
     def __str__(self):
         return f"{self.programming_language }"
+
+class TaxSystem(models.Model):
+    country = models.OneToOneField(cntry_mstr, on_delete=models.CASCADE)
+    tax_name = models.CharField(max_length=100)  # e.g., VAT, GST
+    tax_percentage = models.DecimalField(max_digits=5, decimal_places=2)  # e.g., 5.00 for 5%
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"{self.country.country_name} - {self.tax_name} ({self.tax_percentage}%)"

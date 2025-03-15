@@ -107,11 +107,12 @@ class DocumentNumbering(models.Model):
 
     leave_type = models.ForeignKey('calendars.leave_type', on_delete=models.CASCADE, null=True, blank=True)
 
-    # automatic_numbering =  models.BooleanField(default=True)
+    # automatic_numbering = models.BooleanField(default=True)
     prefix = models.CharField(max_length=50)
     suffix = models.CharField(max_length=50, blank=True, null=True)
     year = models.IntegerField(default=timezone.now().year)
     current_number = models.IntegerField(default=0)  # Tracks the last used number
+    total_length = models.IntegerField(default=10)  # Total length of the document number
     start_date = models.DateField(blank=True, null=True)  # New field
     end_date = models.DateField(blank=True, null=True)  # New field
     created_at = models.DateTimeField(auto_now_add=True)
@@ -136,6 +137,7 @@ class DocumentNumbering(models.Model):
             raise ValidationError({'leave_type': "Leave type is required for leave requests."})
         if self.type == 'general_request' and self.leave_type:
             raise ValidationError({'leave_type': "Leave type should not be set for general requests."})
+        
         # Check for duplicates before saving
         if self.type == 'general_request':
             if DocumentNumbering.objects.filter(branch_id=self.branch_id, type='general_request').exclude(id=self.id).exists():
@@ -144,13 +146,14 @@ class DocumentNumbering(models.Model):
         if self.type == 'leave_request':
             if DocumentNumbering.objects.filter(branch_id=self.branch_id, leave_type=self.leave_type, type='leave_request').exclude(id=self.id).exists():
                 raise ValidationError("A leave request document numbering already exists for this branch and leave type.")
-    
     # Validate start and end dates
         if self.start_date >= self.end_date:
             raise ValidationError({'end_date': "End date must be greater than start date."})
+        if self.total_length < len(self.prefix) + len(self.suffix) + 2:  # Ensure total length can accommodate the format
+            raise ValidationError({'total_length': "Total length is too short for the given prefix and suffix."})
 
     def get_next_number(self):
-        """Generate the next document number within the valid date range."""
+        """Generate the next document number with a fixed total length."""
         current_date = timezone.now().date()
         
         if not (self.start_date <= current_date <= self.end_date):
@@ -167,8 +170,15 @@ class DocumentNumbering(models.Model):
             doc_numbering.current_number = next_number
             doc_numbering.save()
 
-            suffix = f"-{doc_numbering.suffix}" if doc_numbering.suffix else ""
-            return f"{doc_numbering.prefix}-{doc_numbering.year}-{next_number:04d}{suffix}"
+            # Construct document number and determine available space for the number
+            suffix_part = f"-{doc_numbering.suffix}" if doc_numbering.suffix else ""
+            base_format = f"{doc_numbering.prefix}-{doc_numbering.year}" + suffix_part
+            available_space = doc_numbering.total_length - len(base_format) - 1  # Subtract fixed parts and the dash
+
+            # Ensure the number fits in the available space
+            number_str = str(next_number).zfill(available_space)
+
+            return f"{doc_numbering.prefix}-{doc_numbering.year}-{number_str}{suffix_part}"
     
 
 class CompanyPolicy(models.Model):

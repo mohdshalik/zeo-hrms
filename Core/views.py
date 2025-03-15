@@ -1,9 +1,9 @@
 from django.shortcuts import render
-from .models import (state_mstr,crncy_mstr,cntry_mstr,document_type,LanguageMaster,Nationality,LanguageSkill,ProgrammingLanguageSkill,MarketingSkill)
+from .models import (state_mstr,crncy_mstr,cntry_mstr,TaxSystem,document_type,LanguageMaster,Nationality,LanguageSkill,ProgrammingLanguageSkill,MarketingSkill)
 from .serializer import (CountrySerializer,StateSerializer,LanguageMasterSerializer,
                          CurrencySerializer,Document_type,CntryBulkUploadSerializer,NationalityBlkUpldSerializer,LanguageBlkupldSerializer,
                          MarketingBlkupldSerializer,LanguageSkillSerializer,MarketingSkillSerializer,ProgrammingLanguageSkillSerializer,
-                         ProLangBlkupldSerializer,MarketingBlkupldSerializer,LanguageBlkupldSerializer)
+                         ProLangBlkupldSerializer,MarketingBlkupldSerializer,LanguageBlkupldSerializer,TaxSystemSerializer)
 from . permissions import LanguageMasterPermission
 from rest_framework.decorators import action
 from rest_framework import viewsets
@@ -43,9 +43,16 @@ class CountryViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'])
     def states(self, request, pk=None):
         country = self.get_object()
-        states = country.state_mstr_set.all()  # Use the correct related_name
+        states = country.state_mstr_set.all()
         serializer = StateSerializer(states, many=True)
-        return Response(serializer.data)
+
+        # Get the dynamic label from the serializer
+        state_label = self.get_serializer(country).data.get('state_label')
+
+        response_data = {"states": serializer.data}
+        if state_label:  # Only include label if it's set
+            response_data["state_label"] = state_label
+        return Response(response_data)
 
 class CountryBulkuploadViewSet(viewsets.ModelViewSet):
     queryset = cntry_mstr.objects.all()
@@ -245,3 +252,7 @@ class ProLangBlkupldViewSet(viewsets.ModelViewSet):
             return Response({'message': 'Bulk upload successful'}, status=status.HTTP_201_CREATED)
         else:
             return Response({'error': 'No file found'}, status=status.HTTP_400_BAD_REQUEST)
+        
+class TaxSystemViewSet(viewsets.ModelViewSet):
+    queryset = TaxSystem.objects.all()
+    serializer_class = TaxSystemSerializer
