@@ -107,6 +107,7 @@ class Payslip(models.Model):
     issued_date = models.DateTimeField(auto_now_add=True)
     payslip_pdf = models.FileField(upload_to='payslips/', blank=True, null=True, help_text="Generated Payslip PDF")
     created_at         = models.DateTimeField(auto_now_add=True)
+    
     created_by         = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
 
     def __str__(self):
