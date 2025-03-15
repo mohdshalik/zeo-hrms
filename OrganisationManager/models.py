@@ -124,11 +124,11 @@ class DocumentNumbering(models.Model):
     )
 
     class Meta:
-        # unique_together = ('branch_id', 'type', 'leave_type')
-        constraints = [
-            models.UniqueConstraint(fields=['branch_id', 'type'],name='unique_general_request_per_branch',condition=models.Q(type='general_request')),
-            models.UniqueConstraint(fields=['branch_id', 'leave_type'],name='unique_leave_request_per_branch_leave_type',condition=models.Q(type='leave_request')),
-        ]
+        unique_together = ('branch_id', 'type', 'leave_type')
+        # constraints = [
+        #     models.UniqueConstraint(fields=['branch_id', 'type'],name='unique_general_request_per_branch',condition=models.Q(type='general_request')),
+        #     models.UniqueConstraint(fields=['branch_id', 'leave_type'],name='unique_leave_request_per_branch_leave_type',condition=models.Q(type='leave_request')),
+        # ]
     def __str__(self):
         return f"{self.branch_id.branch_name} - {self.type}"
 
