@@ -378,11 +378,11 @@ class leave_entitlement(models.Model):
         ('Dec', 'December')
     ]
     
-    PRORATE_CHOICES = [
-        ('start_of_policy', 'Start of Policy'),
-        ('start_and_end_of_policy', 'Start and End of Policy'),
-        ('do_not_prorate', 'Do not Prorate')
-    ]
+    # PRORATE_CHOICES = [
+    #     ('start_of_policy', 'Start of Policy'),
+    #     ('start_and_end_of_policy', 'Start and End of Policy'),
+    #     ('do_not_prorate', 'Do not Prorate')
+    # ]
     leave_type                     = models.ForeignKey('leave_type', on_delete=models.CASCADE)
     min_experience                 = models.PositiveIntegerField(default=0, help_text="Minimum experience required.")
     effective_after_unit           = models.CharField(max_length=10, choices=TIME_UNIT_CHOICES, default='months')
@@ -392,10 +392,10 @@ class leave_entitlement(models.Model):
     accrual_frequency              = models.CharField(max_length=20, choices=TIME_UNIT_CHOICES)
     accrual_month                  = models.CharField(max_length=3, choices=MONTH_CHOICES, default='Jan',null=True,blank=True)
     accrual_day                    = models.CharField(max_length=10, choices=DAY_CHOICES, default='1st')
-    round_of                       = models.CharField(choices=ROUND_OF_TYPE,max_length=20)
+    # round_of                       = models.CharField(choices=ROUND_OF_TYPE,max_length=20)
     
     prorate_accrual                = models.BooleanField(default=False, help_text="Enable prorate accrual for this leave type.")
-    prorate_type                   = models.CharField(max_length=30, choices=PRORATE_CHOICES, null=True, blank=True, help_text="Prorate accrual type.")
+    # prorate_type                   = models.CharField(max_length=30, choices=PRORATE_CHOICES, null=True, blank=True, help_text="Prorate accrual type.")
     created_at                     = models.DateTimeField(auto_now_add=True)
     created_by                     = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
 
