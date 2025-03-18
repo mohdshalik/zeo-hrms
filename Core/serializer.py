@@ -9,6 +9,8 @@ class StateSerializer(serializers.ModelSerializer):
         rep = super(StateSerializer, self).to_representation(instance)
         if instance.country:  # Check if emp_state_id is not None
             rep['country'] = instance.country.country_name
+       
+        return rep
 #CURRENCY SERIALIZER
 class CurrencySerializer(serializers.ModelSerializer):
     class Meta:
