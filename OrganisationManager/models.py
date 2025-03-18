@@ -112,6 +112,7 @@ class DocumentNumbering(models.Model):
     suffix = models.CharField(max_length=50, blank=True, null=True)
     year = models.IntegerField(default=timezone.now().year)
     current_number = models.IntegerField(default=0)  # Tracks the last used number
+    total_length = models.IntegerField(default=10)  # Total length of the document number
     start_date = models.DateField(blank=True, null=True)  # New field
     end_date = models.DateField(blank=True, null=True)  # New field
     created_at = models.DateTimeField(auto_now_add=True)
@@ -148,9 +149,11 @@ class DocumentNumbering(models.Model):
     # Validate start and end dates
         if self.start_date >= self.end_date:
             raise ValidationError({'end_date': "End date must be greater than start date."})
+        if self.total_length < len(self.prefix) + len(self.suffix) + 2:  # Ensure total length can accommodate the format
+            raise ValidationError({'total_length': "Total length is too short for the given prefix and suffix."})
 
     def get_next_number(self):
-        """Generate the next document number within the valid date range."""
+        """Generate the next document number with a fixed total length."""
         current_date = timezone.now().date()
         
         if not (self.start_date <= current_date <= self.end_date):
@@ -167,8 +170,15 @@ class DocumentNumbering(models.Model):
             doc_numbering.current_number = next_number
             doc_numbering.save()
 
-            suffix = f"-{doc_numbering.suffix}" if doc_numbering.suffix else ""
-            return f"{doc_numbering.prefix}-{doc_numbering.year}-{next_number:04d}{suffix}"
+            # Construct document number and determine available space for the number
+            suffix_part = f"-{doc_numbering.suffix}" if doc_numbering.suffix else ""
+            base_format = f"{doc_numbering.prefix}-{doc_numbering.year}" + suffix_part
+            available_space = doc_numbering.total_length - len(base_format) - 1  # Subtract fixed parts and the dash
+
+            # Ensure the number fits in the available space
+            number_str = str(next_number).zfill(available_space)
+
+            return f"{doc_numbering.prefix}-{doc_numbering.year}-{number_str}{suffix_part}"
     
 
 class CompanyPolicy(models.Model):
