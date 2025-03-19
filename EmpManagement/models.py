@@ -139,7 +139,9 @@ class emp_master(models.Model):
         from calendars .models import Attendance
         # Fetch approvals assigned to this user
         return Attendance.objects.filter(employee=self)
-
+    def get_leave_balance(self):
+        from calendars.models import emp_leave_balance
+        return emp_leave_balance.objects.filter(employee=self)
 class Report(models.Model):
     file_name   = models.CharField(max_length=100,unique=True)
     report_data = models.FileField(upload_to='employee_report/', null=True, blank=True)

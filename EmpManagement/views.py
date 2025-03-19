@@ -237,6 +237,29 @@ class EmpViewSet(viewsets.ModelViewSet):
         serializer = AttendanceSerializer(attendance, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
+    @action(detail=True, methods=['get'])
+    def leave_balance(self, request, pk=None):
+        user = self.get_object()
+
+        # Get leave balance
+        leave_balance = user.get_leave_balance()
+
+        # Get pending leave requests for the employee
+        pending_leave_types = employee_leave_request.objects.filter(
+            employee=user, status="pending"
+        ).values_list("leave_type", flat=True)  # Extract leave_type IDs
+
+        # Exclude leave types that are in pending requests
+        available_leave_types = leave_type.objects.exclude(id__in=pending_leave_types)
+
+        # Serialize data
+        leave_balance_serializer = EmployeeLeaveBalanceSerializer(leave_balance, many=True)
+        leave_type_serializer = LeaveTypeSerializer(available_leave_types, many=True)
+
+        return Response({
+            "leave_balance": leave_balance_serializer.data,
+            "available_leave_types": leave_type_serializer.data,
+        }, status=status.HTTP_200_OK)
     
     def get_queryset(self):
         user = self.request.user
