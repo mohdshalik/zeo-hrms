@@ -1,16 +1,18 @@
 from django.shortcuts import render
-from .models import (SalaryComponent,EmployeeSalaryStructure,PayrollFormula,PayrollTransaction,Payslip,PaySlipComponent,LoanType,LoanApplication,
+from .models import (SalaryComponent,EmployeeSalaryStructure,PayrollFormula,PayrollRun,Payslip,PayslipComponent,LoanType,LoanApplication,
                      LoanRepayment,LoanApprovalLevels,LoanApproval)
-from .serializer import (SalaryComponentSerializer,EmployeeSalaryStructureSerializer,PayrollFormulaSerializer,PayrollTransactionSerializer,PayslipSerializer,PaySlipComponentSerializer,LoanTypeSerializer,LoanApplicationSerializer,LoanRepaymentSerializer,
-                         LoanApprovalSerializer,LoanApprovalLevelsSerializer)
+from .serializer import (SalaryComponentSerializer,EmployeeSalaryStructureSerializer,PayrollFormulaSerializer,PayslipSerializer,PaySlipComponentSerializer,LoanTypeSerializer,LoanApplicationSerializer,LoanRepaymentSerializer,
+                         LoanApprovalSerializer,LoanApprovalLevelsSerializer,PayrollRunSerializer)
 from rest_framework import status,generics,viewsets,permissions
+from EmpManagement.models import emp_master
 from rest_framework.decorators import action
 from django.core.exceptions import ValidationError
 from rest_framework.response import Response
-from EmpManagement .models import emp_master
-from decimal import Decimal
-from django.utils.dateparse import parse_date
-from .utils import evaluate_payroll_formula
+from .utils import process_payroll
+import logging
+
+# Set up logging
+logger = logging.getLogger(__name__)
 # Create your views here.
 
 
@@ -23,63 +25,6 @@ class EmployeeSalaryStructureViewSet(viewsets.ModelViewSet):
     queryset = EmployeeSalaryStructure.objects.all()
     serializer_class = EmployeeSalaryStructureSerializer
 
-from rest_framework.renderers import JSONRenderer
-class PayrollTransactionViewSet(viewsets.ModelViewSet):
-    queryset = PayrollTransaction.objects.all()
-    serializer_class = PayrollTransactionSerializer
-    renderer_classes = [JSONRenderer]
-
-    @action(detail=False, methods=['post'], url_path='process-payroll')
-    def process_payroll(self, request):
-        try:
-            # Extract data from request
-            employee_id = request.data.get('employee_id')
-            pay_period_start = request.data.get('pay_period_start')
-            pay_period_end = request.data.get('pay_period_end')
-            payment_date = request.data.get('payment_date')
-            formula_id = request.data.get('formula_id')
-
-            # Validate required fields
-            if not all([employee_id, pay_period_start, pay_period_end, payment_date, formula_id]):
-                return Response({"error": "All fields are required."}, status=status.HTTP_400_BAD_REQUEST)
-
-            # Fetch employee and formula
-            try:
-                employee = emp_master.objects.get(id=employee_id)
-                formula = PayrollFormula.objects.get(id=formula_id, is_active=True)
-            except emp_master.DoesNotExist:
-                return Response({"error": "Employee not found."}, status=status.HTTP_404_NOT_FOUND)
-            except PayrollFormula.DoesNotExist:
-                return Response({"error": "Payroll formula not found or inactive."}, status=status.HTTP_404_NOT_FOUND)
-
-            # Calculate gross pay (sum of all additions)
-            additions = EmployeeSalaryStructure.objects.filter(
-                employee=employee, component__component_type='addition', is_active=True
-            )
-            gross_pay = sum(structure.amount or Decimal('0.00') for structure in additions)
-
-            # Calculate net pay using formula
-            net_pay = evaluate_payroll_formula(employee, formula.formula_text)
-
-            # Create PayrollTransaction
-            payroll_transaction = PayrollTransaction.objects.create(
-                employee=employee,
-                pay_period_start=parse_date(pay_period_start),
-                pay_period_end=parse_date(pay_period_end),
-                gross_pay=gross_pay,
-                net_pay=net_pay,
-                payment_date=parse_date(payment_date),
-                status="pending"
-            )
-
-            # Serialize and return response
-            serializer = self.get_serializer(payroll_transaction)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-        except Exception as e:
-            return Response({"error": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
 class PayrollFormulaViewSet(viewsets.ModelViewSet):
     queryset = PayrollFormula.objects.all()
     serializer_class = PayrollFormulaSerializer
@@ -90,8 +35,27 @@ class PayslipViewSet(viewsets.ModelViewSet):
 
 
 class PayslipComponentViewSet(viewsets.ModelViewSet):
-    queryset = PaySlipComponent.objects.all()
+    queryset = PayslipComponent.objects.all()
     serializer_class = PaySlipComponentSerializer
+
+
+class PayrollRunViewSet(viewsets.ModelViewSet):
+    queryset = PayrollRun.objects.all()
+    serializer_class = PayrollRunSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payroll_run = serializer.save()  # Save the PayrollRun instance
+
+        # Trigger payslip generation
+        try:
+            process_payroll(payroll_run.id)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        except ValueError as e:
+            # Rollback and return error if formula evaluation fails
+            payroll_run.delete()
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 class LoanTypeviewset(viewsets.ModelViewSet):
     queryset = LoanType.objects.all()

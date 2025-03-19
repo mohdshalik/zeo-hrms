@@ -1,33 +1,75 @@
 import re
 from decimal import Decimal
-from EmpManagement.models import emp_master
-from .models import EmployeeSalaryStructure, SalaryComponent, PayrollFormula
+from django.db import transaction
+from .models import PayrollRun, Payslip, PayslipComponent, EmployeeSalaryStructure, SalaryComponent
 
-def evaluate_payroll_formula(employee, formula_text):
-    """
-    Evaluate payroll formula dynamically by substituting component values.
-    """
-    try:
-        # Fetch all salary components assigned to the employee
-        salary_components = EmployeeSalaryStructure.objects.filter(
-            employee=employee, is_active=True
-        )
+def process_payroll(payroll_run_id):
+    payroll_run = PayrollRun.objects.get(id=payroll_run_id)  # Use 'id' as the field name    # Fetch employees based on branch (and optionally dept/category)
+    employees = payroll_run.branch.emp_master_set.all()  # Assuming emp_master has a related_name to branch
+    
+    with transaction.atomic():  # Ensure atomicity
+        for employee in employees:
+            # Get employee's salary structure
+            salary_structures = EmployeeSalaryStructure.objects.filter(employee=employee, is_active=True)
+            
+            # Initialize totals
+            total_additions = Decimal('0.00')
+            total_deductions = Decimal('0.00')
+            basic_salary = None
+            
+            # Create payslip
+            payslip = Payslip.objects.create(
+                payroll_run=payroll_run,
+                employee=employee,
+                status='pending'
+            )
+            
+            # Process each component
+            for structure in salary_structures:
+                component = structure.component
+                amount = structure.amount or Decimal('0.00')
+                
+                # Save to PayslipComponent
+                PayslipComponent.objects.create(
+                    payslip=payslip,
+                    component=component,
+                    amount=amount
+                )
+                
+                # Categorize amounts
+                if component.component_type == 'addition':
+                    total_additions += amount
+                    if component.name.lower() == 'basic':  # Assuming 'Basic' is the basic salary component
+                        basic_salary = amount
+                elif component.component_type == 'deduction':
+                    total_deductions += amount
+            
+            # Calculate gross and net salary
+            gross_salary = total_additions
+            net_salary = total_additions - total_deductions
+            
+            # Apply formula (basic parsing for now)
+            formula = payroll_run.pay_formula.formula_text
+            components_dict = {s.component.name: s.amount for s in salary_structures}
+            try:
+                net_salary = eval_formula(formula, components_dict)
+            except Exception as e:
+                raise ValueError(f"Error evaluating formula: {e}")
+            
+            # Update payslip
+            payslip.basic_salary = basic_salary
+            payslip.gross_salary = gross_salary
+            payslip.net_salary = net_salary
+            payslip.total_additions = total_additions
+            payslip.total_deductions = total_deductions
+            payslip.save()
+        
+        # Mark payroll as processed
+        payroll_run.status = 'processed'
+        payroll_run.save()
 
-        # Create a dictionary with component names and their values
-        component_values = {comp.component.name: comp.amount for comp in salary_components}
-
-        # Validate formula variables
-        variables = set(re.findall(r'[a-zA-Z_]+', formula_text))
-        for var in variables:
-            if var not in component_values:
-                component_values[var] = Decimal('0.00')  # Default to 0 if the component isn't assigned
-
-        # Safely evaluate the formula
-        allowed_names = {key: float(value) for key, value in component_values.items()}
-        net_salary = eval(formula_text, {"__builtins__": {}}, allowed_names)
-
-        return Decimal(net_salary)
-
-    except Exception as e:
-        print(f"Error in formula evaluation: {e}")
-        return Decimal('0.00')  # Return 0 in case of any error
+def eval_formula(formula, components_dict):
+    # Replace component names with their values in the formula
+    for name, value in components_dict.items():
+        formula = formula.replace(name, str(value or 0))
+    return Decimal(eval(formula))  # Use with caution; consider a safer parser

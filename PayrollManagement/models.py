@@ -1,6 +1,6 @@
 from django.db import models
 from EmpManagement.models import emp_master
-from datetime import timedelta
+from datetime import timedelta,datetime
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils import timezone
@@ -21,16 +21,16 @@ class SalaryComponent(models.Model):
 
     name = models.CharField(max_length=100, unique=True)  # Component name (e.g., HRA, PF)
     component_type = models.CharField(max_length=20, choices=COMPONENT_TYPES)
-    glcode = models.CharField(max_length=20,null=True)
+    code = models.CharField(max_length=20,null=True)
     # printdiscription= models.CharField(max_length=20,null=True)
     is_fixed = models.BooleanField(default=True, help_text="Is this component fixed (True) or variable (False)?")
     description = models.TextField(blank=True, null=True)
 
-    #hop rules
-    affected_by_unpaid_leave = models.BooleanField(default=False,
-                                                   help_text="Is this component affected by unpaid leave?")
-    affected_by_halfpaid_leave = models.BooleanField(default=False,
-                                                     help_text="Is this component affected by half-paid leave?")
+    # #hop rules
+    # affected_by_unpaid_leave = models.BooleanField(default=False,
+    #                                                help_text="Is this component affected by unpaid leave?")
+    # affected_by_halfpaid_leave = models.BooleanField(default=False,
+    #                                                  help_text="Is this component affected by half-paid leave?")
     # prorata_calculation = models.BooleanField(default=False, help_text="Should this component use prorata calculation?")
     # is_emi_deduction = models.BooleanField(default=False, help_text="Is this component used for EMI deduction from loan?")
 
@@ -79,61 +79,66 @@ class PayrollFormula(models.Model):
 
 
 
-class PayrollTransaction(models.Model):
-    transaction_id = models.AutoField(primary_key=True)
-    employee = models.ForeignKey('EmpManagement.emp_master', on_delete=models.CASCADE)
-    pay_period_start = models.DateField()  # From Calendar model
-    pay_period_end = models.DateField()    # From Calendar model
-    gross_pay = models.DecimalField(max_digits=10, decimal_places=2)
-    net_pay = models.DecimalField(max_digits=10, decimal_places=2)
-    payment_date = models.DateField()
-    status = models.CharField(
-        max_length=20,
-        choices=[("pending", "Pending"), ("approved", "Approved"), ("processed", "Processed")],
-        default="pending"
+class PayrollRun(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('processed', 'Processed'),
+        ('approved', 'Approved'),
+    ]
+
+    year = models.PositiveIntegerField(default=datetime.now().year, help_text="Payroll Year")
+    month = models.PositiveIntegerField(
+        choices=[(i, datetime(2000, i, 1).strftime('%B')) for i in range(1, 13)],
+        help_text="Payroll Month"
     )
+    pay_formula=models.ForeignKey('PayrollFormula',on_delete=models.CASCADE)
+    branch = models.ForeignKey('OrganisationManager.brnch_mstr', on_delete=models.SET_NULL, null=True, blank=True)
+    department = models.ForeignKey('OrganisationManager.dept_master', on_delete=models.SET_NULL, null=True, blank=True)
+    category = models.ForeignKey('OrganisationManager.ctgry_master', on_delete=models.SET_NULL, null=True, blank=True)
+    
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    def get_employees(self):
+        from EmpManagement.models import emp_master
+        employees = emp_master.objects.all()
+        if self.branch:
+            employees = employees.filter(branch=self.branch)
+        if self.department:
+            employees = employees.filter(department=self.department)
+        if self.category:
+            employees = employees.filter(category=self.category)
+        return employees
+
 
     def __str__(self):
-        return f"Payroll {self.transaction_id} for {self.employee}"
+        return f"Payroll - {self.get_month_display()} {self.year} ({self.status})"
 
-    class Meta:
-        verbose_name = "Payroll Transaction"
-        verbose_name_plural = "Payroll Transactions"
-
-    
 
 class Payslip(models.Model):
-    payroll = models.OneToOneField(PayrollTransaction, on_delete=models.CASCADE, related_name='payslip')
-    issued_date = models.DateTimeField(auto_now_add=True)
-    payslip_pdf = models.FileField(upload_to='payslips/', blank=True, null=True, help_text="Generated Payslip PDF")
-    created_at         = models.DateTimeField(auto_now_add=True)
-    
-    created_by         = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+    payroll_run = models.ForeignKey(PayrollRun, on_delete=models.CASCADE, related_name='payslips')
+    employee = models.ForeignKey('EmpManagement.emp_master', on_delete=models.CASCADE, related_name='payslips')
+    basic_salary = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    gross_salary = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # Added
+    net_salary = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    total_deductions = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    total_additions = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    status = models.CharField(max_length=20, choices=[('pending', 'Pending'), ('paid', 'Paid')], default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Payslip for {self.payroll.employee} - {self.payroll.period.name}"
+        return f"Payslip for {self.employee} - {self.payroll_run.get_month_display()} {self.payroll_run.year}"    # def __str__(self):
+    #     return f"Payslip for {self.employee} ({self.payroll_run.start_date} - {self.payroll_run.end_date})"
 
 
-class PaySlipComponent(models.Model):
+class PayslipComponent(models.Model):
     payslip = models.ForeignKey(Payslip, on_delete=models.CASCADE, related_name='components')
-    salary_component = models.ForeignKey(SalaryComponent, on_delete=models.CASCADE)
+    component = models.ForeignKey(SalaryComponent, on_delete=models.CASCADE)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
-    
-    def __str__(self):
-        return f"{self.payslip} - {self.salary_component.name}"
-
-
-
-class SalaryFormula(models.Model):
-    component = models.ForeignKey(SalaryComponent, on_delete=models.CASCADE, related_name='formulas')
-    formula = models.TextField(help_text="Formula for calculating the component amount. Use placeholders for employee attributes.")
-    description = models.TextField(blank=True, null=True)
-    created_at         = models.DateTimeField(auto_now_add=True)
-    created_by         = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
-
 
     def __str__(self):
-        return f"Formula for {self.component.name}"
+        return f"{self.payslip.employee} - {self.component.name} ({self.amount})"
 
 class LoanCommonWorkflow(models.Model):
     level    = models.IntegerField()
