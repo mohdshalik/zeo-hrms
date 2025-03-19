@@ -31,6 +31,8 @@ class PaySlipComponentSerializer(serializers.ModelSerializer):
 
 
 class PayslipSerializer(serializers.ModelSerializer):
+    payroll_run = PayrollRunSerializer(read_only=True)
+    employee = serializers.StringRelatedField()  # Displays employee's string representation
     class Meta:
         model = Payslip
         fields = '__all__'

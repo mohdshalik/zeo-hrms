@@ -8,7 +8,7 @@ from EmpManagement.models import emp_master
 from rest_framework.decorators import action
 from django.core.exceptions import ValidationError
 from rest_framework.response import Response
-from .utils import process_payroll
+from .utils import process_payroll,generate_payslip_pdf 
 import logging
 
 # Set up logging
@@ -32,7 +32,33 @@ class PayrollFormulaViewSet(viewsets.ModelViewSet):
 class PayslipViewSet(viewsets.ModelViewSet):
     queryset = Payslip.objects.all()
     serializer_class = PayslipSerializer
+    '''Assuming you have a PayslipViewSet or similar, you might already have something like /payroll/api/payslips/?employee=<emp_id>.'''
+    def get_queryset(self):
+        employee_id = self.request.query_params.get('employee', None)
+        if employee_id:
+            return self.queryset.filter(employee_id=employee_id)
+        return self.queryset
+    @action(detail=False, methods=['get'], url_path='employee/(?P<employee_id>\d+)/download/(?P<year>\d{4})/(?P<month>\d{1,2})')
+    def download_employee_payslip_by_month(self, request, employee_id=None, year=None, month=None):
+        """Download a payslip for a specific employee for a given month and year."""
+        try:
+            # Ensure month is an integer between 1 and 12
+            month = int(month)
+            if not 1 <= month <= 12:
+                return Response({"error": "Month must be between 1 and 12"}, status=status.HTTP_400_BAD_REQUEST)
 
+            # Fetch the payslip for the employee, year, and month
+            payslip = Payslip.objects.get(
+                employee_id=employee_id,
+                payroll_run__year=year,
+                payroll_run__month=month
+            )
+            return generate_payslip_pdf(payslip)
+        except Payslip.DoesNotExist:
+            return Response({"error": f"No payslip found for employee {employee_id} for {month}/{year}"}, 
+                           status=status.HTTP_404_NOT_FOUND)
+        except ValueError:
+            return Response({"error": "Invalid year or month format"}, status=status.HTTP_400_BAD_REQUEST)
 
 class PayslipComponentViewSet(viewsets.ModelViewSet):
     queryset = PayslipComponent.objects.all()
@@ -56,6 +82,15 @@ class PayrollRunViewSet(viewsets.ModelViewSet):
             # Rollback and return error if formula evaluation fails
             payroll_run.delete()
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+    @action(detail=False, methods=['get'], url_path='employee/(?P<employee_id>\d+)/download/(?P<payslip_id>\d+)')
+    def download_employee_payslip(self, request, employee_id=None, payslip_id=None):
+        """Download a specific payslip for a given employee."""
+        try:
+            payslip = Payslip.objects.get(employee_id=employee_id, id=payslip_id)
+            return generate_payslip_pdf(payslip)
+        except Payslip.DoesNotExist:
+            return Response({"error": "Payslip not found for this employee"}, status=status.HTTP_404_NOT_FOUND)
 
 class LoanTypeviewset(viewsets.ModelViewSet):
     queryset = LoanType.objects.all()
