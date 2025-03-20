@@ -39,6 +39,7 @@ class PayslipSerializer(serializers.ModelSerializer):
 
 
 
+
 class LoanTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = LoanType

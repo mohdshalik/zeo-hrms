@@ -26,14 +26,6 @@ class SalaryComponent(models.Model):
     is_fixed = models.BooleanField(default=True, help_text="Is this component fixed (True) or variable (False)?")
     description = models.TextField(blank=True, null=True)
 
-    # #hop rules
-    # affected_by_unpaid_leave = models.BooleanField(default=False,
-    #                                                help_text="Is this component affected by unpaid leave?")
-    # affected_by_halfpaid_leave = models.BooleanField(default=False,
-    #                                                  help_text="Is this component affected by half-paid leave?")
-    # prorata_calculation = models.BooleanField(default=False, help_text="Should this component use prorata calculation?")
-    # is_emi_deduction = models.BooleanField(default=False, help_text="Is this component used for EMI deduction from loan?")
-
 
     def __str__(self):
         return f"{self.name} ({self.get_component_type_display()})"
@@ -104,11 +96,11 @@ class PayrollRun(models.Model):
         from EmpManagement.models import emp_master
         employees = emp_master.objects.all()
         if self.branch:
-            employees = employees.filter(branch=self.branch)
+            employees = employees.filter(emp_branch_id=self.branch)
         if self.department:
-            employees = employees.filter(department=self.department)
+            employees = employees.filter(emp_dept_id=self.department)
         if self.category:
-            employees = employees.filter(category=self.category)
+            employees = employees.filter(emp_ctgry_id=self.category)
         return employees
 
 

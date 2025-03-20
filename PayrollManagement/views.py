@@ -32,12 +32,6 @@ class PayrollFormulaViewSet(viewsets.ModelViewSet):
 class PayslipViewSet(viewsets.ModelViewSet):
     queryset = Payslip.objects.all()
     serializer_class = PayslipSerializer
-    '''Assuming you have a PayslipViewSet or similar, you might already have something like /payroll/api/payslips/?employee=<emp_id>.'''
-    def get_queryset(self):
-        employee_id = self.request.query_params.get('employee', None)
-        if employee_id:
-            return self.queryset.filter(employee_id=employee_id)
-        return self.queryset
     @action(detail=False, methods=['get'], url_path='employee/(?P<employee_id>\d+)/download/(?P<year>\d{4})/(?P<month>\d{1,2})')
     def download_employee_payslip_by_month(self, request, employee_id=None, year=None, month=None):
         """Download a payslip for a specific employee for a given month and year."""
@@ -53,13 +47,13 @@ class PayslipViewSet(viewsets.ModelViewSet):
                 payroll_run__year=year,
                 payroll_run__month=month
             )
-            return generate_payslip_pdf(payslip)
+            return generate_payslip_pdf(request, payslip)  # Pass the request to the PDF generation function
         except Payslip.DoesNotExist:
             return Response({"error": f"No payslip found for employee {employee_id} for {month}/{year}"}, 
                            status=status.HTTP_404_NOT_FOUND)
         except ValueError:
             return Response({"error": "Invalid year or month format"}, status=status.HTTP_400_BAD_REQUEST)
-
+    
 class PayslipComponentViewSet(viewsets.ModelViewSet):
     queryset = PayslipComponent.objects.all()
     serializer_class = PaySlipComponentSerializer
