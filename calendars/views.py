@@ -180,6 +180,12 @@ class LvEmailTemplateviewset(viewsets.ModelViewSet):
 class LvApprovalNotifyviewset(viewsets.ModelViewSet):
     queryset = LvApprovalNotify.objects.all()
     serializer_class = LvApprovalNotifySerializer
+    def get_queryset(self):
+        user = self.request.user
+
+        return LvApprovalNotify.objects.filter(
+            Q(recipient_user=user) | Q(recipient_employee__user=user)
+        ).order_by('-created_at')  # Fetch only relevant notifications, sorted by latest
 
 class LeaveEntitlementviewset(viewsets.ModelViewSet):
     queryset = leave_entitlement.objects.all()

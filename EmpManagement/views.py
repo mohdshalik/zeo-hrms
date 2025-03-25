@@ -59,6 +59,7 @@ import redis
 import json
 from calendars .serializer import AttendanceSerializer
 from rest_framework.exceptions import NotFound
+from django.db.models import Q
 
 r = redis.StrictRedis(host='localhost', port=6379, db=0)
 
@@ -1867,9 +1868,12 @@ class UserNotificationsViewSet(viewsets.ModelViewSet):
     serializer_class = ReqNotifySerializer
     # permission_classes = [IsAuthenticated]
 
-    # def get_queryset(self):
-    #     user = self.request.user
-    #     return RequestNotification.objects.filter(recipient_user=user).order_by('-created_at')
+    def get_queryset(self):
+        user = self.request.user
+
+        return RequestNotification.objects.filter(
+            Q(recipient_user=user) | Q(recipient_employee__user=user)
+        ).order_by('-created_at')  # Fetch only relevant notifications, sorted by latest
 from django.shortcuts import render, get_object_or_404
 from django.http import HttpResponse
 
