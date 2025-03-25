@@ -1,9 +1,9 @@
 from django.shortcuts import render
-from .models import (state_mstr,crncy_mstr,cntry_mstr,document_type,LanguageMaster,Nationality,LanguageSkill,ProgrammingLanguageSkill,MarketingSkill,TaxSystem)
+from .models import (state_mstr,crncy_mstr,cntry_mstr,document_type,LanguageMaster,Nationality,LanguageSkill,ProgrammingLanguageSkill,MarketingSkill,TaxSystem,ReligionMaster)
 from .serializer import (CountrySerializer,StateSerializer,LanguageMasterSerializer,
                          CurrencySerializer,Document_type,CntryBulkUploadSerializer,NationalityBlkUpldSerializer,LanguageBlkupldSerializer,
                          MarketingBlkupldSerializer,LanguageSkillSerializer,MarketingSkillSerializer,ProgrammingLanguageSkillSerializer,
-                         ProLangBlkupldSerializer,MarketingBlkupldSerializer,LanguageBlkupldSerializer,TaxSystemSerializer)
+                         ProLangBlkupldSerializer,MarketingBlkupldSerializer,LanguageBlkupldSerializer,TaxSystemSerializer,ReligionMasterBlkupldSerializer,NationalitySerializer,ReligionMasterSerializer)
 from . permissions import LanguageMasterPermission
 from rest_framework.decorators import action
 from rest_framework import viewsets
@@ -104,7 +104,11 @@ class CountryBulkuploadViewSet(viewsets.ModelViewSet):
                 return Response({'message': f'Bulk upload successful. {success_count} rows added.'}, status=status.HTTP_201_CREATED)
         else:
             return Response({'error': 'No file found'}, status=status.HTTP_400_BAD_REQUEST)
-
+class NationalityViewSet(viewsets.ModelViewSet):
+    queryset = Nationality.objects.all()
+    serializer_class = NationalitySerializer
+    # permission_classes = [IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser)
 #nationality bulkupload
 class NationalityBlkupldViewSet(viewsets.ModelViewSet):
     queryset = Nationality.objects.all()
@@ -262,3 +266,32 @@ class ProLangBlkupldViewSet(viewsets.ModelViewSet):
 class TaxSystemViewSet(viewsets.ModelViewSet):
     queryset = TaxSystem.objects.all()
     serializer_class = TaxSystemSerializer
+
+class ReligionMasterViewSet(viewsets.ModelViewSet):
+    queryset = ReligionMaster.objects.all()
+    serializer_class = ReligionMasterSerializer
+class ReligionMasterBlkupldViewSet(viewsets.ModelViewSet):
+    queryset = ReligionMaster.objects.all()
+    serializer_class = ReligionMasterBlkupldSerializer
+    # permission_classes = [IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser)
+
+    @action(detail=False, methods=['post'], parser_classes=[MultiPartParser, FormParser])
+    def bulk_upload(self, request):
+        if request.method == 'POST' and request.FILES.get('file'):
+            csv_file = request.FILES['file']
+            decoded_file = csv_file.read().decode('utf-8').splitlines()
+            reader = csv.DictReader(decoded_file)
+
+            try:
+                for row in reader:
+                    ReligionMaster.objects.create(
+                        religion=row['religion'],
+                        
+                    )
+            except Exception as e:
+                return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+            return Response({'message': 'Bulk upload successful'}, status=status.HTTP_201_CREATED)
+        else:
+            return Response({'error': 'No file found'}, status=status.HTTP_400_BAD_REQUEST)

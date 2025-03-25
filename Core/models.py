@@ -48,6 +48,12 @@ class Nationality(models.Model):
     def str(self):
         return self.N_name
 
+class ReligionMaster(models.Model):
+    religion = models.CharField(max_length=200,null=True)
+
+    def __str__(self):
+        return self.religion
+
 class LanguageSkill(models.Model):
     language = models.CharField(max_length=100,null=True,blank =True,default=None)
     

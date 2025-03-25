@@ -11,7 +11,7 @@ from import_export.widgets import Widget
 from django.core.exceptions import ValidationError
 from django.db import models
 import re
-from Core.models import document_type,state_mstr,cntry_mstr,Nationality
+from Core.models import document_type,state_mstr,cntry_mstr,Nationality,ReligionMaster
 from OrganisationManager.models import brnch_mstr,ctgry_master,dept_master,desgntn_master
 from import_export.widgets import ForeignKeyWidget
 from django.core.files.base import ContentFile
@@ -118,9 +118,9 @@ class EmployeeResource(resources.ModelResource):
     emp_status = fields.Field(attribute='emp_status', column_name='Employee Status(True/False)')
     emp_joined_date = fields.Field(attribute='emp_joined_date', column_name='Employee Joining Date(DD/MM/YYYY)')
     emp_date_of_confirmation = fields.Field(attribute='emp_date_of_confirmation', column_name='Employee Confirmaton Date(DD/MM/YYYY)')
-    emp_relegion = fields.Field(attribute='emp_relegion', column_name='Employee Religion')
+    emp_relegion = fields.Field(attribute='emp_relegion', column_name='Employee Religion',widget=ForeignKeyWidget(ReligionMaster, 'religion'))
     emp_blood_group = fields.Field(attribute='emp_blood_group', column_name='Employee Blood Group')
-    emp_nationality_id = fields.Field(attribute='emp_nationality_id', column_name='Employee Nationality')
+    emp_nationality = fields.Field(attribute='emp_nationality', column_name='Employee Nationality',widget=ForeignKeyWidget(Nationality, 'N_name'))
     emp_marital_status = fields.Field(attribute='emp_marital_status', column_name='Employee Marital Status')
     emp_father_name = fields.Field(attribute='emp_father_name', column_name='Employee Father Name')
     emp_mother_name = fields.Field(attribute='emp_mother_name', column_name='Employee Mother Name')
@@ -156,7 +156,7 @@ class EmployeeResource(resources.ModelResource):
             'emp_date_of_confirmation',
             'emp_relegion',
             'emp_blood_group',
-            'emp_nationality_id',
+            'emp_nationality',
             'emp_marital_status',
             'emp_father_name',
             'emp_mother_name',
@@ -201,7 +201,21 @@ class EmployeeResource(resources.ModelResource):
             else:
                 row['emp_designation_id'] = matching_designation.id
         
-
+            # Nationality Validation
+            emp_nationality = row.get('Employee Nationality')
+            matching_emp_nationality = Nationality.objects.filter(N_name__iexact=emp_nationality).first()
+            if not matching_emp_nationality:
+                errors.append(f"No matching Nationality found for Nationality: '{emp_nationality}'")
+            else:
+                row['emp_nationality'] = matching_emp_nationality.id
+            # Religion Validation
+            emp_relegion = row.get('Employee Religion')
+            print(emp_relegion)
+            matching_emp_relegion = ReligionMaster.objects.filter(religion__iexact=emp_relegion).first()
+            if not matching_emp_relegion:
+                errors.append(f"No matching Religion found for Religion: '{emp_relegion}'")
+            else:
+                row['emp_relegion'] = matching_emp_relegion.id
         # if emp_master.objects.filter(emp_personal_email=personal_email).exists():
         #     errors.append(f"Duplicate value found for Employee Personal Email ID: {personal_email}")
         

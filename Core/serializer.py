@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import(state_mstr,cntry_mstr,TaxSystem,crncy_mstr,document_type,LanguageMaster,Nationality,LanguageSkill,MarketingSkill,ProgrammingLanguageSkill)
+from .models import(state_mstr,cntry_mstr,TaxSystem,crncy_mstr,document_type,LanguageMaster,Nationality,LanguageSkill,MarketingSkill,ProgrammingLanguageSkill,
+                    ReligionMaster)
 #STATE SERIALIZER
 class StateSerializer(serializers.ModelSerializer):
     class Meta:
@@ -231,22 +232,21 @@ class CntryBulkUploadSerializer(serializers.ModelSerializer):
         model = cntry_mstr
         fields = '__all__'
 
+class NationalitySerializer(serializers.ModelSerializer):  
+    class Meta:
+        model = Nationality
+        fields = '__all__'
+ 
  #ntionality bulk upload
 class NationalityBlkUpldSerializer(serializers.ModelSerializer):  
     file = serializers.FileField(write_only=True) 
     class Meta:
         model = Nationality
         fields = '__all__'
-
-
-
 class Document_type(serializers.ModelSerializer):
     class Meta:
         model = document_type
         fields = '__all__'
-
-
-
 # LANGUAGES
 class LanguageMasterSerializer(serializers.ModelSerializer):
     # br_created_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
@@ -293,3 +293,14 @@ class TaxSystemSerializer(serializers.ModelSerializer):
         model = TaxSystem
         # fields = '__all__'
         fields = ['id', 'country', 'country_name', 'tax_name', 'tax_percentage', 'is_active']
+
+class ReligionMasterSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ReligionMaster
+        fields = '__all__'
+        
+class ReligionMasterBlkupldSerializer(serializers.ModelSerializer):
+    file = serializers.FileField(write_only=True) 
+    class Meta:
+        model = ReligionMaster
+        fields = '__all__'
