@@ -50,7 +50,7 @@ class company(TenantMixin):
         # Switch to the newly created schema using schema_context
         with schema_context(self.schema_name):
             # Create the branch within the company's schema
-            brnch_mstr.objects.create(
+            branch = brnch_mstr.objects.create(
                 branch_name=self.name,
                 branch_logo=self.logo,
                 branch_code='BR001',  # Provide a default or unique branch code
@@ -61,7 +61,12 @@ class company(TenantMixin):
                 br_branch_nmbr_1='BR-0001',  # Provide a unique branch number
                 br_branch_mail='branch@example.com',  # Provide a valid email
             )
-
+            from UserManagement.models import CustomUser  # Import user model dynamically
+            try:
+                default_user = CustomUser.objects.get(id=1)
+                branch.branch_users.add(default_user)  # Add user ID 1 to branch_users
+            except CustomUser.DoesNotExist:
+                pass  # If user with ID 1 does not exist, skip adding
     def __str__(self):
         return self.name
 
@@ -89,8 +94,8 @@ class CustomUser(UserProfile):
     objects = CustomUserManager()
 
     def save(self, *args, **kwargs):
-        # Set is_active to True before saving
-        self.is_active = True
+        if not self.pk:  # Only set is_active=True on creation
+            self.is_active = True
         super().save(*args, **kwargs)
     
     # Add any additional fields if needed

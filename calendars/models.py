@@ -32,8 +32,8 @@ from datetime import datetime, timedelta
 class weekend_calendar(models.Model):
     DAY_TYPE_CHOICES = [
         ('leave', 'Leave'),
-        ('fullday', 'fullday'),
-        ('halfday', 'Halfday'),
+        ('fullday', 'FullDay'),
+        ('halfday', 'HalfDay'),
     ]
     description       = models.TextField()
     calendar_code     = models.CharField(max_length=100)
@@ -71,8 +71,8 @@ class WeekendDetail(models.Model):
     ]
     DAY_TYPE_CHOICES = [
         ('leave', 'Leave'),
-        ('work', 'Work'),
-        ('halfday', 'Halfday'),
+        ('fullday', 'Full Day'),
+        ('halfday', 'HalfDay'),
     ]
     weekend_calendar = models.ForeignKey(weekend_calendar, related_name='details', on_delete=models.CASCADE)
     weekday          = models.CharField(max_length=9, choices=WEEKDAY_CHOICES)

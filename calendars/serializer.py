@@ -115,7 +115,24 @@ class WeekendAssignSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError("The employee is already assigned to a weekend calendar.")
 
         return data
-
+    def to_representation(self, instance):
+        rep = super(WeekendAssignSerializer, self).to_representation(instance)
+        if instance.weekend_model:
+            rep['weekend_model'] =instance.weekend_model.calendar_code
+        # Handling Many-to-Many relationships correctly
+        if instance.branch.exists():  # Ensure branch is not empty
+            rep['branch'] = [branch.branch_name for branch in instance.branch.all()]
+        
+        if instance.category.exists():  # Ensure branch is not empty
+            rep['category'] = [category.ctgry_title for category in instance.category.all()]
+        
+        if instance.department.exists():
+            rep['department'] = [dept.dept_name for dept in instance.department.all()]
+        
+        if instance.employee.exists():
+            rep['employee'] = [emp.religion for emp in instance.employee.all()]
+    
+        return rep
 class HolidaySerializer(serializers.ModelSerializer):
     class Meta:
         model = holiday
