@@ -115,6 +115,7 @@ class GroupSerializer(serializers.ModelSerializer):
         return representation
 
 class PermissionSerializer(serializers.ModelSerializer):
+    user = serializers.CharField(source="profile.username", read_only=True)
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         representation['groups'] = GroupSerializer(instance.groups.all(), many=True).data

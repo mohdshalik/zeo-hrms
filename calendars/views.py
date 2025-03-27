@@ -264,15 +264,8 @@ class LeaveRequestviewset(viewsets.ModelViewSet):
         return super().get_queryset()  # Non-ESS users can access as per their permissions
     def perform_create(self, serializer):
         with transaction.atomic():
-            # Get employee from validated data (or set it for ESS users)
             employee = serializer.validated_data.get('employee')
-            if self.request.user.is_ess:
-                # For ESS users, set employee to the user's employee record
-                employee = self.request.user.emp_master  # Adjust if emp_master relation differs
-                serializer.validated_data['employee'] = employee
-
-            # Derive branch_id from employee's branch (adjust field name as needed)
-            branch_id = employee.emp_branch_id.id  # Assuming emp_branch_id is the ForeignKey to brnch_mstr
+            branch_id = employee.emp_branch_id.id  # Ensure this field exists
             leave_type = serializer.validated_data['leave_type']
 
             try:
@@ -284,7 +277,20 @@ class LeaveRequestviewset(viewsets.ModelViewSet):
             except DocumentNumbering.DoesNotExist:
                 raise NotFound(f"No document numbering configuration found for branch {branch_id} and leave type {leave_type}.")
 
-            document_number = doc_config.get_next_number()
+            # Check if the user entered a document number manually
+            document_number = serializer.validated_data.get('document_number')
+
+            if document_number:
+                # Validate the entered document number falls within the allowed date range
+                current_date = timezone.now().date()
+                if doc_config.start_date and doc_config.end_date:
+                    if not (doc_config.start_date <= current_date <= doc_config.end_date):
+                        raise ValidationError("The document number cannot be assigned outside the valid date range.")
+            else:
+                # Generate the document number automatically
+                document_number = doc_config.get_next_number()
+
+            serializer.save(document_number=document_number)
             serializer.save(document_number=document_number)
 
 

@@ -2,6 +2,7 @@ from django.shortcuts import render
 from django.conf import settings
 from datetime import date
 import logging
+from django.utils import timezone
 from openpyxl import load_workbook
 from .models import (emp_family,Emp_Documents,EmpJobHistory,EmpLeaveRequest,EmpQualification,GeneralRequest,RequestType,
                      emp_master,notification,EmpFamily_CustomField,EmpJobHistory_CustomField,
@@ -1762,11 +1763,10 @@ class GeneralRequestViewset(viewsets.ModelViewSet):
     permission_classes =[IsSuperUserOrHasGeneralRequestPermission]
     def perform_create(self, serializer):
         with transaction.atomic():
-            # Get employee from validated data
             employee = serializer.validated_data.get('employee')
+            document_number = serializer.validated_data.get('document_number')  # Get manually entered document number
 
-            # Derive branch_id from employee's branch (adjust field name as needed)
-            branch_id = employee.emp_branch_id.id  # Assuming emp_branch_id is the ForeignKey to brnch_mstr
+            branch_id = employee.emp_branch_id.id  
 
             try:
                 doc_config = DocumentNumbering.objects.get(
@@ -1777,7 +1777,17 @@ class GeneralRequestViewset(viewsets.ModelViewSet):
             except DocumentNumbering.DoesNotExist:
                 raise NotFound(f"No document numbering configuration found for branch {branch_id} and general request.")
 
-            document_number = doc_config.get_next_number()
+            current_date = timezone.now().date()
+
+            # Validate if the manually entered document number is within the date range
+            if document_number:
+                if doc_config.start_date and doc_config.end_date:
+                    if not (doc_config.start_date <= current_date <= doc_config.end_date):
+                        raise ValidationError("Document number cannot be assigned outside the valid date range.")
+            else:
+                # If no document number is entered, generate one automatically
+                document_number = doc_config.get_next_number()
+
             serializer.save(document_number=document_number)
 
     @action(detail=False, methods=['get'])

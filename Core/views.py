@@ -279,19 +279,23 @@ class ReligionMasterBlkupldViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'], parser_classes=[MultiPartParser, FormParser])
     def bulk_upload(self, request):
         if request.method == 'POST' and request.FILES.get('file'):
-            csv_file = request.FILES['file']
-            decoded_file = csv_file.read().decode('utf-8').splitlines()
-            reader = csv.DictReader(decoded_file)
-
+            excel_file = request.FILES['file']
+            # Check if the uploaded file is an Excel file
+            if not excel_file.name.endswith('.xlsx'):
+                return Response({'error': 'Only Excel files (.xlsx) are supported'}, status=status.HTTP_400_BAD_REQUEST)
             try:
-                for row in reader:
+                # Read the Excel file using pandas
+                df = pd.read_excel(excel_file) 
+                # Iterate through each row in the DataFrame
+                for index, row in df.iterrows():
+                    # Get the emp_master instance corresponding to the emp_id
+                    # Create a Skills_Master object with the emp_instance
                     ReligionMaster.objects.create(
-                        religion=row['religion'],
                         
+                        religion=row['religion'],    
                     )
             except Exception as e:
                 return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
             return Response({'message': 'Bulk upload successful'}, status=status.HTTP_201_CREATED)
         else:
             return Response({'error': 'No file found'}, status=status.HTTP_400_BAD_REQUEST)
