@@ -445,8 +445,12 @@ class permissionviewset(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         if user.is_authenticated:
-            # Filter queryset based on authenticated user's profile ID
-            return UserTenantPermissions.objects.filter(profile_id=user.id)
+            if user.is_superuser:
+                # Superusers see all user permissions
+                return UserTenantPermissions.objects.all()
+            else:
+                # Regular users only see their assigned permissions
+                return UserTenantPermissions.objects.filter(profile_id=user.id)
         return UserTenantPermissions.objects.none() 
     # def get_queryset(self):
     # def get_queryset(self):
