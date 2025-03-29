@@ -243,7 +243,7 @@ class NationalityBlkUpldSerializer(serializers.ModelSerializer):
     class Meta:
         model = Nationality
         fields = '__all__'
-class Document_type(serializers.ModelSerializer):
+class Document_typeSerializer(serializers.ModelSerializer):
     class Meta:
         model = document_type
         fields = '__all__'

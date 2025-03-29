@@ -210,15 +210,16 @@ class EmployeeResource(resources.ModelResource):
                 row['emp_nationality'] = matching_emp_nationality.id
             # Religion Validation
             emp_relegion = row.get('Employee Religion')
-            print(emp_relegion)
-            matching_emp_relegion = ReligionMaster.objects.filter(religion__iexact=emp_relegion).first()
-            if not matching_emp_relegion:
-                errors.append(f"No matching Religion found for Religion: '{emp_relegion}'")
+            # Check if religion is None or empty before querying
+            if emp_relegion and emp_relegion.strip():
+                matching_emp_relegion = ReligionMaster.objects.filter(religion__iexact=emp_relegion.strip()).first()
+                if not matching_emp_relegion:
+                    errors.append(f"No matching Religion found for Religion: '{emp_relegion}'")
+                else:
+                    row['emp_relegion'] = matching_emp_relegion.id
             else:
-                row['emp_relegion'] = matching_emp_relegion.id
-        # if emp_master.objects.filter(emp_personal_email=personal_email).exists():
-        #     errors.append(f"Duplicate value found for Employee Personal Email ID: {personal_email}")
-        
+                row['emp_relegion'] = None  # Allow blank religion without error
+                
          # Validating gender field
         gender = row.get('Employee Gender')
         if gender and gender not in ['Male', 'Female', 'Other','M','F','O']:

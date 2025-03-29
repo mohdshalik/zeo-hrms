@@ -2,7 +2,6 @@
 from rest_framework import serializers
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
-from Core.serializer import Document_type
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from OrganisationManager.serializer import DocumentNumberingSerializer

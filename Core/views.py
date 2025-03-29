@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from .models import (state_mstr,crncy_mstr,cntry_mstr,document_type,LanguageMaster,Nationality,LanguageSkill,ProgrammingLanguageSkill,MarketingSkill,TaxSystem,ReligionMaster)
 from .serializer import (CountrySerializer,StateSerializer,LanguageMasterSerializer,
-                         CurrencySerializer,Document_type,CntryBulkUploadSerializer,NationalityBlkUpldSerializer,LanguageBlkupldSerializer,
+                         CurrencySerializer,Document_typeSerializer,CntryBulkUploadSerializer,NationalityBlkUpldSerializer,LanguageBlkupldSerializer,
                          MarketingBlkupldSerializer,LanguageSkillSerializer,MarketingSkillSerializer,ProgrammingLanguageSkillSerializer,
                          ProLangBlkupldSerializer,MarketingBlkupldSerializer,LanguageBlkupldSerializer,TaxSystemSerializer,ReligionMasterBlkupldSerializer,NationalitySerializer,ReligionMasterSerializer)
 from . permissions import LanguageMasterPermission
@@ -146,7 +146,7 @@ class CurrencyViewSet(viewsets.ModelViewSet):
 
 class DocumentViewSet(viewsets.ModelViewSet):
     queryset = document_type.objects.all()
-    serializer_class = Document_type
+    serializer_class = Document_typeSerializer
     permission_classes = [DocTypePermission,] 
 
 class LanguageViewSet(viewsets.ModelViewSet):
