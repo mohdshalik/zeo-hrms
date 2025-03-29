@@ -266,7 +266,7 @@ def update_category_weekend_calendar(sender, instance, action, **kwargs):
         for category in categories:
             updated_count = emp_master.objects.filter(emp_ctgry_id=category.id).update(holiday_calendar=instance.holiday_model)
             # logger.debug(f"Updated {updated_count} employees for category ID {category.id}")
-@receiver(m2m_changed, sender=assign_weekend.employee.through)
+@receiver(m2m_changed, sender=assign_holiday.employee.through)
 def update_employee_weekend_calendar(sender, instance, action, **kwargs):
     if action in ['post_add', 'post_remove', 'post_clear'] and instance.related_to == "employee":
         employees = instance.employee.all()

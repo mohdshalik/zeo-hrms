@@ -152,7 +152,24 @@ class HolidayAssignSerializer(serializers.ModelSerializer):
         model = assign_holiday
         fields = '__all__'
     
-
+    def to_representation(self, instance):
+        rep = super(HolidayAssignSerializer, self).to_representation(instance)
+        if instance.holiday_model:
+            rep['holiday_model'] =instance.holiday_model.calendar_title
+        # Handling Many-to-Many relationships correctly
+        if instance.branch.exists():  # Ensure branch is not empty
+            rep['branch'] = [branch.branch_name for branch in instance.branch.all()]
+        
+        if instance.category.exists():  # Ensure branch is not empty
+            rep['category'] = [category.ctgry_title for category in instance.category.all()]
+        
+        if instance.department.exists():
+            rep['department'] = [dept.dept_name for dept in instance.department.all()]
+        
+        if instance.employee.exists():
+            rep['employee'] = [emp.emp_code for emp in instance.employee.all()]
+    
+        return rep
 #leave
 class LeaveTypeSerializer(serializers.ModelSerializer):
     class Meta:
