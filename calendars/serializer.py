@@ -130,7 +130,7 @@ class WeekendAssignSerializer(serializers.ModelSerializer):
             rep['department'] = [dept.dept_name for dept in instance.department.all()]
         
         if instance.employee.exists():
-            rep['employee'] = [emp.religion for emp in instance.employee.all()]
+            rep['employee'] = [emp.emp_code for emp in instance.employee.all()]
     
         return rep
 class HolidaySerializer(serializers.ModelSerializer):
