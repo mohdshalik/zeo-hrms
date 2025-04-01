@@ -118,6 +118,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 class CompanySerializer(serializers.ModelSerializer):
     # tax_details = serializers.SerializerMethodField()
     # currency_details = serializers.SerializerMethodField()
+    state_label = serializers.SerializerMethodField()
     class Meta:
         model = company 
         fields = '__all__'
@@ -133,7 +134,8 @@ class CompanySerializer(serializers.ModelSerializer):
     #     if currency:
     #         return {"currency_name": currency.currency_name, "currency_code": currency.currency_code,"symbol": currency.symbol}
     #     return None  # If no currency is found
-        
+    def get_state_label(self, obj):
+        return obj.country.get_state_label() if obj.country else None
 class Non_EssUserListSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
