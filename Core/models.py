@@ -9,24 +9,6 @@ class cntry_mstr(models.Model):
     
     def __str__(self):
         return self.country_name
-#STATE MODEL
-class state_mstr(models.Model):
-
-    state_name  = models.CharField(max_length=50)
-    is_active   = models.BooleanField(default=True)
-    country     = models.ForeignKey('cntry_mstr',on_delete=models.CASCADE)
-    def __str__(self):
-        return self.state_name
-
-#CURRENCY MODEL
-class crncy_mstr(models.Model):
-    currency_name    = models.CharField(max_length=50,unique=True)
-    currency_code    = models.CharField(max_length=3, unique=True)
-    symbol           = models.CharField(max_length=5, blank=True, null=True)
-    country = models.OneToOneField(cntry_mstr, on_delete=models.CASCADE, related_name='currency',null=True,blank=True)
-    
-    def __str__(self):
-        return self.currency_name
     def get_state_label(self):
         """Return dynamic name for 'states' based on country selection."""
         custom_labels = {
@@ -227,6 +209,25 @@ class crncy_mstr(models.Model):
     }
 
         return custom_labels.get(self.country_name)  # No default value
+#STATE MODEL
+class state_mstr(models.Model):
+
+    state_name  = models.CharField(max_length=50)
+    is_active   = models.BooleanField(default=True)
+    country     = models.ForeignKey('cntry_mstr',on_delete=models.CASCADE)
+    def __str__(self):
+        return self.state_name
+
+#CURRENCY MODEL
+class crncy_mstr(models.Model):
+    currency_name    = models.CharField(max_length=50,unique=True)
+    currency_code    = models.CharField(max_length=3, unique=True)
+    symbol           = models.CharField(max_length=5, blank=True, null=True)
+    country = models.OneToOneField(cntry_mstr, on_delete=models.CASCADE, related_name='currency',null=True,blank=True)
+    
+    def __str__(self):
+        return self.currency_name
+    
 # document master
 class document_type(models.Model):
     type_name   = models.CharField(max_length=50,unique=True)
