@@ -5,10 +5,12 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.contenttypes.models import ContentType
 from django_tenants.utils import schema_context
 # from Core .models import TaxSystem,crncy_mstr
+from tenant_users.tenants.models import UserTenantPermissions
        
 class CustomUserSerializer(serializers.ModelSerializer):
     tenants = serializers.PrimaryKeyRelatedField(queryset=company.objects.all(), many=True, write_only=True)
     allocated_tenants = serializers.SerializerMethodField(read_only=True)
+    user_groups = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = CustomUser
@@ -20,10 +22,17 @@ class CustomUserSerializer(serializers.ModelSerializer):
     def get_allocated_tenants(self, obj):
         tenants = obj.tenants.all()
         return CompanySerializer(tenants, many=True).data
-
+    def get_user_groups(self, obj):
+        """Retrieve assigned groups for the user via UserTenantPermissions."""
+        try:
+            user_tenant_permissions = UserTenantPermissions.objects.get(profile=obj)
+            return [group.name for group in user_tenant_permissions.groups.all()]  # Fetch group names
+        except UserTenantPermissions.DoesNotExist:
+            return []  # Return empty if no groups assigned
     def to_representation(self, instance):
         rep = super().to_representation(instance)
         rep['allocated_tenants'] = self.get_allocated_tenants(instance)
+        rep['user_groups'] = self.get_user_groups(instance)  # Include group names
         return rep
 
     def create(self, validated_data):
