@@ -12,6 +12,7 @@ import re
 # from calendars .models import LeaveApproval
 
 # Create your models here.
+# Create your models here.
 class SalaryComponent(models.Model):
     COMPONENT_TYPES = [
         ('deduction', 'Deduction'),
@@ -22,8 +23,9 @@ class SalaryComponent(models.Model):
     name = models.CharField(max_length=100, unique=True)  # Component name (e.g., HRA, PF)
     component_type = models.CharField(max_length=20, choices=COMPONENT_TYPES)
     code = models.CharField(max_length=20,null=True)
-    # printdiscription= models.CharField(max_length=20,null=True)
+    unpaid_leave = models.BooleanField(default=False)
     is_fixed = models.BooleanField(default=True, help_text="Is this component fixed (True) or variable (False)?")
+    formula = models.CharField(max_length=255, blank=True, null=True, help_text="Formula to calculate this component (e.g., 'basic_salary * 0.4')")
     description = models.TextField(blank=True, null=True)
 
 
@@ -46,44 +48,20 @@ class EmployeeSalaryStructure(models.Model):
 
 
 
-class PayrollFormula(models.Model):
-    name = models.CharField(max_length=100, unique=True, help_text="Name of the formula (e.g., 'Net Salary')")
-    formula_text = models.TextField(
-        help_text="Formula using component names (e.g., 'Basic + HRA - PF'). Use component names as variables."
-    )
-    description = models.TextField(blank=True, null=True)
-    is_active = models.BooleanField(default=True)
-
-    def __str__(self):
-        return self.name
-
-    def validate_formula(self):
-        """Basic validation to ensure formula references valid components."""
-        component_names = set(
-            SalaryComponent.objects.values_list('name', flat=True)
-        )
-        # Extract variables from formula (assume simple words for now)
-        variables = re.findall(r'[a-zA-Z_]+', self.formula_text)
-        invalid_vars = [var for var in variables if var not in component_names and var not in ['+', '-', '*', '/', '(', ')']]
-        if invalid_vars:
-            raise ValueError(f"Invalid variables in formula: {invalid_vars}")
-        return True
-
-
 
 class PayrollRun(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('processed', 'Processed'),
         ('approved', 'Approved'),
+        ('paid', 'Paid'),  # Added status
     ]
 
-    year = models.PositiveIntegerField(default=datetime.now().year, help_text="Payroll Year")
-    month = models.PositiveIntegerField(
-        choices=[(i, datetime(2000, i, 1).strftime('%B')) for i in range(1, 13)],
-        help_text="Payroll Month"
-    )
-    pay_formula=models.ForeignKey('PayrollFormula',on_delete=models.CASCADE)
+    name = models.CharField(max_length=100, blank=True, help_text="Optional payroll run name")  # New field
+    start_date = models.DateField(help_text="Start date of payroll period",null=True)#avoid null=true
+    end_date = models.DateField(help_text="End date of payroll period",null=True)
+    payment_date = models.DateField(null=True, blank=True, help_text="When employees will be paid")  # New field
+
     branch = models.ForeignKey('OrganisationManager.brnch_mstr', on_delete=models.SET_NULL, null=True, blank=True)
     department = models.ForeignKey('OrganisationManager.dept_master', on_delete=models.SET_NULL, null=True, blank=True)
     category = models.ForeignKey('OrganisationManager.ctgry_master', on_delete=models.SET_NULL, null=True, blank=True)
@@ -111,13 +89,17 @@ class PayrollRun(models.Model):
 class Payslip(models.Model):
     payroll_run = models.ForeignKey(PayrollRun, on_delete=models.CASCADE, related_name='payslips')
     employee = models.ForeignKey('EmpManagement.emp_master', on_delete=models.CASCADE, related_name='payslips')
-    basic_salary = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     gross_salary = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # Added
     net_salary = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     total_deductions = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     total_additions = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     status = models.CharField(max_length=20, choices=[('pending', 'Pending'), ('paid', 'Paid')], default='pending')
     created_at = models.DateTimeField(auto_now_add=True)
+    # New fields for working days
+    total_working_days = models.PositiveIntegerField(default=0, help_text="Total working days in the payroll period")
+    days_worked = models.PositiveIntegerField(default=0, help_text="Number of days the employee worked")
+    pro_rata_adjustment = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, help_text="Pro-rata adjustment")  # New field
+    arrears = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, help_text="Arrears amount")  # New field
 
     def __str__(self):
         return f"Payslip for {self.employee} - {self.payroll_run.get_month_display()} {self.payroll_run.year}"    # def __str__(self):

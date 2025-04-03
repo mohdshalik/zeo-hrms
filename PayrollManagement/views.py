@@ -1,14 +1,25 @@
 from django.shortcuts import render
-from .models import (SalaryComponent,EmployeeSalaryStructure,PayrollFormula,PayrollRun,Payslip,PayslipComponent,LoanType,LoanApplication,
+from .models import (SalaryComponent,EmployeeSalaryStructure,PayslipComponent,Payslip,PayrollRun,LoanType,LoanApplication,
                      LoanRepayment,LoanApprovalLevels,LoanApproval)
-from .serializer import (SalaryComponentSerializer,EmployeeSalaryStructureSerializer,PayrollFormulaSerializer,PayslipSerializer,PaySlipComponentSerializer,LoanTypeSerializer,LoanApplicationSerializer,LoanRepaymentSerializer,
+from .serializer import (SalaryComponentSerializer,EmployeeSalaryStructureSerializer,PayrollRunSerializer,PayslipSerializer,PaySlipComponentSerializer,LoanTypeSerializer,LoanApplicationSerializer,LoanRepaymentSerializer,
+                         LoanApprovalSerializer,LoanApprovalLevelsSerializer,EmpBulkuploadSalaryStructureSerializer)
+from django.shortcuts import render
+from .models import (SalaryComponent,EmployeeSalaryStructure,PayrollRun,Payslip,PayslipComponent,LoanType,LoanApplication,
+                     LoanRepayment,LoanApprovalLevels,LoanApproval)
+from .serializer import (SalaryComponentSerializer,EmployeeSalaryStructureSerializer,PayslipSerializer,PaySlipComponentSerializer,LoanTypeSerializer,LoanApplicationSerializer,LoanRepaymentSerializer,
                          LoanApprovalSerializer,LoanApprovalLevelsSerializer,PayrollRunSerializer)
 from rest_framework import status,generics,viewsets,permissions
+from .permissions import(SalaryComponentPermission,EmployeeSalaryStructurePermission,PayrollRunPermission,PayslipComponentPermission,PayslipPermission)
+from .resource import EmployeeSalaryStructureResource
 from EmpManagement.models import emp_master
 from rest_framework.decorators import action
 from django.core.exceptions import ValidationError
 from rest_framework.response import Response
-from .utils import process_payroll,generate_payslip_pdf 
+from tablib import Dataset
+from rest_framework.parsers import MultiPartParser, FormParser
+from django.db import transaction
+from .utils import generate_payslip_pdf 
+
 import logging
 
 # Set up logging
@@ -19,15 +30,16 @@ logger = logging.getLogger(__name__)
 class SalaryComponentViewSet(viewsets.ModelViewSet):
     queryset = SalaryComponent.objects.all()
     serializer_class = SalaryComponentSerializer
+    # permission_classes = [SalaryComponentPermission]
 
 
 class EmployeeSalaryStructureViewSet(viewsets.ModelViewSet):
     queryset = EmployeeSalaryStructure.objects.all()
     serializer_class = EmployeeSalaryStructureSerializer
 
-class PayrollFormulaViewSet(viewsets.ModelViewSet):
-    queryset = PayrollFormula.objects.all()
-    serializer_class = PayrollFormulaSerializer
+# class PayrollFormulaViewSet(viewsets.ModelViewSet):
+#     queryset = PayrollFormula.objects.all()
+#     serializer_class = PayrollFormulaSerializer
 
 class PayslipViewSet(viewsets.ModelViewSet):
     queryset = Payslip.objects.all()
@@ -63,28 +75,46 @@ class PayrollRunViewSet(viewsets.ModelViewSet):
     queryset = PayrollRun.objects.all()
     serializer_class = PayrollRunSerializer
 
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        payroll_run = serializer.save()  # Save the PayrollRun instance
+class EmpBulkuploadSalaryStructureViewSet(viewsets.ModelViewSet):
+    queryset = EmployeeSalaryStructure.objects.all()
+    serializer_class = EmpBulkuploadSalaryStructureSerializer
+    
+    @action(detail=False, methods=['post'], parser_classes=[MultiPartParser, FormParser])
+    def bulk_upload(self, request):
+        if request.method == 'POST' and request.FILES.get('file'):
+            excel_file = request.FILES['file']
+            if excel_file.name.endswith('.xlsx'):
+                try:
+                    dataset = Dataset()
+                    dataset.load(excel_file.read(), format='xlsx')
+                    resource = EmployeeSalaryStructureResource()
+                    all_errors = []
+                    valid_rows = []
+                    with transaction.atomic():
+                        for row_idx, row in enumerate(dataset.dict, start=2):
+                            row_errors = []
+                            try:
+                                resource.before_import_row(row, row_idx=row_idx)
+                            except ValidationError as e:
+                                row_errors.extend([f"Row {row_idx}: {error}" for error in e.messages])
+                            if row_errors:
+                                all_errors.extend(row_errors)
+                            else:
+                                valid_rows.append(row)
 
-        # Trigger payslip generation
-        try:
-            process_payroll(payroll_run.id)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        except ValueError as e:
-            # Rollback and return error if formula evaluation fails
-            payroll_run.delete()
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        
-    @action(detail=False, methods=['get'], url_path='employee/(?P<employee_id>\d+)/download/(?P<payslip_id>\d+)')
-    def download_employee_payslip(self, request, employee_id=None, payslip_id=None):
-        """Download a specific payslip for a given employee."""
-        try:
-            payslip = Payslip.objects.get(employee_id=employee_id, id=payslip_id)
-            return generate_payslip_pdf(payslip)
-        except Payslip.DoesNotExist:
-            return Response({"error": "Payslip not found for this employee"}, status=status.HTTP_404_NOT_FOUND)
+                    if all_errors:
+                        return Response({"errors": all_errors}, status=400)
+
+                    with transaction.atomic():
+                        result = resource.import_data(dataset, dry_run=False, raise_errors=True)
+
+                    return Response({"message": f"{result.total_rows} records created successfully"})
+                except Exception as e:
+                    return Response({"error": str(e)}, status=400)
+            else:
+                return Response({"error": "Invalid file format. Only Excel files (.xlsx) are supported."}, status=400)
+        else:
+            return Response({"error": "Please provide an Excel file."}, status=400)
 
 class LoanTypeviewset(viewsets.ModelViewSet):
     queryset = LoanType.objects.all()

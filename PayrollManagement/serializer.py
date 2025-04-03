@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import (SalaryComponent,EmployeeSalaryStructure,PayrollRun,Payslip,PayrollFormula,PayslipComponent,LoanType,LoanApplication,
+from .models import (SalaryComponent,EmployeeSalaryStructure,PayrollRun,Payslip,PayslipComponent,LoanType,LoanApplication,
                     LoanRepayment,LoanApprovalLevels,LoanApproval)
 
 
@@ -14,11 +14,16 @@ class EmployeeSalaryStructureSerializer(serializers.ModelSerializer):
     class Meta:
         model = EmployeeSalaryStructure
         fields = '__all__'
-
-class PayrollFormulaSerializer(serializers.ModelSerializer):
+class EmpBulkuploadSalaryStructureSerializer(serializers.ModelSerializer):
+    file = serializers.FileField(write_only=True)
     class Meta:
-        model = PayrollFormula
+        model = EmployeeSalaryStructure
         fields = '__all__'
+
+# class PayrollFormulaSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = PayrollFormula
+#         fields = '__all__'
 class PayrollRunSerializer(serializers.ModelSerializer):
     class Meta:
         model = PayrollRun
