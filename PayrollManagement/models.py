@@ -23,7 +23,7 @@ class SalaryComponent(models.Model):
     name = models.CharField(max_length=100, unique=True)  # Component name (e.g., HRA, PF)
     component_type = models.CharField(max_length=20, choices=COMPONENT_TYPES)
     code = models.CharField(max_length=20,null=True)
-    unpaid_leave = models.BooleanField(default=False)
+    deduct_leave=models.BooleanField(default=False)
     is_fixed = models.BooleanField(default=True, help_text="Is this component fixed (True) or variable (False)?")
     formula = models.CharField(max_length=255, blank=True, null=True, help_text="Formula to calculate this component (e.g., 'basic_salary * 0.4')")
     description = models.TextField(blank=True, null=True)
@@ -58,8 +58,8 @@ class PayrollRun(models.Model):
     ]
 
     name = models.CharField(max_length=100, blank=True, help_text="Optional payroll run name")  # New field
-    start_date = models.DateField(help_text="Start date of payroll period",null=True)#avoid null=true
-    end_date = models.DateField(help_text="End date of payroll period",null=True)
+    start_date = models.DateField(help_text="Start date of payroll period")
+    end_date = models.DateField(help_text="End date of payroll period")
     payment_date = models.DateField(null=True, blank=True, help_text="When employees will be paid")  # New field
 
     branch = models.ForeignKey('OrganisationManager.brnch_mstr', on_delete=models.SET_NULL, null=True, blank=True)
@@ -101,8 +101,8 @@ class Payslip(models.Model):
     pro_rata_adjustment = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, help_text="Pro-rata adjustment")  # New field
     arrears = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, help_text="Arrears amount")  # New field
 
-    def __str__(self):
-        return f"Payslip for {self.employee} - {self.payroll_run.get_month_display()} {self.payroll_run.year}"    # def __str__(self):
+    # def __str__(self):
+        # return f"Payslip for {self.employee} - {self.payroll_run.get_month_display()} {self.payroll_run.year}"    # def __str__(self):
     #     return f"Payslip for {self.employee} ({self.payroll_run.start_date} - {self.payroll_run.end_date})"
 
 

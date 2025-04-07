@@ -18,8 +18,13 @@ from rest_framework.response import Response
 from tablib import Dataset
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.db import transaction
-from .utils import generate_payslip_pdf 
-
+from .utils import process_payroll,generate_payslip_pdf 
+from .models import (SalaryComponent,EmployeeSalaryStructure,PayrollRun,Payslip,PayslipComponent,LoanType,LoanApplication,
+                     LoanRepayment,LoanApprovalLevels,LoanApproval)
+from .serializer import (SalaryComponentSerializer,EmployeeSalaryStructureSerializer,PayslipSerializer,PaySlipComponentSerializer,LoanTypeSerializer,LoanApplicationSerializer,LoanRepaymentSerializer,
+                         LoanApprovalSerializer,LoanApprovalLevelsSerializer,PayrollRunSerializer)
+from rest_framework import status,generics,viewsets,permissions
+import datetime
 import logging
 
 # Set up logging
@@ -30,7 +35,6 @@ logger = logging.getLogger(__name__)
 class SalaryComponentViewSet(viewsets.ModelViewSet):
     queryset = SalaryComponent.objects.all()
     serializer_class = SalaryComponentSerializer
-    # permission_classes = [SalaryComponentPermission]
 
 
 class EmployeeSalaryStructureViewSet(viewsets.ModelViewSet):
@@ -50,19 +54,29 @@ class PayslipViewSet(viewsets.ModelViewSet):
         try:
             # Ensure month is an integer between 1 and 12
             month = int(month)
+            year = int(year)
             if not 1 <= month <= 12:
                 return Response({"error": "Month must be between 1 and 12"}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Fetch the payslip for the employee, year, and month
+            # Calculate the start and end dates for the given month/year
+            start_date = datetime.date(year=year, month=month, day=1)
+            if month == 12:
+                end_date = datetime.date(year=year+1, month=1, day=1) - datetime.timedelta(days=1)
+            else:
+                end_date = datetime.date(year=year, month=month+1, day=1) - datetime.timedelta(days=1)
+
+            # Fetch the payslip for the employee and date range
             payslip = Payslip.objects.get(
                 employee_id=employee_id,
-                payroll_run__year=year,
-                payroll_run__month=month
+                payroll_run__start_date=start_date,
+                payroll_run__end_date=end_date
             )
-            return generate_payslip_pdf(request, payslip)  # Pass the request to the PDF generation function
+            return generate_payslip_pdf(request, payslip)
         except Payslip.DoesNotExist:
-            return Response({"error": f"No payslip found for employee {employee_id} for {month}/{year}"}, 
-                           status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"error": f"No payslip found for employee {employee_id} for {month}/{year}"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
         except ValueError:
             return Response({"error": "Invalid year or month format"}, status=status.HTTP_400_BAD_REQUEST)
     
