@@ -269,11 +269,25 @@ class EmpLangSkillSerializer(serializers.ModelSerializer):
         representation = super().to_representation(instance)
         representation['language_skill'] = instance.language_skill.language if instance.language_skill else None
         return representation
-
+from rest_framework import serializers
+from django.conf import settings
+import os
+import json
+from .models import Report
 class EmployeeReportSerializer(serializers.ModelSerializer):
+    report_data = serializers.SerializerMethodField()
     class Meta:
         model = Report
         fields = '__all__'
+    def get_report_data(self, obj):
+        if obj.report_data:
+            try:
+                file_path = os.path.join(settings.MEDIA_ROOT, obj.report_data.name)
+                with open(file_path, 'r') as f:
+                    return json.load(f)
+            except Exception as e:
+                return {"error": str(e)}
+        return None
 
 class DocumentReportSerializer(serializers.ModelSerializer):
     class Meta:
