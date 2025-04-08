@@ -275,19 +275,19 @@ import os
 import json
 from .models import Report
 class EmployeeReportSerializer(serializers.ModelSerializer):
-    report_data = serializers.SerializerMethodField()
+    # report_data = serializers.SerializerMethodField()
     class Meta:
         model = Report
         fields = '__all__'
-    def get_report_data(self, obj):
-        if obj.report_data:
-            try:
-                file_path = os.path.join(settings.MEDIA_ROOT, obj.report_data.name)
-                with open(file_path, 'r') as f:
-                    return json.load(f)
-            except Exception as e:
-                return {"error": str(e)}
-        return None
+    # def get_report_data(self, obj):
+    #     if obj.report_data:
+    #         try:
+    #             file_path = os.path.join(settings.MEDIA_ROOT, obj.report_data.name)
+    #             with open(file_path, 'r') as f:
+    #                 return json.load(f)
+    #         except Exception as e:
+    #             return {"error": str(e)}
+    #     return None
 
 class DocumentReportSerializer(serializers.ModelSerializer):
     class Meta:
