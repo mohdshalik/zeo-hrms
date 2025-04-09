@@ -453,7 +453,7 @@ class GeneralRequestSerializer(serializers.ModelSerializer):
         return {
             "document_number": obj.document_number,
             "prefix": obj.document_number.split('-')[0] if obj.document_number else None,
-            "year": obj.document_number.split('-')[1] if obj.document_number else None,
+            # "year": obj.document_number.split('-')[1] if obj.document_number else None,
         }
     def to_representation(self, instance):
         rep = super(GeneralRequestSerializer, self).to_representation(instance)
