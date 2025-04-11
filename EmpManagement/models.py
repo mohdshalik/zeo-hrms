@@ -78,16 +78,24 @@ class emp_master(models.Model):
     
 
     def save(self, *args, **kwargs):
-        created = not self.pk  # Check if the instance is being created for the first time
+        created = not self.pk  # Check if the instance is being created
+        authenticated_user = kwargs.pop('authenticated_user', None)  # Get authenticated user from kwargs, if provided
+
+        # Set probation period
         if self.emp_joined_date and self.emp_branch_id:
             self.emp_date_of_confirmation = self.emp_joined_date + timedelta(days=self.emp_branch_id.probation_period_days)
 
+        # Set created_by for new records
+        if created and authenticated_user:
+            self.created_by = authenticated_user
+
         super().save(*args, **kwargs)
 
+        # Create a CustomUser for ESS employees
         if created and self.is_ess:
             user_model = get_user_model()
             username = self.emp_code
-            password = 'admin'
+            password = 'admin'  # Consider using a secure password
             email = self.emp_personal_email
             schema_name = connection.schema_name
 
@@ -100,7 +108,8 @@ class emp_master(models.Model):
 
             try:
                 user = user_model.objects.create_user(username=username, email=email, password=password)
-                self.created_by = user
+                self.users = user  # Assign the new user to the users field
+                super().save(update_fields=['users'])  # Save again to update users field
 
                 if company_instance:
                     user.tenants.set([company_instance])

@@ -85,7 +85,14 @@ class EmpViewSet(viewsets.ModelViewSet):
     serializer_class = EmpSerializer
     permission_classes = [EmployeePermission]
 
-    
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_authenticated:
+            if hasattr(user, 'is_ess') and user.is_ess:  # If user is an ESS, they can only access their own employee information
+                return emp_master.objects.filter(users=user)
+            else:
+                return emp_master.objects.all()  # Other users can access all employee information
+        return emp_master.objects.none()
     @action(detail=True, methods=['POST', 'GET'])
     def emp_family(self, request, pk=None):
         employee = self.get_object()
@@ -265,14 +272,7 @@ class EmpViewSet(viewsets.ModelViewSet):
             "available_leave_types": leave_type_serializer.data,
         }, status=status.HTTP_200_OK)
     
-    def get_queryset(self):
-        user = self.request.user
-        if user.is_authenticated:
-            if hasattr(user, 'is_ess') and user.is_ess:  # If user is an ESS, they can only access their own employee information
-                return emp_master.objects.filter(emp_code=user.username)
-            else:
-                return emp_master.objects.all()  # Other users can access all employee information
-        return emp_master.objects.none() 
+     
 
     @action(detail=False, methods=['get'])
     def filter_empty_user_non_ess(self, request):
