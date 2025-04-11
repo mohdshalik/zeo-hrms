@@ -925,19 +925,19 @@ class LvApprovalViewset(viewsets.ModelViewSet):
     def reject(self, request, pk=None):
         approval = self.get_object()
         note = request.data.get('note')
-        rejection_reason_id = request.data.get('rejection_reason')
-
-        if not rejection_reason_id:
+        rejection_reason = request.data.get('rejection_reason')
+        if not rejection_reason:
             raise ValidationError("Rejection reason is required.")
-
-        try:
-            rejection_reason = LvRejectionReason.objects.get(id=rejection_reason_id)
-        except LvRejectionReason.DoesNotExist:
-            raise ValidationError("Invalid rejection reason.")
-
+        # Just pass the text directly to the model method
         approval.reject(rejection_reason=rejection_reason, note=note)
-        return Response({'status': 'rejected', 'note': note, 'rejection_reason': rejection_reason.reason_text}, status=status.HTTP_200_OK)
-
+        return Response(
+            {
+                'status': 'rejected',
+                'note': note,
+                'rejection_reason': rejection_reason
+            },
+            status=status.HTTP_200_OK
+        )
     # Custom action to get grouped leave approvals
     @action(detail=False, methods=['get'])
     def grouped_approvals(self, request):

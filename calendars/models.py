@@ -607,7 +607,6 @@ class applicablity_critirea(models.Model):
 
 
 class LvEmailTemplate(models.Model):
-    request_type  = models.ForeignKey('leave_type', related_name='email_templates', on_delete=models.CASCADE,null=True)
     template_type = models.CharField(max_length=50, choices=[
         ('request_created', 'Request Created'),
         ('request_approved', 'Request Approved'),
@@ -1229,11 +1228,12 @@ class LeaveApproval(models.Model):
     level                = models.IntegerField(default=1)
     status               = models.CharField(max_length=20, choices=STATUS_CHOICES,default=PENDING)
     note                 = models.TextField(null=True, blank=True)
-    rejection_reason     = models.ForeignKey(LvRejectionReason,null=True, blank=True, on_delete=models.SET_NULL)
+    rejection_reason     = models.TextField(null=True, blank=True)
     created_at           = models.DateField(auto_now_add=True)
     created_by           = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
     updated_at           = models.DateField(auto_now=True)
     employee_id          = models.IntegerField(null=True, blank=True)
+
 
     def approve(self, note=None):
         self.status = self.APPROVED
@@ -1268,8 +1268,12 @@ class LeaveApproval(models.Model):
                 message=f"Your leave request has been rejected."
             )
             notification.send_email_notification('request_rejected', {
-                'request_type': self.leave_request.leave_type,
-                'rejection_reason': self.rejection_reason.reason_text if self.rejection_reason else "No reason provided",
+                'leave_type': self.leave_request.leave_type,
+                'start_date':self.leave_request.start_date,
+                'end_date':self.leave_request.end_date,
+                'status':self.leave_request.status,
+                'document_number':self.leave_request.document_number,
+                'rejection_reason': self.rejection_reason if self.rejection_reason else "No reason provided",
                 'emp_gender': self.leave_request.employee.emp_gender,
                 'emp_date_of_birth': self.leave_request.employee.emp_date_of_birth,
                 'emp_personal_email': self.leave_request.employee.emp_personal_email,
@@ -1285,8 +1289,12 @@ class LeaveApproval(models.Model):
                     message=f"Your leave request has been rejected."
                 )
                 notification.send_email_notification('request_rejected', {
-                    'request_type': self.leave_request.leave_type,
-                    'rejection_reason': self.rejection_reason.reason_text if self.rejection_reason else "No reason provided",
+                    'leave_type': self.leave_request.leave_type,
+                    'status':self.leave_request.status,
+                    'start_date':self.leave_request.start_date,
+                    'end_date':self.leave_request.end_date,
+                    'document_number':self.leave_request.document_number,
+                    'rejection_reason': self.rejection_reason if self.rejection_reason else "No reason provided",
                     'emp_gender': self.leave_request.employee.emp_gender,
                     'emp_date_of_birth': self.leave_request.employee.emp_date_of_birth,
                     'emp_personal_email': self.leave_request.employee.emp_personal_email,
@@ -1324,7 +1332,7 @@ class LeaveApproval(models.Model):
                 )
                 notification.send_email_notification('request_rejected', {
                     'request_type': 'Compensatory Leave',
-                    'rejection_reason': self.rejection_reason.reason_text if self.rejection_reason else "No reason provided",
+                    'rejection_reason': self.rejection_reason if self.rejection_reason else "No reason provided",
                     'emp_gender': self.compensatory_request.employee.emp_gender,
                     'emp_date_of_birth': self.compensatory_request.employee.emp_date_of_birth,
                     'emp_personal_email': self.compensatory_request.employee.emp_personal_email,
@@ -1360,7 +1368,11 @@ def create_initial_approval(sender, instance, created, **kwargs):
                 message=f"New request for approval: {instance.leave_type}, employee: {instance.employee}"
             )
             notification.send_email_notification('request_created', {
-                'request_type': instance.leave_type,
+                'leave_type': instance.leave_type,
+                'start_date':instance.start_date,
+                'end_date':instance.end_date,
+                'status':instance.status,
+                'document_number':instance.document_number,
                 'employee_name': instance.employee.emp_first_name,
                 'reason': instance.reason,
                 'emp_gender':instance.employee.emp_gender,

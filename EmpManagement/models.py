@@ -999,7 +999,6 @@ def update_value_field(sender, instance, **kwargs):
 
 ### EmailTemplate Model ###
 class EmailTemplate(models.Model):
-    request_type  = models.ForeignKey('RequestType', related_name='email_templates', on_delete=models.CASCADE,null=True)
     template_type = models.CharField(max_length=50, choices=[
         ('request_created', 'Request Created'),
         ('request_approved', 'Request Approved'),
@@ -1007,14 +1006,11 @@ class EmailTemplate(models.Model):
     ])
     subject             = models.CharField(max_length=255)
     body                = models.TextField()
-    use_common_template = models.BooleanField(default=False)
     created_at          = models.DateTimeField(auto_now_add=True)
     created_by          = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
 
     def __str__(self):
-        if self.use_common_template:
-            return f"Common {self.template_type} template"
-        return f"{self.template_type} for {self.request_type.name if self.request_type else 'None'}"
+        return f"{self.template_type} - {self.subject}"
 
 
 class EmailConfiguration(models.Model):
@@ -1050,44 +1046,20 @@ class RequestNotification(models.Model):
             return f"Notification for employee: {self.message}"    
     
     def send_email_notification(self, template_type, context):
-        # # Generate unique approval and rejection URLs
-        # approval_url_approve = f"{settings.SITE_URL}/approve/{self.id}/"
-        # approval_url_reject = f"{settings.SITE_URL}/reject/{self.id}/"
-        
-        # # Update the context with these URLs
-        # context.update({
-        #     'approval_url_approve': approval_url_approve,
-        #     'approval_url_reject': approval_url_reject,
-        # })
-        # Ensure that request_type in the context is an instance of RequestType
-        request_type = context.get('request_type')
-        
-        if isinstance(request_type, str):
-            # If request_type is passed as a string, retrieve the actual RequestType object
-            request_type = RequestType.objects.get(name=request_type)
+        try:
+            email_template = EmailTemplate.objects.get(template_type=template_type)
+        except EmailTemplate.DoesNotExist:
+            return {"status": "warning", "message": f"No email template found for '{template_type}'."}
+        except EmailTemplate.MultipleObjectsReturned:
+            return {"status": "error", "message": f"Multiple templates found for '{template_type}'. Please ensure only one exists."}
 
-        # Try to fetch the specific email template for the request type and template type
-        email_templates = request_type.email_templates.filter(template_type=template_type)
-
-        if email_templates.exists():
-            # Use the specific email template for this request type
-            email_template = email_templates.first()
-        else:
-            # No specific template, fall back to the common email template if it exists
-            common_templates = EmailTemplate.objects.filter(template_type=template_type, use_common_template=True)
-            if common_templates.exists():
-                email_template = common_templates.first()  # Use the common template
-            else:
-                # Handle the case where no template is found
-                # raise ValueError(f"No email template found for template type '{template_type}' and request type '{request_type.name}', and no common template found.")
-                return {"status": "warning", "message": f"No email template found for '{template_type}'."}
-        # Proceed with sending the email using the selected template
+        # Render subject and body using the context
         subject = email_template.subject
         template = Template(email_template.body)
         html_message = template.render(Context(context))
         plain_message = strip_tags(html_message)
 
-        # Try to retrieve the active email configuration
+        # Get email configuration
         try:
             email_config = EmailConfiguration.objects.get(is_active=True)
             use_custom_config = True
@@ -1095,7 +1067,6 @@ class RequestNotification(models.Model):
             use_custom_config = False
             default_email = settings.EMAIL_HOST_USER
 
-        # Use custom or default email configuration
         if use_custom_config:
             default_email = email_config.email_host_user
             connection = get_connection(
@@ -1114,7 +1085,7 @@ class RequestNotification(models.Model):
                 use_tls=settings.EMAIL_USE_TLS,
             )
 
-        # Determine recipient email and name
+        # Determine recipient email
         to_email = None
         recipient_name = None
         if self.recipient_user and self.recipient_user.email:
@@ -1126,20 +1097,22 @@ class RequestNotification(models.Model):
 
         if to_email:
             context.update({'recipient_name': recipient_name})
-
             plain_message = strip_tags(html_message)
 
-            # Send the email
             email = EmailMultiAlternatives(
                 subject=subject,
                 body=plain_message,
-                from_email=default_email,  # From email
-                to=[to_email],  # Recipient list
+                from_email=default_email,
+                to=[to_email],
                 connection=connection,
-                headers={'From': 'zeosoftware@abc.com'}  # Custom header
+                headers={'From': 'zeosoftware@abc.com'}
             )
             email.attach_alternative(html_message, "text/html")
             email.send(fail_silently=False)
+
+            return {"status": "success", "message": f"Email sent to {to_email}"}
+
+        return {"status": "error", "message": "No recipient email found."}
 
 class RequestType(models.Model):
     name                =  models.CharField(max_length=50,unique=True)
@@ -1152,30 +1125,7 @@ class RequestType(models.Model):
     def __str__(self):
         return self.name
 
-    # # Fetch email template for this request type based on template type
-    # def get_email_template(self, template_type):
-    #     return self.email_templates.filter(template_type=template_type).first()
     
-    def get_email_template(self, template_type):
-        # Try fetching a specific template for the request type
-        email_templates = self.email_templates.filter(template_type=template_type)
-
-        # Check if there are multiple templates and handle appropriately
-        if email_templates.count() > 1:
-            raise ValueError(f"Multiple email templates found for template type '{template_type}' and request type '{self.name}'")
-        elif email_templates.exists():
-            return email_templates.first()
-
-        # If no specific template, try fetching a common template
-        common_templates = EmailTemplate.objects.filter(template_type=template_type, use_common_template=True)
-        
-        if common_templates.count() > 1:
-            raise ValueError(f"Multiple common email templates found for template type '{template_type}'")
-        elif common_templates.exists():
-            return common_templates.first()
-
-        # If no templates found
-        return None
 class CommonWorkflow(models.Model):
     level = models.IntegerField()
     role = models.CharField(max_length=50, null=True, blank=True)
@@ -1367,7 +1317,6 @@ class Approval(models.Model):
         self.general_request.status = 'Rejected'
         self.general_request.save()
 
-        branch_email = self.general_request.branch.branch_name
 
         notification = RequestNotification.objects.create(
             recipient_user=self.general_request.created_by,
