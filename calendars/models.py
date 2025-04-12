@@ -472,10 +472,10 @@ class LeaveResetPolicy(models.Model):
     cf_unit_or_percentage          = models.CharField(max_length=50,choices=UNIT_CHOICES)
     cf_max_limit                   = models.PositiveIntegerField(null=True,blank=True)
     cf_expires_in_value            = models.PositiveIntegerField(null=True,blank=True)
-    cf_time_choice                 = models.CharField(max_length=20,choices=TIME_UNIT_CHOICES)
+    cf_time_choice                 = models.CharField(max_length=20,choices=TIME_UNIT_CHOICES,null=True,blank=True)
     allow_encashment               = models.BooleanField(default=False)
     encashment_value               = models.PositiveIntegerField(default=50)
-    encashment_unit_or_percentage  = models.CharField(max_length=50,choices=UNIT_CHOICES)
+    encashment_unit_or_percentage  = models.CharField(max_length=50,choices=UNIT_CHOICES,null=True,blank=True)
     encashment_max_limit           = models.PositiveIntegerField(null=True,blank=True)
     
 # from django.db.models import Q
