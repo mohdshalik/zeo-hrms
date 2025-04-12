@@ -1724,6 +1724,10 @@ class EmailTemplateViewset(viewsets.ModelViewSet):
                 # Add other request-related placeholders here
             ],
             'employee': [
+                '{{ doc_number }}',
+                '{{ request_type }}',
+                '{{ reason }}',
+                '{{ recipient_name }}',
                 '{{ emp_first_name }}',
                 '{{ emp_last_name }}',
                 '{{ emp_gender }}',

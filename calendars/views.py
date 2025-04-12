@@ -144,6 +144,10 @@ class LvEmailTemplateviewset(viewsets.ModelViewSet):
                 # Add other request-related placeholders here
             ],
             'employee': [
+                '{{ document_number }}',
+                '{{ leave_type }}',
+                '{{ reason }}',
+                '{{ recipient_name }}',
                 '{{ emp_first_name }}',
                 '{{ emp_last_name }}',
                 '{{ emp_gender }}',
