@@ -6,4 +6,4 @@ class PayrollmanagementConfig(AppConfig):
     name = 'PayrollManagement'
     
     def ready(self):
-        import calendars.signals
+        import PayrollManagement.signals
