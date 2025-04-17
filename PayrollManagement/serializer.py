@@ -11,9 +11,29 @@ class SalaryComponentSerializer(serializers.ModelSerializer):
 
 
 class EmployeeSalaryStructureSerializer(serializers.ModelSerializer):
+    emp_code = serializers.SerializerMethodField()  # Field for emp_code from emp_master
+    component_name = serializers.SerializerMethodField()  # Field for name from SalaryComponent
+
     class Meta:
         model = EmployeeSalaryStructure
-        fields = '__all__'
+        fields = '__all__'  # Include all fields from the model
+        # Optionally, explicitly list fields to include emp_code and component_name
+        # fields = ['id', 'employee', 'component', 'amount', 'is_active', 'date_created', 'date_updated', 'emp_code', 'component_name']
+
+    def get_emp_code(self, obj):
+        return obj.employee.emp_code  # Fetch emp_code from the related emp_master
+
+    def get_component_name(self, obj):
+        return obj.component.name  # Fetch name from the related SalaryComponent
+
+    def to_representation(self, instance):
+        """
+        Customize the output to replace employee and component IDs with emp_code and component_name.
+        """
+        rep = super().to_representation(instance)
+        rep['employee'] = self.get_emp_code(instance)  # Replace employee ID with emp_code
+        rep['component'] = self.get_component_name(instance)  # Replace component ID with name
+        return rep
 class EmpBulkuploadSalaryStructureSerializer(serializers.ModelSerializer):
     file = serializers.FileField(write_only=True)
     class Meta:

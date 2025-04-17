@@ -2,7 +2,7 @@ import re
 from decimal import Decimal
 from django.db import transaction
 from .models import PayrollRun, Payslip, PayslipComponent, EmployeeSalaryStructure, SalaryComponent
-
+import calendar
 import logging
 
 # Set up logging
@@ -55,18 +55,7 @@ def process_payroll(payroll_run_id):
             
             # Calculate gross and net salary
             gross_salary = total_additions
-            net_salary = total_additions - total_deductions
-            
-            # Apply formula with validation
-            formula = payroll_run.pay_formula.formula_text
-            components_dict = {s.component.name: s.amount or Decimal('0.00') for s in salary_structures}
-            try:
-                net_salary = eval_formula(formula, components_dict)
-            except ValueError as e:
-                logger.error(f"Formula error for {employee}: {e}")
-                payslip.status = 'pending'  # Keep as pending for manual review
-                payslip.save()
-                continue  # Skip to next employee
+            net_salary = gross_salary - total_deductions
             
             # Update payslip
             payslip.basic_salary = basic_salary
@@ -74,6 +63,7 @@ def process_payroll(payroll_run_id):
             payslip.net_salary = net_salary
             payslip.total_additions = total_additions
             payslip.total_deductions = total_deductions
+            payslip.status = 'processed'  # Mark as processed since no formula errors
             payslip.save()
         
         # Mark payroll as processed
@@ -131,10 +121,16 @@ def generate_payslip_pdf(request, payslip):
     # Add company header
     elements.append(Paragraph(f"Company Name: {company_name}", title_style))
     elements.append(Paragraph(f"Payslip for {payslip.employee.emp_first_name} {payslip.employee.emp_last_name or ''}", normal_style))
-    elements.append(Paragraph(f"Payroll Period: {payslip.payroll_run.get_month_display()} {payslip.payroll_run.year}", normal_style))
+    
+    # Updated payroll period display to use start_date and end_date
+    payroll_period = f"{payslip.payroll_run.start_date.strftime('%d %b %Y')} to {payslip.payroll_run.end_date.strftime('%d %b %Y')}"
+    elements.append(Paragraph(f"Payroll Period: {payroll_period}", normal_style))
+    
+    # Add working days information
+    elements.append(Paragraph(f"Working Days: {payslip.days_worked}/{payslip.total_working_days}", normal_style))
     elements.append(Spacer(1, 12))
 
-    # Employee details
+    # Employee details (unchanged)
     employee_details = [
         ["Employee Code", payslip.employee.emp_code],
         ["First Name", payslip.employee.emp_first_name],
@@ -158,16 +154,19 @@ def generate_payslip_pdf(request, payslip):
     elements.append(employee_table)
     elements.append(Spacer(1, 12))
 
-    # Salary components table
+    # Salary components table with new fields
     components = PayslipComponent.objects.filter(payslip=payslip)
     data = [["Component", "Type", "Amount"]]
     for component in components:
         data.append([component.component.name, component.component.get_component_type_display(), f"{component.amount:.2f}"])
 
-    # Add totals
+    # Add totals including new fields
     data.append(["", "", ""])
     data.append(["Gross Salary", "", f"{payslip.gross_salary:.2f}"])
+    data.append(["Total Additions", "", f"{payslip.total_additions:.2f}"])
     data.append(["Total Deductions", "", f"{payslip.total_deductions:.2f}"])
+    # data.append(["Pro-rata Adjustment", "", f"{payslip.pro_rata_adjustment:.2f}"])
+    # data.append(["Arrears", "", f"{payslip.arrears:.2f}"])
     data.append(["Net Salary", "", f"{payslip.net_salary:.2f}"])
 
     salary_table = Table(data, colWidths=[200, 100, 200])
@@ -197,6 +196,7 @@ def generate_payslip_pdf(request, payslip):
     buffer.close()
 
     # Return the PDF as an HTTP response
+    filename = f"payslip_{payslip.employee.emp_code}_{payslip.payroll_run.start_date.strftime('%Y%m')}.pdf"
     response = HttpResponse(pdf_data, content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="payslip_{payslip.employee.emp_code}_{payslip.payroll_run.month}_{payslip.payroll_run.year}.pdf"'
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
