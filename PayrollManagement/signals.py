@@ -1,16 +1,6 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from . models import PayrollRun,EmployeeSalaryStructure,Payslip,PayslipComponent
-from calendars.models import Attendance
-from django.db.models import Q
-
-import logging
-
-logger = logging.getLogger(__name__)
-
-from django.db.models.signals import post_save
-from django.dispatch import receiver
-from .models import PayrollRun, Payslip, PayslipComponent, EmployeeSalaryStructure
+from .models import Payslip, PayslipComponent, EmployeeSalaryStructure
 from calendars.models import Attendance
 from django.db.models import Q
 import logging
@@ -50,7 +40,7 @@ def update_employee_salary_structure(sender, instance, created, **kwargs):
     if not instance.is_fixed and instance.formula:  # Only for variable components with a formula
         # Get the EmpMaster model dynamically
         EmpMaster = apps.get_model('EmpManagement', 'emp_master')
-        employees = EmpMaster.objects.all()
+        employees = EmpMaster.objects.filter(is_active=True)  # Only active employees
 
         for employee in employees:
             # Fetch all existing salary components for this employee to use in formula
@@ -82,9 +72,12 @@ def update_employee_salary_structure(sender, instance, created, **kwargs):
 def run_payroll_on_save(sender, instance, created, **kwargs):
     """
     Simplified payslip creation using pre-calculated amounts from EmployeeSalaryStructure.
+    Only processes employees with is_active=True.
     """
     if created and instance.status == 'pending':
-        employees = instance.get_employees()
+        # Get the EmpMaster model dynamically
+        EmpMaster = apps.get_model('EmpManagement', 'emp_master')
+        employees = EmpMaster.objects.filter(is_active=True)  # Only active employees
         total_working_days = (instance.end_date - instance.start_date).days + 1
 
         for employee in employees:
@@ -126,10 +119,9 @@ def run_payroll_on_save(sender, instance, created, **kwargs):
             
                 # Update totals
                 if component.component_type == 'addition':
-                    total_additions += calculated_amount  # Use calculated_amount here
+                    total_additions += calculated_amount
                 elif component.component_type == 'deduction':
-                    total_deductions += calculated_amount  # Deductions are not pro-rated here unless needed
-
+                    total_deductions += calculated_amount
 
             # Calculate and save payslip totals
             gross_salary = total_additions
