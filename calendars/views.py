@@ -127,7 +127,7 @@ class HolidayAssignViewset(viewsets.ModelViewSet):
 class LeaveTypeviewset(viewsets.ModelViewSet):
     queryset = leave_type.objects.all()
     serializer_class = LeaveTypeSerializer
-    permission_classes = [LeaveTypePermission] 
+    # permission_classes = [LeaveTypePermission] 
     
 class LvEmailTemplateviewset(viewsets.ModelViewSet):
     queryset = LvEmailTemplate.objects.all()
