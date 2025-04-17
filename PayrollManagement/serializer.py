@@ -1,8 +1,7 @@
 from rest_framework import serializers
 from .models import (SalaryComponent,EmployeeSalaryStructure,PayrollRun,Payslip,PayslipComponent,LoanType,LoanApplication,
                     LoanRepayment,LoanApprovalLevels,LoanApproval)
-
-
+from EmpManagement .serializer import EmpSerializer
 
 class SalaryComponentSerializer(serializers.ModelSerializer):
     class Meta:
@@ -57,8 +56,9 @@ class PaySlipComponentSerializer(serializers.ModelSerializer):
 
 class PayslipSerializer(serializers.ModelSerializer):
     payroll_run = PayrollRunSerializer(read_only=True)
-    employee = serializers.StringRelatedField()  # Displays employee's string representation
-    components = PaySlipComponentSerializer(many=True, read_only=True)
+    employee = EmpSerializer()  # Use the nested serializer for employee
+    components = PaySlipComponentSerializer(many=True, read_only=True)  # Include related components
+
     class Meta:
         model = Payslip
         fields = '__all__'
