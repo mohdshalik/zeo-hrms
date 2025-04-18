@@ -1411,6 +1411,7 @@ class SelectedEmpNotify(models.Model):
 
 class NotificationSettings(models.Model):
     branch              = models.ForeignKey("OrganisationManager.brnch_mstr", on_delete=models.CASCADE)
+    selected_employees  = models.ManyToManyField(emp_master, blank=True)  # Allows multiple employee selections
     days_before_expiry  = models.IntegerField(default=7)  # Default reminder 7 days before expiry
     days_after_expiry   = models.IntegerField(default=0)  # Default reminder 0 days after expiry (on expiry day)
     created_at          = models.DateTimeField(auto_now_add=True)
@@ -1430,9 +1431,9 @@ class DocExpEmailTemplate(models.Model):
     created_at      = models.DateTimeField(auto_now_add=True)
     created_by      = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
 
-        
     def __str__(self):
         return self.template_name
+
 class EmployeeBankDetail(models.Model):
     employee = models.OneToOneField(emp_master, on_delete=models.CASCADE, related_name="bank_details")
     bank_name = models.CharField(max_length=255,blank=True, null=True)

@@ -2206,6 +2206,21 @@ class NotificationSettingsViewSet(viewsets.ModelViewSet):
 class DocExpEmailTemplateViewset(viewsets.ModelViewSet):
     queryset = DocExpEmailTemplate.objects.all()
     serializer_class = DocExpEmailTemplateSerializer
+    
+    @action(detail=False, methods=['get'], url_path='placeholders')
+    def placeholder_list(self, request):
+        placeholders = {
+            'employee': [
+                '{{ emp_first_name }}',
+                '{{ branch }}',
+                '{{ reason }}',
+                '{{ department }}',
+                '{{ designation }}',
+                '{{ document_type }}',
+                '{{ expiry_date }}',
+            ]
+        }
+        return Response(placeholders)
 
 class EmployeeBankDetailViewset(viewsets.ModelViewSet):
     queryset = EmployeeBankDetail.objects.all()
