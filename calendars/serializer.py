@@ -372,7 +372,7 @@ class LvApprovalSerializer(serializers.ModelSerializer):
         if instance.approver:
             rep['approver'] = instance.approver.username   
         if instance.leave_request:
-            rep['leave_request'] = instance.leave_request.leave_type.name  
+            rep['leave_request'] = instance.leave_request.document_number  
         return rep
    
 
