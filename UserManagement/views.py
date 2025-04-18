@@ -135,3 +135,23 @@ class NoEssUerListView(generics.ListAPIView):
                 tenants__schema_name=schema_name,
                 is_active=True,is_ess=False  # Filter for users that are active
             )
+
+class GroupPermTenantUserListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserListSerializer
+
+    def get_queryset(self):
+        # Get the schema name from the request parameters
+        schema_name = self.request.GET.get('schema')
+
+        # Ensure the schema name is provided
+        if not schema_name:
+            raise ValidationError({"error": "Schema name is required"})
+
+        # Use schema_context to access the correct tenant's users
+        with schema_context(schema_name):
+            # Filter users based on schema_name and only show active users
+            return CustomUser.objects.filter(
+                tenants__schema_name=schema_name,
+                is_active=True  # Filter for users that are active
+            )
