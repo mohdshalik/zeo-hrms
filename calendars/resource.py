@@ -1,7 +1,7 @@
 # resources.py
 from import_export import resources, fields
 from import_export.widgets import ForeignKeyWidget, DateWidget, TimeWidget
-from .models import Attendance, Shift, EmployeeMachineMapping,EmployeeShiftSchedule
+from .models import Attendance, Shift, EmployeeMachineMapping,EmployeeShiftSchedule,leave_type,emp_leave_balance
 from EmpManagement.models import emp_master
 from django.core.exceptions import ValidationError
 from datetime import datetime,time 
@@ -98,4 +98,32 @@ class AttendanceResource(resources.ModelResource):
                 attendance.save()
             except Attendance.DoesNotExist:
                 print(f"Attendance record not found for {employee} on {date}")
-    
+
+class EmployeeOpenBalanceResource(resources.ModelResource):
+    employee            = fields.Field(attribute='employee',column_name='Employee Code',widget=ForeignKeyWidget(emp_master, 'emp_code'))
+    leave_type          = fields.Field(attribute='leave_type', column_name='Leave Type',widget=ForeignKeyWidget(leave_type, 'name'))
+    openings            = fields.Field(attribute='openings', column_name='Openings')
+    is_active           = fields.Field(attribute='is_active', column_name='Active')
+    class Meta:
+        model = emp_leave_balance
+        fields = ('employee', 'leave_type', 'openings','is_active')
+        import_id_fields = ('employee', 'leave_type')
+    def get_instance(self, instance_loader, row):
+        employee_code = row.get('Employee Code')
+        leave_type_name = row.get('Leave Type')
+        try:
+            employee = emp_master.objects.get(emp_code=employee_code)
+            leave = leave_type.objects.get(name=leave_type_name)
+            return emp_leave_balance.objects.filter(employee=employee, leave_type=leave).first()
+        except (emp_master.DoesNotExist, leave_type.DoesNotExist):
+            return None
+    def before_import_row(self, row, **kwargs):
+        errors = []  
+        emp_code = row.get('Employee Code')
+        leavetype = row.get('Leave Type')
+        if not emp_master.objects.filter(emp_code=emp_code).exists():
+            errors.append(f"emp_master matching query does not exist for ID: {emp_code}")
+        if not leave_type.objects.filter(name=leavetype).exists():
+            errors.append(f"Leave Type matching query does not exist for ID: {emp_code}")
+        if errors:
+            raise ValidationError(errors)

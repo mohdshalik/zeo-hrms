@@ -532,7 +532,17 @@ class emp_leave_balance(models.Model):
 
         self.balance -= leave_days
         self.save()
-
+    
+    def save(self, *args, **kwargs):
+        if self.pk is None:
+            self.balance = (self.balance or 0) + (self.openings or 0)
+            self.openings = 0  # Reset after adding
+        else:
+            old_instance = emp_leave_balance.objects.filter(pk=self.pk).first()
+            if old_instance:
+                self.balance = (old_instance.balance or 0) + (self.openings or 0)
+                self.openings = 0  # Reset after adding
+        super(emp_leave_balance, self).save(*args, **kwargs)
 
 from django.db import models
 from django.core.validators import MinValueValidator

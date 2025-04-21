@@ -427,3 +427,17 @@ class EmployeeYearlyCalendarSerializer(serializers.ModelSerializer):
     class Meta:
         model = EmployeeYearlyCalendar
         fields = '__all__'
+
+class EmpOpeningsBlkupldSerializer(serializers.ModelSerializer):
+    file = serializers.FileField(write_only=True)
+    class Meta:
+        model = emp_leave_balance
+        fields = '__all__'
+    def to_representation(self, instance):
+        rep = super(EmpOpeningsBlkupldSerializer, self).to_representation(instance)
+        if instance.leave_type:  
+            rep['leave_type'] = instance.leave_type.name
+        if instance.employee:  
+            rep['employee'] = instance.employee.emp_code
+           
+        return rep

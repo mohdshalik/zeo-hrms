@@ -8,7 +8,7 @@ from . serializer import (WeekendCalendarSerailizer,WeekendAssignSerializer,Holi
                          AttendanceSerializer,ShiftSerializer,ImportAttendanceSerializer,EmployeeMappingSerializer,LeaveReportSerializer,LvApprovalLevelSerializer,EmployeeYearlyCalendarSerializer,
                          LvApprovalSerializer,LvEmailTemplateSerializer,LvApprovalNotifySerializer,LvCommonWorkflowSerializer,LvRejectionReasonSerializer,LvApprovalReportSerializer,AttendanceReportSerializer,lvBalanceReportSerializer,
                          CompensatoryLeaveRequestSerializer,CompensatoryLeaveTransactionSerializer,CompensatoryLeaveBalanceSerializer,ShiftOverrideSerializer,ShiftPatternSerializer,EmployeeShiftScheduleSerializer,WeekPatternAssignmentSerializer,LeaveResetPolicySerializer,LeaveCarryForwardTransactionSerializer,
-                         LeaveEncashmentTransactionSerializer
+                         LeaveEncashmentTransactionSerializer,EmpOpeningsBlkupldSerializer
                          )
 from rest_framework import viewsets,filters,status
 from rest_framework.response import Response
@@ -21,7 +21,7 @@ from .permissions import( WeekendCalendarPermission, WeekendDetailPermission, As
                         )
 from rest_framework.parsers import MultiPartParser, FormParser
 from EmpManagement.models import emp_master
-from .resource import AttendanceResource
+from .resource import AttendanceResource,EmployeeOpenBalanceResource
 from django.http import HttpResponse,JsonResponse
 from tablib import Dataset
 from django.core.exceptions import ValidationError
@@ -1819,3 +1819,44 @@ class EmployeeYearlyCalendarViewset(viewsets.ModelViewSet):
     queryset = EmployeeYearlyCalendar.objects.all()
     serializer_class = EmployeeYearlyCalendarSerializer
     permission_classes = [EmployeeYearlyCalendarPermission]
+
+class EmpOpeningsBlkupldViewSet(viewsets.ModelViewSet):
+    queryset = emp_leave_balance.objects.all()
+    serializer_class = EmpOpeningsBlkupldSerializer
+    
+    @action(detail=False, methods=['post'], parser_classes=[MultiPartParser, FormParser])
+    def bulk_upload(self, request):
+        if request.method == 'POST' and request.FILES.get('file'):
+            excel_file = request.FILES['file']
+            if excel_file.name.endswith('.xlsx'):
+                try:
+                    dataset = Dataset()
+                    dataset.load(excel_file.read(), format='xlsx')
+                    resource = EmployeeOpenBalanceResource()
+                    all_errors = []
+                    valid_rows = []
+                    with transaction.atomic():
+                        for row_idx, row in enumerate(dataset.dict, start=2):
+                            row_errors = []
+                            try:
+                                resource.before_import_row(row, row_idx=row_idx)
+                            except ValidationError as e:
+                                row_errors.extend([f"Row {row_idx}: {error}" for error in e.messages])
+                            if row_errors:
+                                all_errors.extend(row_errors)
+                            else:
+                                valid_rows.append(row)
+
+                    if all_errors:
+                        return Response({"errors": all_errors}, status=400)
+
+                    with transaction.atomic():
+                        result = resource.import_data(dataset, dry_run=False, raise_errors=True)
+
+                    return Response({"message": f"{result.total_rows} records created successfully"})
+                except Exception as e:
+                    return Response({"error": str(e)}, status=400)
+            else:
+                return Response({"error": "Invalid file format. Only Excel files (.xlsx) are supported."}, status=400)
+        else:
+            return Response({"error": "Please provide an Excel file."}, status=400)

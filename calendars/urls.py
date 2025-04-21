@@ -3,7 +3,7 @@ from .  views import (WeekendViewset,AssignWeekendViewset,HolidayViewset,Holiday
                     AttendanceViewSet,ShiftViewSet,ImportAttendanceViewSet,EmployeeMachineMappingViewset,Leave_ReportViewset,LvApprovalLevelViewset,
                     LvApprovalViewset,LvEmailTemplateviewset,LvApprovalNotifyviewset,LvCommonWorkflowViewset,LvRejectionViewset,Lv_Approval_ReportViewset,
                     AttendanceReportViewset,LvBalanceReportViewset,EmployeeYearlyCalendarViewset,ShiftPatternViewSet,EmployeeShiftScheduleViewSet,WeekPatternAssignmentVSet,
-                    ShiftOverrideViewSet,LeaveResetPolicyviewset,LeaveCarryForwardTransactionviewset,LeaveEncashmentTransactionviewset
+                    ShiftOverrideViewSet,LeaveResetPolicyviewset,LeaveCarryForwardTransactionviewset,LeaveEncashmentTransactionviewset,EmpOpeningsBlkupldViewSet
                     )
 
 from rest_framework.routers import DefaultRouter
@@ -49,6 +49,7 @@ router.register(r'Lv_Approval_Report', Lv_Approval_ReportViewset, basename='Lv_A
 router.register(r'AttendanceReport', AttendanceReportViewset, basename='AttendanceReport')
 router.register(r'lvBalanceReport', LvBalanceReportViewset, basename='lvBalanceReport')
 router.register(r'EmployeeYearlyCalendarViewset',EmployeeYearlyCalendarViewset , basename='EmployeeYearlyCalendarViewset')
+router.register(r'Emp-bulkupld-openings',EmpOpeningsBlkupldViewSet , basename='Emp-bulkupld-openings')
 
 
 urlpatterns = [
