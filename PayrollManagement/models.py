@@ -46,45 +46,54 @@ class EmployeeSalaryStructure(models.Model):
     def __str__(self):
         return f"{self.employee} - {self.component.name} ({self.amount})"
 
-
-
+import logging
+# Initialize logger
+logger = logging.getLogger('PayrollManagement')
 
 class PayrollRun(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('processed', 'Processed'),
         ('approved', 'Approved'),
-        ('paid', 'Paid'),  # Added status
+        ('paid', 'Paid'),
     ]
 
-    name = models.CharField(max_length=100, blank=True, help_text="Optional payroll run name")  # New field
+    name = models.CharField(max_length=100, blank=True, help_text="Optional payroll run name")
     start_date = models.DateField(help_text="Start date of payroll period")
     end_date = models.DateField(help_text="End date of payroll period")
-    payment_date = models.DateField(null=True, blank=True, help_text="When employees will be paid")  # New field
-
+    payment_date = models.DateField(null=True, blank=True, help_text="When employees will be paid")
     branch = models.ForeignKey('OrganisationManager.brnch_mstr', on_delete=models.SET_NULL, null=True, blank=True)
     department = models.ForeignKey('OrganisationManager.dept_master', on_delete=models.SET_NULL, null=True, blank=True)
     category = models.ForeignKey('OrganisationManager.ctgry_master', on_delete=models.SET_NULL, null=True, blank=True)
-    
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    def get_employees(self):
-        from EmpManagement.models import emp_master
-        employees = emp_master.objects.all()
-        if self.branch:
-            employees = employees.filter(emp_branch_id=self.branch)
-        if self.department:
-            employees = employees.filter(emp_dept_id=self.department)
-        if self.category:
-            employees = employees.filter(emp_ctgry_id=self.category)
-        return employees
 
+    def get_employees(self):
+        logger.info(f"Fetching employees for PayrollRun {self.id}")
+        from EmpManagement.models import emp_master
+        try:
+            employees = emp_master.objects.all()
+            logger.debug(f"Initial employee count: {employees.count()}")
+            
+            if self.branch:
+                employees = employees.filter(emp_branch_id=self.branch)
+                logger.debug(f"Filtered by branch {self.branch}: {employees.count()} employees")
+            if self.department:
+                employees = employees.filter(emp_dept_id=self.department)
+                logger.debug(f"Filtered by department {self.department}: {employees.count()} employees")
+            if self.category:
+                employees = employees.filter(emp_ctgry_id=self.category)
+                logger.debug(f"Filtered by category {self.category}: {employees.count()} employees")
+                
+            logger.info(f"Final employee count for PayrollRun {self.id}: {employees.count()}")
+            return employees
+        except Exception as e:
+            logger.error(f"Error fetching employees for PayrollRun {self.id}: {e}")
+            return emp_master.objects.none()
 
     def __str__(self):
         return f"Payroll - {self.get_month_display()} {self.year} ({self.status})"
-
 
 class Payslip(models.Model):
     payroll_run = models.ForeignKey(PayrollRun, on_delete=models.CASCADE, related_name='payslips')
