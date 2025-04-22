@@ -2,3 +2,5 @@
 */migrations/*.py
 !*/migrations/__init__.py
 media/
+*.pyc
+__pycache__/
