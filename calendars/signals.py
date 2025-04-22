@@ -59,7 +59,7 @@ def update_emp_leave_balance_on_employee_create(sender, instance, created, **kwa
 
         # Get all applicable applicability criteria based on the new employee's attributes
         applicable_criteria = applicablity_critirea.objects.filter(
-            models.Q(gender=instance.emp_gender) | models.Q(gender=None),
+            models.Q(gender=instance.emp_gender) | models.Q(gender="B") | models.Q(gender=None),  # Include "Both" or None
             models.Q(branch=instance.emp_branch_id) | models.Q(branch=None),
             models.Q(department=instance.emp_dept_id) | models.Q(department=None),
             models.Q(designation=instance.emp_desgntn_id) | models.Q(designation=None),
@@ -77,7 +77,6 @@ def update_emp_leave_balance_on_employee_create(sender, instance, created, **kwa
             logger.info(f"Checked leave balance for employee {instance.emp_code} based on criteria: {criteria}")
 
         logger.info(f"Leave balance update completed for employee {instance.emp_code}")
-
 
 @receiver(post_save, sender=Attendance)
 def update_employee_yearly_calendar(sender, instance, **kwargs):

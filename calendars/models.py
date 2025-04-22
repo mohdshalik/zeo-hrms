@@ -603,7 +603,7 @@ class applicablity_critirea(models.Model):
     GENDER_CHOICES = [
         ("M", "Male"),
         ("F", "Female"),
-        ("O", "Other"),
+        ("B", "Both"),
     ]
     
     leave_type   = models.ForeignKey(leave_type,on_delete=models.CASCADE)
