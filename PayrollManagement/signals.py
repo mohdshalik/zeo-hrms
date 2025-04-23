@@ -38,8 +38,9 @@ def run_payroll_on_save(sender, instance, created, **kwargs):
     Simplified payslip creation using pre-calculated amounts from EmployeeSalaryStructure.
     Only processes employees with is_active=True.
     """
-    logger.info(f"Signal triggered for PayrollRun: {instance.id}, Created: {created}, Status: {instance.status}")
-    
+    logger.info(f"Signal received for PayrollRun {instance.id}")
+    logger.info(f"Created: {created}, Status: {instance.status}")
+    logger.info(f"Sender: {sender}")
     if created and instance.status == 'pending':
         logger.debug(f"Starting payroll processing for {instance.id}")
         # Get the EmpMaster model dynamically
