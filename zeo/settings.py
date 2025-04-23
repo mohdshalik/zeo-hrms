@@ -197,7 +197,7 @@ DATABASES = {
     'default': {
         'ENGINE': 'django_tenants.postgresql_backend',
         'NAME': 'zeo', 
-        'USER': 'postgres', 
+        'USER': 'zeo_user', 
         'PASSWORD': '1234',
         'HOST': '127.0.0.1', 
         'PORT': '5432',
