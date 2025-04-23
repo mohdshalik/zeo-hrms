@@ -103,7 +103,19 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media/')
 #     },
 # }
 # CORS_ORIGIN_ALLOW_ALL = True
-
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+}
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:4200",  # Angular app running locally
     "http://80.65.208.178:4200",  # Example for your frontend URL
