@@ -1212,8 +1212,11 @@ class GeneralRequest(models.Model):
         if self.request_type.use_common_workflow:
             next_level = CommonWorkflow.objects.filter(level=current_approved_levels + 1).first()
         else:
-            next_level = ApprovalLevel.objects.filter(request_type=self.request_type, level=current_approved_levels + 1).first()
-
+            next_level = ApprovalLevel.objects.filter(
+                request_type=self.request_type,
+                branch__id=self.employee.emp_branch_id.id,
+                level=current_approved_levels + 1
+            ).first()
         if next_level:
             last_approval = self.approvals.order_by('-level').first()
             Approval.objects.create(
@@ -1286,11 +1289,8 @@ class ApprovalLevel(models.Model):
     level = models.IntegerField()
     role = models.CharField(max_length=50, null=True, blank=True)  # Use this for role-based approval like 'CEO' or 'Manager'
     approver = models.ForeignKey('UserManagement.CustomUser', null=True, blank=True, on_delete=models.SET_NULL)  # Use this for user-based approval
-    # request_type = models.ForeignKey('RequestType', related_name='approval_levels', on_delete=models.CASCADE)
     request_type = models.ForeignKey('RequestType', related_name='approval_levels', on_delete=models.CASCADE, null=True, blank=True)  # Nullable for common workflow
-    # is_common_workflow = models.BooleanField(default=False)  # Mark as part of the common workflow
-    class Meta:
-        unique_together = ('level', 'request_type')
+    branch       = models.ManyToManyField('OrganisationManager.brnch_mstr',blank=True)
     
 class Approval(models.Model):
     PENDING = 'Pending'
@@ -1370,8 +1370,10 @@ def create_initial_approval(sender, instance, created, **kwargs):
         if instance.request_type.use_common_workflow:
             first_level = CommonWorkflow.objects.order_by('level').first()
         else:
-            first_level = ApprovalLevel.objects.filter(request_type=instance.request_type).order_by('level').first()
-
+            first_level = ApprovalLevel.objects.filter(
+                request_type=instance.request_type,
+                branch__id=instance.employee.emp_branch_id.id
+            ).order_by('level').first()
         if first_level:
             Approval.objects.create(
                 general_request=instance,

@@ -1126,8 +1126,10 @@ class employee_leave_request(models.Model):
         if self.leave_type.use_common_workflow:
             next_level = LvCommonWorkflow.objects.filter(level=current_approved_levels + 1).first()
         else:
-            next_level = LeaveApprovalLevels.objects.filter(request_type=self.leave_type, level=current_approved_levels + 1).first()
-
+            next_level = LeaveApprovalLevels.objects.filter(
+                request_type=self.leave_type,
+                branch__id=self.employee.emp_branch_id.id,
+                level=current_approved_levels + 1).first()
         if next_level:
             last_approval = self.approvals.order_by('-level').first()
             LeaveApproval.objects.create(
@@ -1215,11 +1217,9 @@ class LeaveApprovalLevels(models.Model):
     approver         = models.ForeignKey('UserManagement.CustomUser',on_delete=models.SET_NULL,null=True, blank=True,)  # Use this for user-based approval
     request_type     = models.ForeignKey('leave_type', related_name='leave_approval_levels', on_delete=models.CASCADE, null=True, blank=True)  # Nullable for common workflow
     is_compensatory  = models.BooleanField(default=False)
+    branch           = models.ManyToManyField('OrganisationManager.brnch_mstr',blank=True)
     created_at       = models.DateTimeField(auto_now_add=True)
     created_by       = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
-
-    class Meta:
-        unique_together = ('level', 'request_type')
 
 class LeaveApproval(models.Model):
     PENDING = 'Pending'
@@ -1359,8 +1359,9 @@ def create_initial_approval(sender, instance, created, **kwargs):
             first_level = LvCommonWorkflow.objects.order_by('level').first()
         else:
         # Select the first approval level
-            first_level = LeaveApprovalLevels.objects.filter(request_type=instance.leave_type).order_by('level').first()
-
+            first_level = LeaveApprovalLevels.objects.filter(
+                request_type=instance.leave_type,
+                branch__id=instance.employee.emp_branch_id.id).order_by('level').first()
         if first_level:
             # Prevent duplicate creation of approvals at the same level
             if not instance.approvals.filter(level=first_level.level).exists():

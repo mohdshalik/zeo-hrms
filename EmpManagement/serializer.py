@@ -464,11 +464,25 @@ class GeneralRequestSerializer(serializers.ModelSerializer):
         return rep
 
 class ApprovalLevelSerializer(serializers.ModelSerializer):
-    approver = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.filter(is_ess=False))
     class Meta:
         model = ApprovalLevel
         fields = '__all__'
-   
+    def validate(self, attrs):
+        level = attrs.get('level')
+        request_type = attrs.get('request_type')
+        branches = attrs.get('branch')  # This will be a list of branches
+
+        for branch in branches:
+            if ApprovalLevel.objects.filter(
+                level=level,
+                request_type=request_type,
+                branch=branch
+            ).exists():
+                raise serializers.ValidationError(
+                    f"An approval level with level={level} already exists for branch '{branch}' and request type '{request_type}'."
+                )
+
+        return attrs
     def to_representation(self, instance):
         rep = super(ApprovalLevelSerializer, self).to_representation(instance)
         if instance.request_type:  
