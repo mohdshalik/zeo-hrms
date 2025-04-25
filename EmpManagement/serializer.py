@@ -7,7 +7,7 @@ from django.core.validators import validate_email
 from OrganisationManager.serializer import DocumentNumberingSerializer
 from django.contrib.contenttypes.models import ContentType
 import datetime
-from calendars.serializer import WeekendCalendarSerailizer,HolidayCalandarSerializer,HolidaySerializer
+from calendars.serializer import WeekendCalendarSerailizer,HolidayCalandarSerializer,HolidaySerializer,EmployeeLeaveBalanceSerializer
 from calendars .models import holiday
 # from UserManagement.serializers import CustomUserSerializer
 
@@ -341,6 +341,7 @@ class GeneralRequestApprovalSerializer(serializers.ModelSerializer):
 class EmpSerializer(serializers.ModelSerializer):
     requests = GeneralRequestApprovalSerializer(many=True, read_only=True, source='generalrequest_set')
     leave_rqsts = LvRqstApprovalSerializer(many=True, read_only=True, source='employee_leave_request_set')
+    leave_balance = EmployeeLeaveBalanceSerializer(many=True, read_only=True, source='emp_leave_balance_set')
     custom_fields = Emp_CustomFieldValueSerializer(many=True, read_only=True, source='custom_field_values')
     emp_family = EmpFamSerializer(many=True, read_only=True)
     emp_documents = DocumentSerializer(many=True, read_only=True)
