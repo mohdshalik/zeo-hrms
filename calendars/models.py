@@ -488,7 +488,8 @@ class emp_leave_balance(models.Model):
     updated_at     = models.DateTimeField(auto_now=True)  # Track last update
     created_at     = models.DateTimeField(auto_now_add=True)
     created_by     = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
-    
+    class Meta:
+        unique_together = ('employee', 'leave_type')
     def is_weekend(self, date):
         """ Check if the given date is a weekend based on the employee's weekend calendar """
         if self.employee.emp_weekend_calendar:
@@ -1223,12 +1224,13 @@ class EmployeeRejoining(models.Model):
     leave_request      = models.OneToOneField('employee_leave_request', on_delete=models.CASCADE)
     rejoining_date     = models.DateField()
     unpaid_leave_days  = models.FloatField(default=0)
+    deduct_from_leave_type = models.ForeignKey(leave_type, on_delete=models.SET_NULL, null=True, blank=True)  
+    deducted = models.BooleanField(default=False)  # <-- New field to track if deduction is already done
     created_at         = models.DateTimeField(auto_now_add=True)
     created_by         = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
 
-    
     def __str__(self):
-        return f"Rejoining for {self.employee.emp_first_name} on {self.rejoining_date}"   
+        return f"Rejoining for {self.employee.emp_first_name} on {self.rejoining_date}"  
 class LvRejectionReason(models.Model):
     reason_text = models.CharField(max_length=255, unique=True)
 
@@ -1561,59 +1563,38 @@ class Attendance(models.Model):
 @receiver(post_save, sender=Attendance)
 def handle_rejoining(sender, instance, **kwargs):
     """
-    Signal to handle rejoining date creation and unpaid leave calculation based on attendance.
+    Signal to handle rejoining date creation based on attendance.
     """
     employee = instance.employee
     attendance_date = instance.date
-
-    print(f"DEBUG: Handling attendance for employee {employee.id} on {attendance_date}")
 
     # Fetch approved leave requests that ended before this attendance date
     leave_requests = employee_leave_request.objects.filter(
         employee=employee,
         status='approved',
         end_date__lt=attendance_date,
-        employeerejoining__isnull=True  # Ensure no rejoining record exists for the leave request
+        employeerejoining__isnull=True
     ).order_by('end_date')
 
     if not leave_requests.exists():
-        print(f"DEBUG: No pending leave requests found for employee {employee.id}")
         return
 
-    # Get the most recent leave request
     leave_request = leave_requests.first()
-    print(f"DEBUG: Found leave request {leave_request.id} with end_date {leave_request.end_date}")
 
-    # Calculate unpaid days
-    unpaid_days = max(0, (attendance_date - leave_request.end_date).days)-1
-    print(f"DEBUG: Calculated unpaid leave days: {unpaid_days}")
+    unpaid_days = max(0, (attendance_date - leave_request.end_date).days) - 1
 
-    # Create the rejoining record
-    rejoining_record, created = EmployeeRejoining.objects.get_or_create(
+    if unpaid_days < 0:
+        unpaid_days = 0  # Safety check
+
+    # Only create the rejoining record; no deduction yet
+    EmployeeRejoining.objects.get_or_create(
         employee=employee,
         leave_request=leave_request,
         defaults={
             'rejoining_date': attendance_date,
             'unpaid_leave_days': unpaid_days,
         }
-    )
-
-    if created:
-        print(f"DEBUG: Created rejoining record for employee {employee.id}")
-    else:
-        print(f"DEBUG: Rejoining record already exists for employee {employee.id}")
-
-    # Deduct unpaid days from the leave balance if any
-    if unpaid_days > 0:
-        leave_balance, _ = emp_leave_balance.objects.get_or_create(
-            employee=employee,
-            leave_type=leave_request.leave_type
-        )
-        old_balance = leave_balance.balance
-        leave_balance.balance -= unpaid_days
-        s=leave_balance.save()
-        print(f"DEBUG: Deducted {unpaid_days} from leave balance (old: {old_balance}, new: {leave_balance.balance})")  
-   
+    )   
 class LeaveReport(models.Model):
     file_name   = models.CharField(max_length=100,unique=True)
     report_data = models.FileField(upload_to='leave_report/', null=True, blank=True)

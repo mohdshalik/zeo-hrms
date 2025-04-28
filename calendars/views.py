@@ -1880,7 +1880,54 @@ class ApplyOpeningsAPIView(APIView):
 class EmployeeRejoiningViewset(viewsets.ModelViewSet):
     queryset = EmployeeRejoining.objects.all()
     serializer_class = EmployeeRejoiningSerializer
+    @action(detail=True, methods=['post'], url_path='deduct-leave-balance')
+    def deduct_leave_balance(self, request, pk=None):
+        """
+        Custom action to choose from which leave type unpaid days should be deducted.
+        """
+        try:
+            rejoining = self.get_object()
+            leave_type_id = request.data.get('deduct_from_leave_type')
 
+            if not leave_type_id:
+                return Response({"error": "leave_type_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+            if rejoining.deducted:
+                return Response({"error": "Leave balance already deducted for this rejoining."}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Get employee leave balance
+            leave_balance, _ = emp_leave_balance.objects.get_or_create(
+                employee=rejoining.employee,
+                leave_type_id=leave_type_id
+            )
+
+            unpaid_days = rejoining.unpaid_leave_days
+
+            if leave_balance.balance < unpaid_days:
+                return Response({"error": "Not enough balance in the selected leave type."}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Deduct unpaid days
+            old_balance = leave_balance.balance
+            leave_balance.balance -= unpaid_days
+            leave_balance.save()
+
+            # Update rejoining record
+            rejoining.deduct_from_leave_type_id = leave_type_id
+            rejoining.deducted = True
+            rejoining.save()
+
+            return Response({
+                "message": "Leave balance deducted successfully.",
+                "employee": rejoining.employee.emp_first_name,
+                "unpaid_days": unpaid_days,
+                "old_balance": old_balance,
+                "new_balance": leave_balance.balance
+            }, status=status.HTTP_200_OK)
+
+        except EmployeeRejoining.DoesNotExist:
+            return Response({"error": "Rejoining record not found."}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 class ImmediateRejectAPIView(APIView):
     """
     API for users with special permissions to immediately reject an approved leave request by document number.
