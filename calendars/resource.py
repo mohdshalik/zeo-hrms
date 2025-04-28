@@ -108,22 +108,49 @@ class EmployeeOpenBalanceResource(resources.ModelResource):
         model = emp_leave_balance
         fields = ('employee', 'leave_type', 'openings','is_active')
         import_id_fields = ('employee', 'leave_type')
-    def get_instance(self, instance_loader, row):
-        employee_code = row.get('Employee Code')
-        leave_type_name = row.get('Leave Type')
-        try:
-            employee = emp_master.objects.get(emp_code=employee_code)
-            leave = leave_type.objects.get(name=leave_type_name)
-            return emp_leave_balance.objects.filter(employee=employee, leave_type=leave).first()
-        except (emp_master.DoesNotExist, leave_type.DoesNotExist):
-            return None
+    
     def before_import_row(self, row, **kwargs):
-        errors = []  
+        errors = []
         emp_code = row.get('Employee Code')
-        leavetype = row.get('Leave Type')
+        leave_type_name = row.get('Leave Type')
+
+        # Check employee exists
         if not emp_master.objects.filter(emp_code=emp_code).exists():
-            errors.append(f"emp_master matching query does not exist for ID: {emp_code}")
-        if not leave_type.objects.filter(name=leavetype).exists():
-            errors.append(f"Leave Type matching query does not exist for ID: {emp_code}")
+            errors.append(f"Employee with code '{emp_code}' does not exist.")
+
+        # Check leave type exists
+        if not leave_type.objects.filter(name=leave_type_name).exists():
+            errors.append(f"Leave Type '{leave_type_name}' does not exist.")
+
         if errors:
             raise ValidationError(errors)
+
+    def import_row(self, row, instance_loader, **kwargs):
+        """
+        Custom import logic: update openings and balance only if record exists
+        """
+        emp_code = row.get('Employee Code')
+        leave_type_name = row.get('Leave Type')
+        openings = row.get('Openings')
+
+        try:
+            employee = emp_master.objects.get(emp_code=emp_code)
+            leave_type_obj = leave_type.objects.get(name=leave_type_name)
+
+            # Try to find existing leave balance record
+            try:
+                leave_balance = emp_leave_balance.objects.get(employee=employee, leave_type=leave_type_obj)
+                # Update openings and apply to balance
+                leave_balance.openings = float(openings) if openings else 0
+                leave_balance.apply_openings()
+                leave_balance.is_active = row.get('Active', True)
+                leave_balance.save()
+            except emp_leave_balance.DoesNotExist:
+                # If record does not exist, SKIP (Don't create new)
+                pass
+
+        except Exception as e:
+            raise ValidationError(f"Error processing row for Employee {emp_code}: {str(e)}")
+
+        # Return None because we handled saving manually
+        return None

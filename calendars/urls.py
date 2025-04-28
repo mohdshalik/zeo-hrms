@@ -3,7 +3,7 @@ from .  views import (WeekendViewset,AssignWeekendViewset,HolidayViewset,Holiday
                     AttendanceViewSet,ShiftViewSet,ImportAttendanceViewSet,EmployeeMachineMappingViewset,Leave_ReportViewset,LvApprovalLevelViewset,
                     LvApprovalViewset,LvEmailTemplateviewset,LvApprovalNotifyviewset,LvCommonWorkflowViewset,LvRejectionViewset,Lv_Approval_ReportViewset,
                     AttendanceReportViewset,LvBalanceReportViewset,EmployeeYearlyCalendarViewset,ShiftPatternViewSet,EmployeeShiftScheduleViewSet,WeekPatternAssignmentVSet,
-                    ShiftOverrideViewSet,LeaveResetPolicyviewset,LeaveCarryForwardTransactionviewset,LeaveEncashmentTransactionviewset,EmpOpeningsBlkupldViewSet
+                    ShiftOverrideViewSet,LeaveResetPolicyviewset,LeaveCarryForwardTransactionviewset,LeaveEncashmentTransactionviewset,EmpOpeningsBlkupldViewSet,ApplyOpeningsAPIView,EmployeeRejoiningViewset,ImmediateRejectAPIView
                     )
 
 from rest_framework.routers import DefaultRouter
@@ -35,6 +35,7 @@ router.register(r'shiftpattern', ShiftPatternViewSet, basename='shiftpattern')
 router.register(r'employee-shift', EmployeeShiftScheduleViewSet, basename='employee-shift')
 router.register(r'weekpattern-assignment', WeekPatternAssignmentVSet, basename='weekpattern-assignment')
 router.register(r'shift-overrides', ShiftOverrideViewSet, basename='shift-overrides')
+router.register(r'employee-leave-rejoins', EmployeeRejoiningViewset, basename='employee-leave-rejoins')
 
 router.register(r'import-attendance', ImportAttendanceViewSet,basename='import-attendance')
 router.register(r'employee-mapping', EmployeeMachineMappingViewset, basename='employee-mapping')
@@ -55,6 +56,8 @@ router.register(r'Emp-bulkupld-openings',EmpOpeningsBlkupldViewSet , basename='E
 urlpatterns = [
     # Other paths
     path('api/', include(router.urls)),
+    path('api/leave-balance/apply-openings/', ApplyOpeningsAPIView.as_view(), name='apply-openings'),
+    path('api/immediate-reject/', ImmediateRejectAPIView.as_view(), name='immediate-reject')
    
 
    

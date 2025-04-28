@@ -2,13 +2,13 @@ from django.shortcuts import render
 from .models import( weekend_calendar,assign_weekend,holiday,holiday_calendar,assign_holiday,WeekendDetail,leave_type,leave_entitlement,applicablity_critirea,emp_leave_balance,leave_accrual_transaction,leave_reset_transaction,employee_leave_request,Attendance,Shift,
                      EmployeeMachineMapping,LeaveReport,LeaveApprovalLevels,LeaveApproval,LvEmailTemplate,LvApprovalNotify,LvCommonWorkflow,LvRejectionReason,LeaveApprovalReport,
                      AttendanceReport,lvBalanceReport,EmployeeYearlyCalendar,CompensatoryLeaveRequest,CompensatoryLeaveTransaction,CompensatoryLeaveBalance,ShiftPattern,EmployeeShiftSchedule,ShiftOverride,WeekPatternAssignment,LeaveResetPolicy,LeaveCarryForwardTransaction,
-                    LeaveEncashmentTransaction
+                    LeaveEncashmentTransaction,EmployeeRejoining
                     )
 from . serializer import (WeekendCalendarSerailizer,WeekendAssignSerializer,HolidayAssignSerializer,HolidayCalandarSerializer,HolidaySerializer,WeekendDetailSerializer,LeaveTypeSerializer,LeaveEntitlementSerializer,ApplicableSerializer,EmployeeLeaveBalanceSerializer,AccrualSerializer,ResetSerializer,LeaveRequestSerializer,
                          AttendanceSerializer,ShiftSerializer,ImportAttendanceSerializer,EmployeeMappingSerializer,LeaveReportSerializer,LvApprovalLevelSerializer,EmployeeYearlyCalendarSerializer,
                          LvApprovalSerializer,LvEmailTemplateSerializer,LvApprovalNotifySerializer,LvCommonWorkflowSerializer,LvRejectionReasonSerializer,LvApprovalReportSerializer,AttendanceReportSerializer,lvBalanceReportSerializer,
                          CompensatoryLeaveRequestSerializer,CompensatoryLeaveTransactionSerializer,CompensatoryLeaveBalanceSerializer,ShiftOverrideSerializer,ShiftPatternSerializer,EmployeeShiftScheduleSerializer,WeekPatternAssignmentSerializer,LeaveResetPolicySerializer,LeaveCarryForwardTransactionSerializer,
-                         LeaveEncashmentTransactionSerializer,EmpOpeningsBlkupldSerializer
+                         LeaveEncashmentTransactionSerializer,EmpOpeningsBlkupldSerializer,EmployeeRejoiningSerializer
                          )
 from rest_framework import viewsets,filters,status
 from rest_framework.response import Response
@@ -25,6 +25,7 @@ from .resource import AttendanceResource,EmployeeOpenBalanceResource
 from django.http import HttpResponse,JsonResponse
 from tablib import Dataset
 from django.core.exceptions import ValidationError
+from rest_framework.views import APIView
 from rest_framework.decorators import action
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
@@ -45,6 +46,7 @@ from django.db.models import Q
 from OrganisationManager.models import DocumentNumbering
 from OrganisationManager.serializer import DocumentNumberingSerializer
 from rest_framework.exceptions import NotFound
+from import_export.formats.base_formats import XLSX
 # Create your views here.
 
 class WeekendDetailsViewset(viewsets.ModelViewSet):
@@ -1824,39 +1826,116 @@ class EmpOpeningsBlkupldViewSet(viewsets.ModelViewSet):
     queryset = emp_leave_balance.objects.all()
     serializer_class = EmpOpeningsBlkupldSerializer
     
-    @action(detail=False, methods=['post'], parser_classes=[MultiPartParser, FormParser])
+    @action(detail=False, methods=['post'])
     def bulk_upload(self, request):
-        if request.method == 'POST' and request.FILES.get('file'):
-            excel_file = request.FILES['file']
-            if excel_file.name.endswith('.xlsx'):
-                try:
-                    dataset = Dataset()
-                    dataset.load(excel_file.read(), format='xlsx')
-                    resource = EmployeeOpenBalanceResource()
-                    all_errors = []
-                    valid_rows = []
-                    with transaction.atomic():
-                        for row_idx, row in enumerate(dataset.dict, start=2):
-                            row_errors = []
-                            try:
-                                resource.before_import_row(row, row_idx=row_idx)
-                            except ValidationError as e:
-                                row_errors.extend([f"Row {row_idx}: {error}" for error in e.messages])
-                            if row_errors:
-                                all_errors.extend(row_errors)
-                            else:
-                                valid_rows.append(row)
-
-                    if all_errors:
-                        return Response({"errors": all_errors}, status=400)
-
-                    with transaction.atomic():
-                        result = resource.import_data(dataset, dry_run=False, raise_errors=True)
-
-                    return Response({"message": f"{result.total_rows} records created successfully"})
-                except Exception as e:
-                    return Response({"error": str(e)}, status=400)
-            else:
-                return Response({"error": "Invalid file format. Only Excel files (.xlsx) are supported."}, status=400)
-        else:
+        if 'file' not in request.FILES:
             return Response({"error": "Please provide an Excel file."}, status=400)
+
+        excel_file = request.FILES['file']
+        if not excel_file.name.endswith('.xlsx'):
+            return Response({"error": "Invalid file format. Only .xlsx supported."}, status=400)
+
+        try:
+            xlsx_format = XLSX()
+            dataset = xlsx_format.create_dataset(excel_file.read())
+
+            resource = EmployeeOpenBalanceResource()
+            all_errors = []
+
+            with transaction.atomic():
+                for row_idx, row in enumerate(dataset.dict, start=2):
+                    try:
+                        resource.before_import_row(row, row_idx=row_idx)
+                        resource.import_row(row, None)
+                    except ValidationError as e:
+                        all_errors.extend([f"Row {row_idx}: {error}" for error in e.messages])
+
+            if all_errors:
+                return Response({"errors": all_errors}, status=400)
+
+            return Response({"message": "Records updated successfully."})
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
+
+class ApplyOpeningsAPIView(APIView):
+    def post(self, request, *args, **kwargs):
+        leave_balance_id = request.data.get('leave_balance_id')
+        openings = request.data.get('openings')
+
+        if leave_balance_id is None or openings is None:
+            return Response({'error': 'Missing required fields.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            leave_balance = emp_leave_balance.objects.get(id=leave_balance_id)
+        except emp_leave_balance.DoesNotExist:
+            return Response({'error': 'Leave balance not found for given ID.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Update the openings and balance
+        leave_balance.openings = openings
+        leave_balance.balance = (leave_balance.balance or 0) + openings  # in case balance is None
+        leave_balance.save()
+
+        return Response({'success': 'Openings applied successfully.'}, status=status.HTTP_200_OK)
+class EmployeeRejoiningViewset(viewsets.ModelViewSet):
+    queryset = EmployeeRejoining.objects.all()
+    serializer_class = EmployeeRejoiningSerializer
+
+class ImmediateRejectAPIView(APIView):
+    """
+    API for users with special permissions to immediately reject an approved leave request by document number.
+    """
+    # permission_classes = [IsAuthenticated]  # Later you can add custom permission here
+
+    def post(self, request, *args, **kwargs):
+        document_number = request.data.get('document_number')
+        rejection_reason = request.data.get('rejection_reason')
+        note = request.data.get('note')
+
+        if not document_number:
+            return Response({'error': 'document_number is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not rejection_reason:
+            return Response({'error': 'rejection_reason is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            leave_request = employee_leave_request.objects.get(document_number=document_number)
+        except employee_leave_request.DoesNotExist:
+            return Response({'error': 'Leave request not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Find the approved LeaveApproval for this leave request
+        approval = LeaveApproval.objects.filter(
+            leave_request=leave_request,
+            status=LeaveApproval.APPROVED
+        ).first()
+
+        if not approval:
+            return Response({'error': 'No approved leave request found for this document number.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # # Optional: Check if user has permission to immediately reject
+        # if not request.user.has_perm('yourapp.immediate_reject_leave'):
+        #     raise PermissionDenied('You do not have permission to immediately reject leave requests.')
+
+        # Perform rejection
+        approval.status = LeaveApproval.REJECTED
+        approval.rejection_reason = rejection_reason
+        approval.note = note
+        approval.save()
+
+        # Also change the employee_leave_request status to REJECTED
+        # leave_request.status = employee_leave_request.status='rejected'
+        leave_request.status = 'rejected'
+        leave_request.save()
+
+        # Restore leave balance
+        leave_request.restore_leave_balance()
+
+        return Response(
+            {
+                'status': 'rejected_immediately',
+                'document_number': document_number,
+                'leave_approval_id': approval.id,
+                'leave_request_id': leave_request.id
+            },
+            status=status.HTTP_200_OK
+        )

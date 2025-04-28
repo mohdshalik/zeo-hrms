@@ -488,7 +488,7 @@ class emp_leave_balance(models.Model):
     updated_at     = models.DateTimeField(auto_now=True)  # Track last update
     created_at     = models.DateTimeField(auto_now_add=True)
     created_by     = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
-
+    
     def is_weekend(self, date):
         """ Check if the given date is a weekend based on the employee's weekend calendar """
         if self.employee.emp_weekend_calendar:
@@ -534,15 +534,15 @@ class emp_leave_balance(models.Model):
         self.save()
     
     def save(self, *args, **kwargs):
-        if self.pk is None:
-            self.balance = (self.balance or 0) + (self.openings or 0)
-            self.openings = 0  # Reset after adding
-        else:
-            old_instance = emp_leave_balance.objects.filter(pk=self.pk).first()
-            if old_instance:
-                self.balance = (old_instance.balance or 0) + (self.openings or 0)
-                self.openings = 0  # Reset after adding
-        super(emp_leave_balance, self).save(*args, **kwargs)
+        # Save normally without modifying balance
+        super().save(*args, **kwargs)
+
+    def apply_openings(self):
+        """Use this method to apply openings to balance when needed."""
+        if self.openings and self.openings > 0:
+            self.balance = (self.balance or 0) + self.openings
+            self.openings = 0
+            self.save(update_fields=['balance', 'openings'])  # Save only these two fields
 
 from django.db import models
 from django.core.validators import MinValueValidator
@@ -998,7 +998,11 @@ class employee_leave_request(models.Model):
         status_changed_to_approved = (
             previous_instance is None or previous_instance.status != 'approved'
         ) and self.status == 'approved'
+        status_changed_to_rejected = (
+        previous_instance and previous_instance.status == 'approved'
+        ) and self.status == 'rejected'
         print("s",status_changed_to_approved)
+        print("sr",status_changed_to_rejected)
         with transaction.atomic():
             super().save(*args, **kwargs)
             if status_changed_to_approved:
@@ -1074,7 +1078,27 @@ class employee_leave_request(models.Model):
             carry_forward_entry.final_carry_forward -= leave_days_to_deduct
             carry_forward_entry.save()
 
-   
+    def restore_leave_balance(self):
+        from decimal import Decimal
+
+        leave_balance, created = emp_leave_balance.objects.get_or_create(
+            employee=self.employee,
+            leave_type=self.leave_type
+        )
+
+        leave_balance.balance += self.number_of_days
+        leave_balance.save()
+
+        # Restore in carry forward if it was deducted
+        leave_days_to_restore = Decimal(str(self.number_of_days))
+        carry_forward_entry = LeaveCarryForwardTransaction.objects.filter(
+            employee=self.employee,
+            leave_type=self.leave_type
+        ).order_by('-reset_date').first()
+
+        if carry_forward_entry:
+            carry_forward_entry.final_carry_forward += leave_days_to_restore
+            carry_forward_entry.save()
     def __str__(self):
         return f"{self.employee} - {self.leave_type} from {self.start_date} to {self.end_date}"
     
@@ -1083,7 +1107,7 @@ class employee_leave_request(models.Model):
      
     def move_to_next_level(self):
         if self.approvals.filter(status=LeaveApproval.REJECTED).exists():
-            self.status = 'Rejected'
+            self.status = 'rejected'
             self.save()
 
             # Notify rejection
@@ -1160,7 +1184,7 @@ class employee_leave_request(models.Model):
                 'emp_designation_name': self.employee.emp_desgntn_id,
             })
         else:
-            self.status = 'Approved'
+            self.status = 'approved'
             self.save()
 
             # Notify the creator about approval
@@ -1263,14 +1287,14 @@ class LeaveApproval(models.Model):
             self.note = note
         self.save()
         if self.leave_request:
-            self.leave_request.status = 'Rejected'
+            self.leave_request.status = 'rejected'
             self.leave_request.save()
         elif self.compensatory_request:
-            self.compensatory_request.status = 'Rejected'
+            self.compensatory_request.status = 'rejected'
             self.compensatory_request.save()
 
         if self.leave_request:
-            self.leave_request.status = 'Rejected'
+            self.leave_request.status = 'rejected'
             self.leave_request.save()
 
             notification = LvApprovalNotify.objects.create(
@@ -1547,7 +1571,7 @@ def handle_rejoining(sender, instance, **kwargs):
     # Fetch approved leave requests that ended before this attendance date
     leave_requests = employee_leave_request.objects.filter(
         employee=employee,
-        status='Approved',
+        status='approved',
         end_date__lt=attendance_date,
         employeerejoining__isnull=True  # Ensure no rejoining record exists for the leave request
     ).order_by('end_date')

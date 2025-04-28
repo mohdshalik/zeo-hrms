@@ -4,7 +4,7 @@ from .models import (weekend_calendar,assign_weekend,holiday_calendar,holiday,as
                     ShiftOverride,WeekPatternAssignment,EmployeeMachineMapping,LeaveReport,
                      LeaveApprovalLevels,LeaveApproval,LvApprovalNotify,LvEmailTemplate,LvCommonWorkflow,LvRejectionReason,LeaveApprovalReport,
                     AttendanceReport,lvBalanceReport,CompensatoryLeaveRequest,CompensatoryLeaveBalance,CompensatoryLeaveTransaction,EmployeeYearlyCalendar,LeaveResetPolicy,LeaveCarryForwardTransaction,
-                    LeaveEncashmentTransaction
+                    LeaveEncashmentTransaction,EmployeeRejoining
 
 )
 from OrganisationManager.serializer import BranchSerializer,CtgrySerializer,DeptSerializer
@@ -456,3 +456,8 @@ class EmpOpeningsBlkupldSerializer(serializers.ModelSerializer):
             rep['employee'] = instance.employee.emp_code
            
         return rep
+
+class EmployeeRejoiningSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EmployeeRejoining
+        fields = '__all__'
