@@ -1544,22 +1544,40 @@ class Attendance(models.Model):
     
     def calculate_total_hours(self):
         if self.check_in_time and self.check_out_time:
-            # Ensure that check_in_time and check_out_time are time objects
             check_in_time = self.check_in_time if isinstance(self.check_in_time, time) else self.check_in_time.time()
             check_out_time = self.check_out_time if isinstance(self.check_out_time, time) else self.check_out_time.time()
 
-            # Combine the date with the check-in and check-out times to get datetime objects
             check_in_datetime = datetime.combine(self.date, check_in_time)
             check_out_datetime = datetime.combine(self.date, check_out_time)
 
-            # Handle check-out after midnight
             if check_out_datetime < check_in_datetime:
                 check_out_datetime += timedelta(days=1)
 
-            # Calculate total time worked as a timedelta
             total_duration = check_out_datetime - check_in_datetime
-            self.total_hours = total_duration  # Store as timedelta (if using DurationField)
+            self.total_hours = total_duration
+
+            # Calculate overtime
+            if self.shift:
+                shift_duration = self.get_shift_duration()
+                if total_duration > shift_duration:
+                    self.overtime_hours = total_duration - shift_duration
+                else:
+                    self.overtime_hours = timedelta(0)
+            else:
+                self.overtime_hours = timedelta(0)  # No shift, no overtime
+
             self.save()
+
+    def get_shift_duration(self):
+        """Calculate the standard shift duration excluding breaks."""
+        if not self.shift:
+            return timedelta(0)
+        start = datetime.combine(self.date, self.shift.start_time)
+        end = datetime.combine(self.date, self.shift.end_time)
+        if end < start:
+            end += timedelta(days=1)
+        return (end - start) - self.shift.break_duration
+    
 @receiver(post_save, sender=Attendance)
 def handle_rejoining(sender, instance, **kwargs):
     """
@@ -1594,7 +1612,43 @@ def handle_rejoining(sender, instance, **kwargs):
             'rejoining_date': attendance_date,
             'unpaid_leave_days': unpaid_days,
         }
-    )   
+    )
+
+    if created:
+        print(f"DEBUG: Created rejoining record for employee {employee.id}")
+    else:
+        print(f"DEBUG: Rejoining record already exists for employee {employee.id}")
+
+    # Deduct unpaid days from the leave balance if any
+    if unpaid_days > 0:
+        leave_balance, _ = emp_leave_balance.objects.get_or_create(
+            employee=employee,
+            leave_type=leave_request.leave_type
+        )
+        old_balance = leave_balance.balance
+        leave_balance.balance -= unpaid_days
+        s=leave_balance.save()
+        print(f"DEBUG: Deducted {unpaid_days} from leave balance (old: {old_balance}, new: {leave_balance.balance})")  
+
+class EmployeeOvertime(models.Model):
+    employee = models.ForeignKey('EmpManagement.emp_master', on_delete=models.CASCADE)
+    date = models.DateField()
+    hours = models.DecimalField(max_digits=5, decimal_places=2, help_text="Number of overtime hours")
+    rate_multiplier = models.DecimalField(max_digits=3, decimal_places=2, default=1.5, 
+                                         help_text="Multiplier for overtime rate (e.g., 1.5 for time-and-a-half)")
+    approved = models.BooleanField(default=False)
+    approved_by = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, 
+                                   null=True, blank=True, related_name='approved_overtimes')
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, 
+                                  null=True, related_name='%(class)s_created_by')
+    
+    class Meta:
+        unique_together = ('employee', 'date')
+    
+    def __str__(self):
+        return f"{self.employee} - {self.date} ({self.hours} hours)"
+
 class LeaveReport(models.Model):
     file_name   = models.CharField(max_length=100,unique=True)
     report_data = models.FileField(upload_to='leave_report/', null=True, blank=True)
@@ -1626,6 +1680,7 @@ class LeaveApprovalReport(models.Model):
        
     def __str__(self):
         return self.file_name 
+
 
 class AttendanceReport(models.Model):
     file_name   = models.CharField(max_length=100,unique=True)
