@@ -1,6 +1,6 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from .models import Payslip, PayslipComponent, EmployeeSalaryStructure
+from .models import Payslip, PayslipComponent, EmployeeSalaryStructure,SalaryComponent
 from calendars.models import Attendance
 from django.db.models import Q
 import logging
@@ -9,7 +9,6 @@ logger = logging.getLogger(__name__)
 
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from .models import SalaryComponent, EmployeeSalaryStructure
 from django.apps import apps
 
 
@@ -44,7 +43,7 @@ def update_employee_salary_structure(sender, instance, created, **kwargs):
 
         for employee in employees:
             # Fetch all existing salary components for this employee to use in formula
-            salary_components = EmployeeSalaryStructure.objects.filter(employee=employee, is_active=True)
+            salary_components = EmployeeSalaryStructure.objects.filter(employee=employee)
             component_amounts = {}
 
             # Populate fixed component amounts for formula evaluation
