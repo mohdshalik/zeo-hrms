@@ -985,7 +985,7 @@ class LvApprovalViewset(viewsets.ModelViewSet):
 class Lv_Approval_ReportViewset(viewsets.ModelViewSet):
     queryset = LeaveApprovalReport.objects.all()
     serializer_class = LvApprovalReportSerializer
-    permission_classes = [LeaveApprovalReportPermission]
+    # permission_classes = [LeaveApprovalReportPermission]
     
     def __init__(self, *args, **kwargs):
         super(Lv_Approval_ReportViewset, self).__init__(*args, **kwargs)
@@ -1303,7 +1303,7 @@ class Lv_Approval_ReportViewset(viewsets.ModelViewSet):
 class AttendanceReportViewset(viewsets.ModelViewSet):
     queryset = AttendanceReport.objects.all()
     serializer_class = AttendanceReportSerializer
-    permission_classes = [AttendanceReportPermission]
+    # permission_classes = [AttendanceReportPermission]
 
     
     
@@ -1573,7 +1573,7 @@ class AttendanceReportViewset(viewsets.ModelViewSet):
 class LvBalanceReportViewset(viewsets.ModelViewSet):
     queryset = lvBalanceReport.objects.all()
     serializer_class = lvBalanceReportSerializer
-    permission_classes = [LvBalanceReportPermission]
+    # permission_classes = [LvBalanceReportPermission]
 
     
 
