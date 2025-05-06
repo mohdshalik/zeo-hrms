@@ -461,3 +461,12 @@ class EmployeeRejoiningSerializer(serializers.ModelSerializer):
     class Meta:
         model = EmployeeRejoining
         fields = '__all__'
+class DailyAttendanceSerializer(serializers.Serializer):
+    date = serializers.DateField()
+    status = serializers.CharField()
+    leave_type = serializers.CharField(allow_null=True, required=False)
+
+class AttendanceSummarySerializer(serializers.Serializer):
+    summary = DailyAttendanceSerializer(many=True)
+    total_present = serializers.IntegerField()
+    total_absent = serializers.IntegerField()
