@@ -47,6 +47,15 @@ from OrganisationManager.models import DocumentNumbering
 from OrganisationManager.serializer import DocumentNumberingSerializer
 from rest_framework.exceptions import NotFound
 from import_export.formats.base_formats import XLSX
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from datetime import date
+from dateutil.relativedelta import relativedelta
+from .utils import get_attendance_summary
+from .serializer import AttendanceSummarySerializer
+from EmpManagement.models import emp_master
+
 # Create your views here.
 
 class WeekendDetailsViewset(viewsets.ModelViewSet):
@@ -267,6 +276,11 @@ class LeaveRequestviewset(viewsets.ModelViewSet):
             # Return only requests related to the ESS user's employee record
             return self.queryset.filter(employee__emp_code=self.request.user.username)
         return super().get_queryset()  # Non-ESS users can access as per their permissions
+    @action(detail=False, methods=['get'], url_path='approved-leaves')
+    def approved_leaves(self, request):
+        approved_queryset = employee_leave_request.objects.filter(status='approved')
+        serializer = self.get_serializer(approved_queryset, many=True)
+        return Response(serializer.data)
     def perform_create(self, serializer):
         with transaction.atomic():
             employee = serializer.validated_data.get('employee')
@@ -1986,3 +2000,139 @@ class ImmediateRejectAPIView(APIView):
             },
             status=status.HTTP_200_OK
         )
+class EmployeeAttendanceSummaryAPIView(APIView):
+    def get(self, request):
+        month = int(request.query_params.get("month", date.today().month))
+        year = int(request.query_params.get("year", date.today().year))
+
+        start_date = date(year, month, 1)
+        end_date = start_date + relativedelta(months=1) - relativedelta(days=1)
+
+        summaries = []
+
+        # You can apply filters here if needed (e.g., by branch, department, etc.)
+        all_employees = emp_master.objects.all()
+
+        # for employee in all_employees:
+        #     summary_data = get_attendance_summary(employee, start_date, end_date)
+        #     serializer = AttendanceSummarySerializer(summary_data)
+
+        #     # Include employee info with the summary
+        #     summaries.append({
+        #         # "employee_id": employee.id,
+        #         "employee_name": f"{employee.emp_code}",
+        #         "attendance_summary": serializer.data
+        #     })
+        #     return Response(serializer.data)
+        for employee in all_employees:
+            summary_data = get_attendance_summary(employee, start_date, end_date)
+            
+            if summary_data is None:
+                continue  # or handle the case differently
+
+            serializer = AttendanceSummarySerializer(summary_data)
+
+            summaries.append({
+                "employee_id": employee.id,
+                "employee_name": f"{employee.emp_first_name}",
+                "attendance_summary": serializer.data
+            })
+        return Response(summaries)
+
+class MonthwiseAccrualSimulationView(APIView):
+    def get(self, request, format=None):
+        employee_id = request.query_params.get("employee_id")
+        year = int(request.query_params.get("year", datetime.now().year))
+
+        if not employee_id:
+            return Response({"error": "employee_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            employee = emp_master.objects.get(id=employee_id)
+        except emp_master.DoesNotExist:
+            return Response({"error": "Employee not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        today = timezone.now().date()
+        start_date = datetime(year, 1, 1).date()
+
+        entitlements = leave_entitlement.objects.filter(accrual=True).order_by("leave_type", "min_experience")
+        all_leave_types = leave_type.objects.all()
+
+        # Select the best entitlement per leave type
+        leave_type_entitlements = {}
+        for entitlement in entitlements:
+            lt = entitlement.leave_type
+
+            base_date = (
+                employee.emp_joined_date
+                if entitlement.effective_after_from == "date_of_joining"
+                else employee.emp_date_of_confirmation
+            )
+            if not base_date:
+                continue
+
+            experience = relativedelta(today, base_date)
+            experience_months = experience.years * 12 + experience.months
+
+            min_exp_months = (
+                entitlement.min_experience * 12
+                if entitlement.effective_after_unit == "years"
+                else entitlement.min_experience
+            )
+
+            if experience_months >= min_exp_months and (
+                lt not in leave_type_entitlements or
+                min_exp_months > leave_type_entitlements[lt]["experience"]
+            ):
+                leave_type_entitlements[lt] = {
+                    "entitlement": entitlement,
+                    "experience": min_exp_months
+                }
+
+        accrual_summary = []
+
+        for lt in all_leave_types:
+            entitlement_info = leave_type_entitlements.get(lt)
+            accrual_rate = 0
+            frequency = None
+
+            if entitlement_info:
+                best_entitlement = entitlement_info["entitlement"]
+                accrual_rate = best_entitlement.accrual_rate
+                frequency = best_entitlement.accrual_frequency
+
+            try:
+                balance_obj = emp_leave_balance.objects.get(employee=employee, leave_type=lt)
+                existing_balance = balance_obj.balance
+            except emp_leave_balance.DoesNotExist:
+                existing_balance = 0
+
+            monthly_accruals = []
+            accrued_sum = 0
+
+            if frequency == "months" and accrual_rate > 0:
+                for i in range(12):
+                    accrual_month = start_date + relativedelta(months=i)
+                    accrued_sum += accrual_rate
+                    monthly_accruals.append({
+                        "month": accrual_month.strftime("%b %Y"),
+                        "accrued_balance": round(accrued_sum, 2),
+                        "total_with_existing_balance": round(accrued_sum + existing_balance, 2)
+                    })
+
+            accrual_summary.append({
+                "leave_type": lt.name,
+                "accrual_frequency": frequency,
+                "accrual_rate": accrual_rate,
+                "existing_balance": round(existing_balance, 2),
+                "monthly_accruals": monthly_accruals
+            })
+
+        response_data = {
+            "employee_id": employee.id,
+            "employee_name": f"{employee.emp_first_name} {employee.emp_last_name}",
+            "year": year,
+            "leave_accrual_summary": accrual_summary
+        }
+
+        return Response(response_data, status=status.HTTP_200_OK)

@@ -360,6 +360,9 @@ class EmpSerializer(serializers.ModelSerializer):
     class Meta:
         model = emp_master
         fields = '__all__' 
+    def create(self, validated_data):
+        validated_data['is_active'] = True  # Force is_active to True
+        return super().create(validated_data)
     def to_representation(self, instance):
         rep = super(EmpSerializer, self).to_representation(instance)
         if instance.emp_state_id:  # Check if emp_state_id is not None

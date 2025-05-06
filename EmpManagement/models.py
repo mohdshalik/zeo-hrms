@@ -85,9 +85,11 @@ class emp_master(models.Model):
         if self.emp_joined_date and self.emp_branch_id:
             self.emp_date_of_confirmation = self.emp_joined_date + timedelta(days=self.emp_branch_id.probation_period_days)
 
-        # Set created_by for new records
-        if created and authenticated_user:
-            self.created_by = authenticated_user
+        # Set created_by and is_active for new records
+        if created:
+            if authenticated_user:
+                self.created_by = authenticated_user
+            self.is_active = True  # Explicitly set is_active to True for new records
 
         super().save(*args, **kwargs)
 
