@@ -126,7 +126,7 @@ class EmployeeResource(resources.ModelResource):
     emp_mother_name = fields.Field(attribute='emp_mother_name', column_name='Employee Mother Name')
     emp_posting_location = fields.Field(attribute='emp_posting_location', column_name='Employee Work Location')
     is_active = fields.Field(attribute='is_active', column_name='Employee Active(True/False)')
-    epm_ot_applicable = fields.Field(attribute='epm_ot_applicable', column_name='Employee OT applicable(True/False)')
+    emp_ot_applicable = fields.Field(attribute='emp_ot_applicable', column_name='Employee OT applicable(True/False)')
     emp_branch_id = fields.Field(attribute='emp_branch_id', column_name='Employee Branch Code',widget=ForeignKeyWidget(brnch_mstr, 'branch_name'))
     emp_dept_id = fields.Field(attribute='emp_dept_id', column_name='Employee Department Code',widget=CustomForeignKeyWidget(dept_master, 'dept_name'))
     emp_desgntn_id = fields.Field(attribute='emp_desgntn_id', column_name='Employee Designation Code',widget=ForeignKeyWidget(desgntn_master, 'desgntn_job_title'))
