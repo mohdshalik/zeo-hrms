@@ -1292,7 +1292,7 @@ class ApprovalLevel(models.Model):
     role = models.CharField(max_length=50, null=True, blank=True)  # Use this for role-based approval like 'CEO' or 'Manager'
     approver = models.ForeignKey('UserManagement.CustomUser', null=True, blank=True, on_delete=models.SET_NULL)  # Use this for user-based approval
     request_type = models.ForeignKey('RequestType', related_name='approval_levels', on_delete=models.CASCADE, null=True, blank=True)  # Nullable for common workflow
-    branch       = models.ManyToManyField('OrganisationManager.brnch_mstr',blank=True)
+    # branch       = models.ManyToManyField('OrganisationManager.brnch_mstr',blank=True)
     
 class Approval(models.Model):
     PENDING = 'Pending'
