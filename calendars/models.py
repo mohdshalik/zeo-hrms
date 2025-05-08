@@ -1498,7 +1498,15 @@ class EmployeeShiftSchedule(models.Model):
 
     def calculate_week_number(self, date):
         """Calculates week number in the rotation cycle from start_date."""
-        delta_weeks = (date - self.start_date).days // 7
+        # Ensure both are date objects
+        if isinstance(date, datetime):
+            date = date.date()
+        if isinstance(self.start_date, datetime):
+            start_date = self.start_date.date()
+        else:
+            start_date = self.start_date
+
+        delta_weeks = (date - start_date).days // 7
         return (delta_weeks % self.rotation_cycle_weeks) + 1
 
     def __str__(self):
@@ -1612,23 +1620,7 @@ def handle_rejoining(sender, instance, **kwargs):
             'rejoining_date': attendance_date,
             'unpaid_leave_days': unpaid_days,
         }
-    )
-
-    if created:
-        print(f"DEBUG: Created rejoining record for employee {employee.id}")
-    else:
-        print(f"DEBUG: Rejoining record already exists for employee {employee.id}")
-
-    # Deduct unpaid days from the leave balance if any
-    if unpaid_days > 0:
-        leave_balance, _ = emp_leave_balance.objects.get_or_create(
-            employee=employee,
-            leave_type=leave_request.leave_type
-        )
-        old_balance = leave_balance.balance
-        leave_balance.balance -= unpaid_days
-        s=leave_balance.save()
-        print(f"DEBUG: Deducted {unpaid_days} from leave balance (old: {old_balance}, new: {leave_balance.balance})")  
+    )  
 
 class EmployeeOvertime(models.Model):
     employee = models.ForeignKey('EmpManagement.emp_master', on_delete=models.CASCADE)

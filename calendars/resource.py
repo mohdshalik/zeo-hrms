@@ -42,10 +42,8 @@ class AttendanceResource(resources.ModelResource):
         date = row.get('Date')
         check_in_time = row.get('Check In Time')
         check_out_time = row.get('Check Out Time')
-        
-        # Validate employee code
         employee = None
-        if isinstance(identifier_code, str):
+        if identifier_code:
             try:
                 employee = emp_master.objects.get(emp_code=identifier_code)
             except emp_master.DoesNotExist:
@@ -53,10 +51,26 @@ class AttendanceResource(resources.ModelResource):
                     mapping = EmployeeMachineMapping.objects.get(machine_code=identifier_code)
                     employee = mapping.employee
                 except EmployeeMachineMapping.DoesNotExist:
-                    errors.append(f"Identifier Code '{identifier_code}' does not exist.")
-        
+                    pass  # We will handle below if employee is still None
+
+        # STEP 2: Handle if employee not found
         if not employee:
-            errors.append(f"Employee not found for Identifier Code '{identifier_code}'.")
+            errors.append(f"Row {row_number}: Employee not found for Identifier Code '{identifier_code}'.")
+        # # Validate employee code
+        # employee = None
+        # if isinstance(identifier_code, str):
+        #     try:
+        #         employee = emp_master.objects.get(emp_code=identifier_code)
+        #         print("f",employee)
+        #     except emp_master.DoesNotExist:
+        #         try:
+        #             mapping = EmployeeMachineMapping.objects.get(machine_code=identifier_code)
+        #             employee = mapping.employee
+        #         except EmployeeMachineMapping.DoesNotExist:
+        #             errors.append(f"Identifier Code '{identifier_code}' does not exist.")
+        
+        # if not employee:
+        #     errors.append(f"Employee not found for Identifier Code '{identifier_code}'.")
 
         if date and employee:
             if Attendance.objects.filter(employee=employee, date=date).exists():
@@ -89,7 +103,7 @@ class AttendanceResource(resources.ModelResource):
                 # Assign shift
                 schedule = EmployeeShiftSchedule.objects.filter(employee=employee).first()
                 if schedule:
-                    shift = schedule.get_shift_for_date(employee, date)  # Pass both employee and date
+                    shift = schedule.get_shift_for_date(date)  # Pass both employee and date
                     attendance.shift = shift
 
                 # Calculate total hours
