@@ -1243,7 +1243,7 @@ class LeaveApprovalLevels(models.Model):
     approver         = models.ForeignKey('UserManagement.CustomUser',on_delete=models.SET_NULL,null=True, blank=True,)  # Use this for user-based approval
     request_type     = models.ForeignKey('leave_type', related_name='leave_approval_levels', on_delete=models.CASCADE, null=True, blank=True)  # Nullable for common workflow
     is_compensatory  = models.BooleanField(default=False)
-    # branch           = models.ManyToManyField('OrganisationManager.brnch_mstr',blank=True)
+    branch           = models.ManyToManyField('OrganisationManager.brnch_mstr',blank=True)
     created_at       = models.DateTimeField(auto_now_add=True)
     created_by       = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
 
