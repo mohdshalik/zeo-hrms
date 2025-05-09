@@ -251,7 +251,7 @@ class LeaveRequestSerializer(serializers.ModelSerializer):
         return data
 
 class EmployeeLeaveBalanceSerializer(serializers.ModelSerializer):
-    leave_type = serializers.PrimaryKeyRelatedField(queryset=leave_type.objects.none())
+    # leave_type = serializers.PrimaryKeyRelatedField(queryset=leave_type.objects.none())
 
     class Meta:
         model = emp_leave_balance
@@ -259,7 +259,10 @@ class EmployeeLeaveBalanceSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         rep = super(EmployeeLeaveBalanceSerializer, self).to_representation(instance)
         if instance.leave_type:  
-            rep['leave_type'] = instance.leave_type.name         
+            rep['leave_type'] = instance.leave_type.name
+        if instance.employee:  
+            rep['employee'] = instance.employee.emp_code
+           
         return rep
 #         extra_fields = ['applicable_leave_types']
 #     def __init__(self, *args, **kwargs):
