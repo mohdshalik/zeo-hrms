@@ -464,6 +464,15 @@ class EmployeeRejoiningSerializer(serializers.ModelSerializer):
     class Meta:
         model = EmployeeRejoining
         fields = '__all__'
+    def to_representation(self, instance):
+        rep = super(EmployeeRejoiningSerializer, self).to_representation(instance)
+        if instance.deduct_from_leave_type:  
+            rep['deduct_from_leave_type'] = instance.deduct_from_leave_type.name
+        if instance.employee:  
+            rep['employee'] = instance.employee.emp_code     
+        if instance.leave_request:    
+            rep['leave_request'] = instance.leave_request.document_number   
+        return rep
 class DailyAttendanceSerializer(serializers.Serializer):
     date = serializers.DateField()
     status = serializers.CharField()
