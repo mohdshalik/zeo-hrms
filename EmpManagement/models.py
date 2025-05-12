@@ -1415,7 +1415,7 @@ class SelectedEmpNotify(models.Model):
 
 class NotificationSettings(models.Model):
     branch              = models.ForeignKey("OrganisationManager.brnch_mstr", on_delete=models.CASCADE)
-    selected_employees  = models.ManyToManyField(emp_master, blank=True)  # Allows multiple employee selections
+    notify_users        = models.ManyToManyField('UserManagement.CustomUser', blank=True)  # Allows multiple employee selections
     days_before_expiry  = models.IntegerField(default=7)  # Default reminder 7 days before expiry
     days_after_expiry   = models.IntegerField(default=0)  # Default reminder 0 days after expiry (on expiry day)
     created_at          = models.DateTimeField(auto_now_add=True)
