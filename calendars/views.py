@@ -1901,9 +1901,9 @@ class EmployeeRejoiningViewset(viewsets.ModelViewSet):
         """
         try:
             rejoining = self.get_object()
-            leave_type_id = request.data.get('deduct_from_leave_type')
+            deduct_from_leave_type = request.data.get('deduct_from_leave_type')
 
-            if not leave_type_id:
+            if not deduct_from_leave_type:
                 return Response({"error": "leave_type_id is required."}, status=status.HTTP_400_BAD_REQUEST)
 
             if rejoining.deducted:
@@ -1912,7 +1912,7 @@ class EmployeeRejoiningViewset(viewsets.ModelViewSet):
             # Get employee leave balance
             leave_balance, _ = emp_leave_balance.objects.get_or_create(
                 employee=rejoining.employee,
-                leave_type_id=leave_type_id
+                leave_type_id=deduct_from_leave_type
             )
 
             unpaid_days = rejoining.unpaid_leave_days
@@ -1926,7 +1926,7 @@ class EmployeeRejoiningViewset(viewsets.ModelViewSet):
             leave_balance.save()
 
             # Update rejoining record
-            rejoining.deduct_from_leave_type_id = leave_type_id
+            rejoining.deduct_from_leave_type_id = deduct_from_leave_type
             rejoining.deducted = True
             rejoining.save()
 
