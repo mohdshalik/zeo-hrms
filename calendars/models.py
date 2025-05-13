@@ -26,6 +26,7 @@ from django.dispatch import receiver
 from django.db.models.signals import post_save
 import calendar
 from datetime import datetime, timedelta
+from django.db.models import Q
 
 
 # Create your models here.
@@ -1552,29 +1553,35 @@ class Attendance(models.Model):
     
     def calculate_total_hours(self):
         if self.check_in_time and self.check_out_time:
-            check_in_time = self.check_in_time if isinstance(self.check_in_time, time) else self.check_in_time.time()
-            check_out_time = self.check_out_time if isinstance(self.check_out_time, time) else self.check_out_time.time()
+            # Combine date with time
+            check_in_datetime = datetime.combine(self.date, self.check_in_time)
+            check_out_datetime = datetime.combine(self.date, self.check_out_time)
 
-            check_in_datetime = datetime.combine(self.date, check_in_time)
-            check_out_datetime = datetime.combine(self.date, check_out_time)
-
+            # Handle overnight shift
             if check_out_datetime < check_in_datetime:
                 check_out_datetime += timedelta(days=1)
 
-            total_duration = check_out_datetime - check_in_datetime
-            self.total_hours = total_duration
+            # Calculate duration
+            self.total_hours = check_out_datetime - check_in_datetime
+    def fetch_shift(self):
+        from .models import EmployeeShiftSchedule  # Avoid circular import
 
-            # Calculate overtime
-            if self.shift:
-                shift_duration = self.get_shift_duration()
-                if total_duration > shift_duration:
-                    self.overtime_hours = total_duration - shift_duration
-                else:
-                    self.overtime_hours = timedelta(0)
-            else:
-                self.overtime_hours = timedelta(0)  # No shift, no overtime
+        schedule = EmployeeShiftSchedule.objects.filter(
+            Q(employee=self.employee) | Q(departments=self.employee.emp_dept_id)
+        ).first()
 
-            self.save()
+        return schedule.get_shift_for_date(self.date) if schedule else None
+
+    def save(self, *args, **kwargs):
+        # Auto-calculate total_hours if both check-in and check-out times exist
+        if self.check_in_time and self.check_out_time:
+            self.calculate_total_hours()
+
+        # Auto-assign shift if not already set
+        if not self.shift:
+            self.shift = self.fetch_shift()
+
+        super().save(*args, **kwargs)
 
     def get_shift_duration(self):
         """Calculate the standard shift duration excluding breaks."""
