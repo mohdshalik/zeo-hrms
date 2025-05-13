@@ -4,6 +4,7 @@ from .  views import (WeekendViewset,AssignWeekendViewset,HolidayViewset,Holiday
                     LvApprovalViewset,LvEmailTemplateviewset,LvApprovalNotifyviewset,LvCommonWorkflowViewset,LvRejectionViewset,Lv_Approval_ReportViewset,
                     AttendanceReportViewset,LvBalanceReportViewset,EmployeeYearlyCalendarViewset,ShiftPatternViewSet,EmployeeShiftScheduleViewSet,WeekPatternAssignmentVSet,
                     ShiftOverrideViewSet,LeaveResetPolicyviewset,LeaveCarryForwardTransactionviewset,LeaveEncashmentTransactionviewset,EmpOpeningsBlkupldViewSet,ApplyOpeningsAPIView,EmployeeRejoiningViewset,ImmediateRejectAPIView,EmployeeAttendanceSummaryAPIView,MonthwiseAccrualSimulationView,
+                    LeaveResetPreviewAPIView
                     )
 
 from rest_framework.routers import DefaultRouter
@@ -59,7 +60,8 @@ urlpatterns = [
     path('api/leave-balance/apply-openings/', ApplyOpeningsAPIView.as_view(), name='apply-openings'),
     path('api/immediate-reject/', ImmediateRejectAPIView.as_view(), name='immediate-reject'),
     path('api/employee-attendance-summary/', EmployeeAttendanceSummaryAPIView.as_view(), name='employee-attendance-summary'),
-    path("test-monthwise-accrual/", MonthwiseAccrualSimulationView.as_view(), name="test-monthwise-accrual")
+    path("api/test-monthwise-accrual/", MonthwiseAccrualSimulationView.as_view(), name="test-monthwise-accrual"),
+    path('api/leave/reset-preview/', LeaveResetPreviewAPIView.as_view(), name='leave-reset-preview'),
    
 
    

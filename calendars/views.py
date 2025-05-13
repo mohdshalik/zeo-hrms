@@ -55,6 +55,8 @@ from dateutil.relativedelta import relativedelta
 from .utils import get_attendance_summary
 from .serializer import AttendanceSummarySerializer
 from EmpManagement.models import emp_master
+import calendar
+from django.utils.dateparse import parse_date
 
 # Create your views here.
 
@@ -2136,3 +2138,82 @@ class MonthwiseAccrualSimulationView(APIView):
         }
 
         return Response(response_data, status=status.HTTP_200_OK)
+class LeaveResetPreviewAPIView(APIView):
+    """
+    API to preview leave reset logic without saving.
+    """
+
+    def post(self, request):
+        # Accept custom reset_date or default to today
+        reset_date_str = request.data.get("reset_date")
+        if reset_date_str:
+            try:
+                reset_date = parse_date(reset_date_str)
+                if not reset_date:
+                    raise ValueError
+            except ValueError:
+                return Response({"error": "Invalid date format. Use YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({"error": "reset_date is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        response_data = []
+
+        resets = LeaveResetPolicy.objects.filter(reset=True)
+        for reset in resets:
+            reset_month = month_name_to_number(reset.month)
+            reset_day = 1 if reset.day == "1st" else calendar.monthrange(reset_date.year, reset_month)[1]
+
+            if reset.frequency == "years":
+                if reset_date.month != reset_month or reset_date.day != reset_day:
+                    continue
+            elif reset.frequency == "months":
+                if reset_date.day != reset_day:
+                    continue
+
+            leave_type = reset.leave_type
+            employees = emp_master.objects.all()
+
+            for emp in employees:
+                leave_balance = emp_leave_balance.objects.filter(employee=emp, leave_type=leave_type).first()
+                if not leave_balance:
+                    continue
+
+                initial_balance = leave_balance.balance if leave_balance.balance is not None else 0
+                carry_forward_amount = 0
+                encashment_amount = 0
+
+                if reset.allow_cf and initial_balance > 0:
+                    if reset.cf_unit_or_percentage == 'percentage':
+                        calculated_cf = (initial_balance * reset.cf_value / 100)
+                        carry_forward_amount = min(calculated_cf, reset.cf_max_limit or calculated_cf)
+                    else:
+                        carry_forward_amount = min(initial_balance, reset.cf_value)
+
+                remaining_balance = initial_balance - carry_forward_amount
+
+                if reset.allow_encashment and remaining_balance > 0:
+                    if reset.encashment_unit_or_percentage == 'percentage':
+                        encashment_amount = min((remaining_balance * reset.encashment_value / 100),
+                                                reset.encashment_max_limit or remaining_balance)
+                    else:
+                        encashment_amount = min(remaining_balance, reset.encashment_value)
+
+                response_data.append({
+                    "employee": emp.emp_code,
+                    "leave_type": leave_type.name,
+                    "reset_date": reset_date,
+                    "initial_balance": float(initial_balance),
+                    "carry_forward": float(carry_forward_amount),
+                    "encashment": float(encashment_amount),
+                    "final_balance": float(carry_forward_amount),
+                })
+
+        return Response(response_data, status=status.HTTP_200_OK)
+
+
+def month_name_to_number(month_name):
+    month_map = {
+        'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
+        'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12
+    }
+    return month_map.get(month_name[:3], datetime.now().month)

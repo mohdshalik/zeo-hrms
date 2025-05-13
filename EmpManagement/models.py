@@ -1426,10 +1426,10 @@ class NotificationSettings(models.Model):
         return f"Reminder Settings for {self.branch.name}"
 
 class DocExpEmailTemplate(models.Model):
-    Name_Choices=[("Employee Notification","Employee Notification"),
-                  ("ESS User Notification","ESS User Notification")
-                  ]
-    template_name   = models.CharField(max_length=100,choices=Name_Choices)
+    template_name = models.CharField(max_length=100, choices=[
+        ('Employee Notification','Employee Notification'),
+        ('User Notification', 'User Notification'),
+    ])
     subject         = models.CharField(max_length=255)
     body            = models.TextField()
     created_at      = models.DateTimeField(auto_now_add=True)
