@@ -172,3 +172,35 @@ def run_payroll_on_save(sender, instance, created, **kwargs):
             logger.info(f"PayrollRun {instance.id} status updated to 'processed'")
         except Exception as e:
             logger.error(f"Error updating PayrollRun status: {e}")
+
+@receiver(post_save, sender=EmployeeSalaryStructure)
+def update_variable_components_on_fixed_change(sender, instance, **kwargs):
+    """
+    Trigger update for variable components if a fixed component (like basic_salary) is changed.
+    """
+    if instance.component.is_fixed:
+        logger.info(f"Fixed component '{instance.component.code}' changed for {instance.employee}. Updating variable components.")
+
+        # Get all variable components that depend on fixed ones
+        variable_components = SalaryComponent.objects.filter(is_fixed=False).exclude(formula__isnull=True).exclude(formula__exact='')
+
+        for vc in variable_components:
+            # Prepare context for formula evaluation
+            salary_structures = EmployeeSalaryStructure.objects.filter(employee=instance.employee)
+            variables = {
+                sc.component.code: float(sc.amount) if sc.amount is not None else 0
+                for sc in salary_structures
+                if sc.component.code
+            }
+
+            amount = evaluate_formula(vc.formula, variables)
+
+            EmployeeSalaryStructure.objects.update_or_create(
+                employee=instance.employee,
+                component=vc,
+                defaults={
+                    'amount': amount,
+                    'is_active': True,
+                }
+            )
+            logger.info(f"Updated variable component '{vc.name}' for employee {instance.employee}: {amount}")
