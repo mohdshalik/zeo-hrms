@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.apps import apps
+from decimal import Decimal
 
 
 # Initialize logger
@@ -71,16 +72,15 @@ def update_employee_salary_structure(sender, instance, created, **kwargs):
 @receiver(post_save, sender='PayrollManagement.PayrollRun')
 def run_payroll_on_save(sender, instance, created, **kwargs):
     """
-    Simplified payslip creation using pre-calculated amounts from EmployeeSalaryStructure.
-    Only processes employees with is_active=True.
+    Process payroll on PayrollRun creation, including overtime for employees with emp_ot_applicable=True.
+    Only processes active employees.
     """
-    logger.info(f"Signal received for PayrollRun {instance.id}")
-    logger.info(f"Created: {created}, Status: {instance.status}")
-    logger.info(f"Sender: {sender}")
+    logger.info(f"Signal received for PayrollRun {instance.id} (Created: {created}, Status: {instance.status})")
     if created and instance.status == 'pending':
-        logger.debug(f"Starting payroll processing for {instance.id}")
-        # Get the EmpMaster model dynamically
+        logger.debug(f"Starting payroll processing for PayrollRun {instance.id}")
         EmpMaster = apps.get_model('EmpManagement', 'emp_master')
+        EmployeeOvertime = apps.get_model('calendars', 'EmployeeOvertime')
+
         try:
             employees = EmpMaster.objects.filter(is_active=True)
             logger.info(f"Found {employees.count()} active employees")
@@ -91,8 +91,13 @@ def run_payroll_on_save(sender, instance, created, **kwargs):
         total_working_days = (instance.end_date - instance.start_date).days + 1
         logger.debug(f"Total working days: {total_working_days}")
 
+        # Ensure Overtime SalaryComponent exists
+        overtime_component = SalaryComponent.objects.get(code='OT')
+        logger.debug("Overtime component verified: ID=4, Code=OT")
+
         for employee in employees:
             logger.debug(f"Processing employee: {employee.id} - {employee}")
+            # Fetch attendance
             try:
                 days_worked = Attendance.objects.filter(
                     employee=employee,
@@ -104,13 +109,15 @@ def run_payroll_on_save(sender, instance, created, **kwargs):
                 logger.debug(f"Days worked for {employee.id}: {days_worked}")
             except Exception as e:
                 logger.error(f"Error fetching attendance for {employee.id}: {e}")
-                continue
+                days_worked = 0
 
+            # Fetch salary components
             salary_components = EmployeeSalaryStructure.objects.filter(employee=employee, is_active=True)
             logger.debug(f"Found {salary_components.count()} salary components for {employee.id}")
-            total_additions = 0
-            total_deductions = 0
+            total_additions = Decimal('0.00')
+            total_deductions = Decimal('0.00')
 
+            # Create payslip
             try:
                 payslip = Payslip.objects.create(
                     payroll_run=instance,
@@ -123,12 +130,21 @@ def run_payroll_on_save(sender, instance, created, **kwargs):
                 logger.error(f"Error creating payslip for {employee.id}: {e}")
                 continue
 
+            # Calculate base hourly rate from Basic Salary (code='bs')
+            base_salary_component = salary_components.filter(component__code='bs').first()
+            base_hourly_rate = Decimal('0.00')
+            if base_salary_component and base_salary_component.amount:
+                monthly_salary = Decimal(str(base_salary_component.amount))
+                base_hourly_rate = monthly_salary / (total_working_days * 8)  # Assume 8 hours/day
+                logger.debug(f"Base hourly rate for {employee.id}: {base_hourly_rate}")
+
+            # Process regular salary components
             for salary_component in salary_components:
                 component = salary_component.component
-                amount = float(salary_component.amount or 0)
+                amount = Decimal(str(salary_component.amount or 0))
                 calculated_amount = amount
 
-                # Adjust amount for leave deduction if applicable
+                # Adjust for leave deduction
                 if component.deduct_leave and total_working_days > 0:
                     calculated_amount = (amount / total_working_days) * days_worked
                     logger.debug(f"Adjusted {component.name} for leave: {calculated_amount}")
@@ -151,7 +167,38 @@ def run_payroll_on_save(sender, instance, created, **kwargs):
                 elif component.component_type == 'deduction':
                     total_deductions += calculated_amount
 
-            # Calculate and save payslip totals
+            # Process overtime if emp_ot_applicable=True
+            if getattr(employee, 'emp_ot_applicable', False):
+                try:
+                    overtime_records = EmployeeOvertime.objects.filter(
+                        employee=employee,
+                        date__gte=instance.start_date,
+                        date__lte=instance.end_date,
+                        approved=True
+                    )
+                    total_overtime_hours = sum(Decimal(str(record.hours)) for record in overtime_records)
+                    logger.debug(f"Total overtime hours for {employee.id}: {total_overtime_hours}")
+
+                    if total_overtime_hours > 0 and base_hourly_rate > 0:
+                        overtime_rate_multiplier = Decimal(str(overtime_records.first().rate_multiplier)) if overtime_records else Decimal('1.5')
+                        overtime_amount = total_overtime_hours * base_hourly_rate * overtime_rate_multiplier
+                        logger.debug(f"Overtime amount for {employee.id}: {overtime_amount}")
+
+                        # Create PayslipComponent for overtime
+                        try:
+                            PayslipComponent.objects.create(
+                                payslip=payslip,
+                                component=overtime_component,
+                                amount=overtime_amount
+                            )
+                            total_additions += overtime_amount
+                            logger.debug(f"Added overtime component to payslip {payslip.id}")
+                        except Exception as e:
+                            logger.error(f"Error adding overtime component to payslip {payslip.id}: {e}")
+                except Exception as e:
+                    logger.error(f"Error processing overtime for {employee.id}: {e}")
+
+            # Update payslip totals
             gross_salary = total_additions
             net_salary = gross_salary - total_deductions
 
@@ -164,43 +211,11 @@ def run_payroll_on_save(sender, instance, created, **kwargs):
                 logger.info(f"Updated payslip {payslip.id}: Gross={gross_salary}, Net={net_salary}")
             except Exception as e:
                 logger.error(f"Error updating payslip {payslip.id}: {e}")
-                continue
 
+        # Update PayrollRun status
         try:
             instance.status = 'processed'
             instance.save()
             logger.info(f"PayrollRun {instance.id} status updated to 'processed'")
         except Exception as e:
             logger.error(f"Error updating PayrollRun status: {e}")
-
-@receiver(post_save, sender=EmployeeSalaryStructure)
-def update_variable_components_on_fixed_change(sender, instance, **kwargs):
-    """
-    Trigger update for variable components if a fixed component (like basic_salary) is changed.
-    """
-    if instance.component.is_fixed:
-        logger.info(f"Fixed component '{instance.component.code}' changed for {instance.employee}. Updating variable components.")
-
-        # Get all variable components that depend on fixed ones
-        variable_components = SalaryComponent.objects.filter(is_fixed=False).exclude(formula__isnull=True).exclude(formula__exact='')
-
-        for vc in variable_components:
-            # Prepare context for formula evaluation
-            salary_structures = EmployeeSalaryStructure.objects.filter(employee=instance.employee)
-            variables = {
-                sc.component.code: float(sc.amount) if sc.amount is not None else 0
-                for sc in salary_structures
-                if sc.component.code
-            }
-
-            amount = evaluate_formula(vc.formula, variables)
-
-            EmployeeSalaryStructure.objects.update_or_create(
-                employee=instance.employee,
-                component=vc,
-                defaults={
-                    'amount': amount,
-                    'is_active': True,
-                }
-            )
-            logger.info(f"Updated variable component '{vc.name}' for employee {instance.employee}: {amount}")

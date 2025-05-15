@@ -27,6 +27,7 @@ from django.db.models.signals import post_save
 import calendar
 from datetime import datetime, timedelta
 from django.db.models import Q
+from decimal import Decimal
 
 
 # Create your models here.
@@ -1551,18 +1552,69 @@ class Attendance(models.Model):
     class Meta:
         unique_together = ('employee', 'date')
     
-    def calculate_total_hours(self):
+    def save(self, *args, **kwargs):
+        # Auto-calculate total_hours if both check-in and check-out times exist
         if self.check_in_time and self.check_out_time:
-            # Combine date with time
-            check_in_datetime = datetime.combine(self.date, self.check_in_time)
-            check_out_datetime = datetime.combine(self.date, self.check_out_time)
+            self.calculate_total_hours()
 
-            # Handle overnight shift
+        # Auto-assign shift if not already set
+        if not self.shift:
+            self.shift = self.fetch_shift()
+        
+        super().save(*args, **kwargs)
+        # Handle overtime calculation and creation
+        if self.employee.epm_ot_applicable and self.total_hours and self.shift:
+            shift_duration = self.get_shift_duration()
+            print(f"[DEBUG] total_hours={self.total_hours}, shift_duration={shift_duration}")
+            if self.total_hours > shift_duration:
+                overtime_duration = self.total_hours - shift_duration
+                overtime_hours = Decimal(overtime_duration.total_seconds()) / Decimal(3600)
+                print(f"[DEBUG] Overtime calculated: {overtime_hours} hours for {self.employee}")
+
+                overtime_obj, created = EmployeeOvertime.objects.update_or_create(
+                    employee=self.employee,
+                    date=self.date,
+                    defaults={
+                        'hours': overtime_hours.quantize(Decimal('0.01')),
+                        'rate_multiplier': Decimal('1.5'),
+                        'approved': False,
+                        'created_by': self.created_by,
+                    }
+                )
+                print(f"[DEBUG] Overtime saved. Created: {created}, Object: {overtime_obj}")
+            else:
+                print("[DEBUG] No overtime: total hours are not greater than shift duration.")
+        else:
+            print("[DEBUG] Conditions not met for overtime. Skipping overtime logic.")
+
+
+    def calculate_total_hours(self, auto_save=True):
+        if self.check_in_time and self.check_out_time:
+            check_in_time = self.check_in_time if isinstance(self.check_in_time, time) else self.check_in_time.time()
+            check_out_time = self.check_out_time if isinstance(self.check_out_time, time) else self.check_out_time.time()
+
+            check_in_datetime = datetime.combine(self.date, check_in_time)
+            check_out_datetime = datetime.combine(self.date, check_out_time)
+
             if check_out_datetime < check_in_datetime:
                 check_out_datetime += timedelta(days=1)
 
-            # Calculate duration
-            self.total_hours = check_out_datetime - check_in_datetime
+            total_duration = check_out_datetime - check_in_datetime
+            self.total_hours = total_duration
+
+            # Calculate overtime
+            if self.shift:
+                shift_duration = self.get_shift_duration()
+                if total_duration > shift_duration:
+                    self.overtime_hours = total_duration - shift_duration
+                else:
+                    self.overtime_hours = timedelta(0)
+            else:
+                self.overtime_hours = timedelta(0)  # No shift, no overtime
+
+            if auto_save:
+                self.save()
+
     def fetch_shift(self):
         from .models import EmployeeShiftSchedule  # Avoid circular import
 
@@ -1572,27 +1624,9 @@ class Attendance(models.Model):
 
         return schedule.get_shift_for_date(self.date) if schedule else None
 
-    def save(self, *args, **kwargs):
-        # Auto-calculate total_hours if both check-in and check-out times exist
-        if self.check_in_time and self.check_out_time:
-            self.calculate_total_hours()
-
-        # Auto-assign shift if not already set
-        if not self.shift:
-            self.shift = self.fetch_shift()
-
-        super().save(*args, **kwargs)
-
-    def get_shift_duration(self):
-        """Calculate the standard shift duration excluding breaks."""
-        if not self.shift:
-            return timedelta(0)
-        start = datetime.combine(self.date, self.shift.start_time)
-        end = datetime.combine(self.date, self.shift.end_time)
-        if end < start:
-            end += timedelta(days=1)
-        return (end - start) - self.shift.break_duration
     
+
+        
 @receiver(post_save, sender=Attendance)
 def handle_rejoining(sender, instance, **kwargs):
     """
@@ -1627,7 +1661,7 @@ def handle_rejoining(sender, instance, **kwargs):
             'rejoining_date': attendance_date,
             'unpaid_leave_days': unpaid_days,
         }
-    )  
+    )
 
 class EmployeeOvertime(models.Model):
     employee = models.ForeignKey('EmpManagement.emp_master', on_delete=models.CASCADE)
@@ -1646,7 +1680,7 @@ class EmployeeOvertime(models.Model):
         unique_together = ('employee', 'date')
     
     def __str__(self):
-        return f"{self.employee} - {self.date} ({self.hours} hours)"
+        return f"{self.employee} - {self.date} ({self.hours} hours)" 
 
 class LeaveReport(models.Model):
     file_name   = models.CharField(max_length=100,unique=True)

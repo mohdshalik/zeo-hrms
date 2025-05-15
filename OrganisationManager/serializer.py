@@ -34,7 +34,7 @@ class BranchSerializer(serializers.ModelSerializer):
         """Fetch company policies assigned to this branch."""
         # from OrganisationManager.serializer import CompanyPolicySerializer  # Import the serializer
         policies = obj.policies.all()  # Using related_name='policies' from CompanyPolicy model
-        return CompanyPolicySerializer(policies, many=True).data
+        return CompanyPolicySerializer(policies, many=True, context={'request': self.context.get('request')}).data
     
     
     

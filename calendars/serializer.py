@@ -4,7 +4,7 @@ from .models import (weekend_calendar,assign_weekend,holiday_calendar,holiday,as
                     ShiftOverride,WeekPatternAssignment,EmployeeMachineMapping,LeaveReport,
                      LeaveApprovalLevels,LeaveApproval,LvApprovalNotify,LvEmailTemplate,LvCommonWorkflow,LvRejectionReason,LeaveApprovalReport,
                     AttendanceReport,lvBalanceReport,CompensatoryLeaveRequest,CompensatoryLeaveBalance,CompensatoryLeaveTransaction,EmployeeYearlyCalendar,LeaveResetPolicy,LeaveCarryForwardTransaction,
-                    LeaveEncashmentTransaction,EmployeeRejoining
+                    LeaveEncashmentTransaction,EmployeeRejoining,EmployeeOvertime
 
 )
 from OrganisationManager.serializer import BranchSerializer,CtgrySerializer,DeptSerializer
@@ -180,28 +180,66 @@ class ApplicableSerializer(serializers.ModelSerializer):
     class Meta:
         model = applicablity_critirea
         fields = '__all__'
-        
+    def to_representation(self, instance):
+        rep = super(ApplicableSerializer, self).to_representation(instance)
+        if instance.leave_type:  
+            rep['leave_type'] = instance.leave_type.name
+        rep['branch'] = [branch.branch_name for branch in instance.branch.all()]
+
+        # Department names
+        rep['department'] = [dept.dept_name for dept in instance.department.all()]
+
+        # Designation names
+        rep['designation'] = [desg.desgntn_job_title for desg in instance.designation.all()]
+
+        # Role/Category names
+        rep['role'] = [role.ctgry_title for role in instance.role.all()]
+        return rep
 class AccrualSerializer(serializers.ModelSerializer):
     class Meta:
         model = leave_accrual_transaction
         fields = '__all__'
-
+    def to_representation(self, instance):
+        rep = super(AccrualSerializer, self).to_representation(instance)
+        if instance.employee:  
+            rep['employee'] = instance.employee.emp_first_name
+        if instance.leave_type:  
+            rep['leave_type'] = instance.leave_type.name
+        return rep
 
 class ResetSerializer(serializers.ModelSerializer):
     class Meta:
         model = leave_reset_transaction
         fields = '__all__'
-
+    def to_representation(self, instance):
+        rep = super(ResetSerializer, self).to_representation(instance)
+        if instance.employee:  
+            rep['employee'] = instance.employee.emp_first_name
+        if instance.leave_type:  
+            rep['leave_type'] = instance.leave_type.name
+        return rep
 class LeaveCarryForwardTransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = LeaveCarryForwardTransaction
         fields = '__all__'
-
+    def to_representation(self, instance):
+        rep = super(LeaveCarryForwardTransactionSerializer, self).to_representation(instance)
+        if instance.employee:  
+            rep['employee'] = instance.employee.emp_first_name
+        if instance.leave_type:  
+            rep['leave_type'] = instance.leave_type.name
+        return rep
 class LeaveEncashmentTransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = LeaveEncashmentTransaction
         fields = '__all__'
-
+    def to_representation(self, instance):
+        rep = super(LeaveEncashmentTransactionSerializer, self).to_representation(instance)
+        if instance.employee:  
+            rep['employee'] = instance.employee.emp_first_name
+        if instance.leave_type:  
+            rep['leave_type'] = instance.leave_type.name
+        return rep
 class LeaveEntitlementSerializer(serializers.ModelSerializer):
     class Meta:
         model = leave_entitlement
@@ -216,7 +254,11 @@ class LeaveResetPolicySerializer(serializers.ModelSerializer):
     class Meta:
         model = LeaveResetPolicy
         fields = '__all__'
-
+    def to_representation(self, instance):
+        rep = super(LeaveResetPolicySerializer, self).to_representation(instance)
+        if instance.leave_type:  
+            rep['leave_type'] = instance.leave_type.name
+        return rep
 class LeaveRequestSerializer(serializers.ModelSerializer):
     # document_numbering_details = serializers.SerializerMethodField()
     class Meta:
@@ -264,19 +306,6 @@ class EmployeeLeaveBalanceSerializer(serializers.ModelSerializer):
             rep['employee'] = instance.employee.emp_code
            
         return rep
-#         extra_fields = ['applicable_leave_types']
-#     def __init__(self, *args, **kwargs):
-#         employee_id = kwargs.pop('employee_id', None)
-#         super().__init__(*args, **kwargs)
-#         if employee_id:
-#             try:
-#                 employee = emp_master.objects.get(id=employee_id)
-#             except emp_master.DoesNotExist:
-#                 raise serializers.ValidationError("Employee not found")
-#             self.fields['leave_type'].queryset = leave_type.objects.filter(
-#                 id__in=emp_leave_balance.objects.filter(employee=employee).values_list('leave_type_id', flat=True)
-#             )
-
 
 class AttendanceSerializer(serializers.ModelSerializer):
     class Meta:
@@ -328,7 +357,23 @@ class ShiftPatternSerializer(serializers.ModelSerializer):
     class Meta:
         model = ShiftPattern
         fields = '__all__'
-        
+    def to_representation(self, instance):
+        rep = super(ShiftPatternSerializer, self).to_representation(instance)
+        if instance.monday_shift:  
+            rep['monday_shift'] = instance.monday_shift.name
+        if instance.tuesday_shift:  
+            rep['tuesday_shift'] = instance.tuesday_shift.name
+        if instance.wednesday_shift:  
+            rep['wednesday_shift'] = instance.wednesday_shift.name
+        if instance.thursday_shift:  
+            rep['thursday_shift'] = instance.thursday_shift.name
+        if instance.friday_shift:  
+            rep['friday_shift'] = instance.friday_shift.name
+        if instance.saturday_shift:  
+            rep['saturday_shift'] = instance.saturday_shift.name
+        if instance.sunday_shift:  
+            rep['sunday_shift'] = instance.sunday_shift.name
+        return rep
 class ShiftOverrideSerializer(serializers.ModelSerializer):
     class Meta:
         model = ShiftOverride
@@ -482,3 +527,8 @@ class AttendanceSummarySerializer(serializers.Serializer):
     summary = DailyAttendanceSerializer(many=True)
     total_present = serializers.IntegerField()
     total_absent = serializers.IntegerField()
+
+class EmployeeOvertimeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EmployeeOvertime
+        fields = '__all__'
