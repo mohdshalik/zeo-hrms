@@ -18,7 +18,7 @@ from rest_framework.response import Response
 from tablib import Dataset
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.db import transaction
-from .utils import process_payroll,generate_payslip_pdf 
+from .utils import generate_payslip_pdf 
 from .models import (SalaryComponent,EmployeeSalaryStructure,PayrollRun,Payslip,PayslipComponent,LoanType,LoanApplication,
                      LoanRepayment,LoanApprovalLevels,LoanApproval)
 from .serializer import (SalaryComponentSerializer,EmployeeSalaryStructureSerializer,PayslipSerializer,PaySlipComponentSerializer,LoanTypeSerializer,LoanApplicationSerializer,LoanRepaymentSerializer,
