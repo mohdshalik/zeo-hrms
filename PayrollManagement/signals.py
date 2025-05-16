@@ -239,3 +239,52 @@ def run_payroll_on_save(sender, instance, created, **kwargs):
             logger.info(f"PayrollRun {instance.id} status updated to 'processed'")
         except Exception as e:
             logger.error(f"Error updating PayrollRun status: {e}")
+@receiver(post_save, sender=EmployeeSalaryStructure)
+def update_dependent_salary_components(sender, instance, created, **kwargs):
+    """
+    When an EmployeeSalaryStructure's amount is updated, recalculate amounts for
+    other components that use this component in their formulas.
+    """
+    # Only proceed if the amount was updated (not created) and the component is fixed
+    if created or not instance.component.is_fixed:
+        return
+
+    # Get the EmpMaster model dynamically
+    EmpMaster = apps.get_model('EmpManagement', 'emp_master')
+    
+    # Get all employees to update their dependent components
+    employees = EmpMaster.objects.all()
+
+    # Find all variable SalaryComponents that might depend on this component
+    dependent_components = SalaryComponent.objects.filter(
+        is_fixed=False,
+        formula__contains=instance.component.code  # Check if the updated component's code appears in the formula
+    )
+
+    for employee in employees:
+        # Fetch all salary components for this employee to use in formula evaluation
+        salary_components = EmployeeSalaryStructure.objects.filter(employee=employee)
+        component_amounts = {}
+
+        # Populate fixed component amounts for formula evaluation
+        for sc in salary_components:
+            if sc.component.is_fixed and sc.amount is not None:
+                component_amounts[sc.component.code] = float(sc.amount)
+                logger.info(f"Using fixed component {sc.component.name} ({sc.component.code}): {sc.amount}")
+
+        # Recalculate amounts for dependent components
+        for component in dependent_components:
+            # Calculate the new amount using the formula
+            amount = evaluate_formula(component.formula, component_amounts)
+            logger.info(f"Calculated amount for {component.name} ({component.code}) for employee {employee}: {amount}")
+
+            # Update or create the EmployeeSalaryStructure entry for the dependent component
+            EmployeeSalaryStructure.objects.update_or_create(
+                employee=employee,
+                component=component,
+                defaults={
+                    'amount': amount,
+                    'is_active': True,
+                }
+            )
+            logger.info(f"Updated EmployeeSalaryStructure for {employee} with component {component.name} - Amount: {amount}")

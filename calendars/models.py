@@ -1553,24 +1553,24 @@ class Attendance(models.Model):
         unique_together = ('employee', 'date')
     
     def save(self, *args, **kwargs):
-        # Auto-calculate total_hours if both check-in and check-out times exist
         if self.check_in_time and self.check_out_time:
             self.calculate_total_hours()
 
-        # Auto-assign shift if not already set
         if not self.shift:
             self.shift = self.fetch_shift()
-        
+
         super().save(*args, **kwargs)
-        # Handle overtime calculation and creation
-        if self.employee.epm_ot_applicable and self.total_hours and self.shift:
+
+        if self.employee.emp_ot_applicable and self.total_hours and self.shift:
             shift_duration = self.get_shift_duration()
             print(f"[DEBUG] total_hours={self.total_hours}, shift_duration={shift_duration}")
             if self.total_hours > shift_duration:
                 overtime_duration = self.total_hours - shift_duration
                 overtime_hours = Decimal(overtime_duration.total_seconds()) / Decimal(3600)
+
                 print(f"[DEBUG] Overtime calculated: {overtime_hours} hours for {self.employee}")
 
+                from .models import EmployeeOvertime  # local import to avoid circular import
                 overtime_obj, created = EmployeeOvertime.objects.update_or_create(
                     employee=self.employee,
                     date=self.date,
@@ -1587,7 +1587,6 @@ class Attendance(models.Model):
         else:
             print("[DEBUG] Conditions not met for overtime. Skipping overtime logic.")
 
-
     def calculate_total_hours(self, auto_save=True):
         if self.check_in_time and self.check_out_time:
             check_in_time = self.check_in_time if isinstance(self.check_in_time, time) else self.check_in_time.time()
@@ -1602,7 +1601,6 @@ class Attendance(models.Model):
             total_duration = check_out_datetime - check_in_datetime
             self.total_hours = total_duration
 
-            # Calculate overtime
             if self.shift:
                 shift_duration = self.get_shift_duration()
                 if total_duration > shift_duration:
@@ -1610,32 +1608,37 @@ class Attendance(models.Model):
                 else:
                     self.overtime_hours = timedelta(0)
             else:
-                self.overtime_hours = timedelta(0)  # No shift, no overtime
-
-            if auto_save:
-                self.save()
+                self.overtime_hours = timedelta(0)
 
     def fetch_shift(self):
         from .models import EmployeeShiftSchedule  # Avoid circular import
-
         schedule = EmployeeShiftSchedule.objects.filter(
             Q(employee=self.employee) | Q(departments=self.employee.emp_dept_id)
         ).first()
-
         return schedule.get_shift_for_date(self.date) if schedule else None
 
+    def get_shift_duration(self):
+        if not self.shift:
+            return timedelta(0)
+        start = datetime.combine(self.date, self.shift.start_time)
+        end = datetime.combine(self.date, self.shift.end_time)
+        if end < start:
+            end += timedelta(days=1)
+        return (end - start)
     
 
         
 @receiver(post_save, sender=Attendance)
 def handle_rejoining(sender, instance, **kwargs):
-    """
-    Signal to handle rejoining date creation based on attendance.
-    """
-    employee = instance.employee
-    attendance_date = instance.date
+    from .models import employee_leave_request, EmployeeRejoining
 
-    # Fetch approved leave requests that ended before this attendance date
+    employee = instance.employee
+
+    # Make sure attendance_date is a date object
+    attendance_date = instance.date
+    if isinstance(attendance_date, datetime):
+        attendance_date = attendance_date.date()
+
     leave_requests = employee_leave_request.objects.filter(
         employee=employee,
         status='approved',
@@ -1648,12 +1651,13 @@ def handle_rejoining(sender, instance, **kwargs):
 
     leave_request = leave_requests.first()
 
-    unpaid_days = max(0, (attendance_date - leave_request.end_date).days) - 1
+    # Make sure end_date is a date object
+    end_date = leave_request.end_date
+    if isinstance(end_date, datetime):
+        end_date = end_date.date()
 
-    if unpaid_days < 0:
-        unpaid_days = 0  # Safety check
+    unpaid_days = max(0, (attendance_date - end_date).days - 1)
 
-    # Only create the rejoining record; no deduction yet
     EmployeeRejoining.objects.get_or_create(
         employee=employee,
         leave_request=leave_request,
