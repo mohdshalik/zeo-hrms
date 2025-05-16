@@ -34,8 +34,8 @@ from decimal import Decimal
 class weekend_calendar(models.Model):
     DAY_TYPE_CHOICES = [
         ('leave', 'Leave'),
-        ('fullday', 'Full Day'),
-        ('halfday', 'Half Day'),
+        ('fullday', 'fullday'),
+        ('halfday', 'Halfday'),
     ]
     description       = models.TextField()
     calendar_code     = models.CharField(max_length=100)
@@ -58,9 +58,6 @@ class weekend_calendar(models.Model):
         print("dayyy",day_name)
         day_type = getattr(self, day_name, 'fullday')
         return day_type == 'leave'
-
-    def __str__(self):
-        return f"{self.calendar_code} - {self.year}"
     def get_weekend_days(self):
         """Return list of day names that are marked as 'leave'."""
         days = {
@@ -144,8 +141,8 @@ class assign_weekend(models.Model):
     ]
     related_to    = models.CharField(max_length=20, choices=EMP_CHOICES,null=True)
     branch        = models.ManyToManyField('OrganisationManager.brnch_mstr',  null=True, blank=True)
-    department    = models.ManyToManyField('OrganisationManager.ctgry_master', null=True, blank=True)
-    category      = models.ManyToManyField('OrganisationManager.dept_master',  null=True, blank=True)
+    department    = models.ManyToManyField('OrganisationManager.dept_master',  null=True, blank=True)
+    category      = models.ManyToManyField('OrganisationManager.ctgry_master', null=True, blank=True)
     employee      = models.ManyToManyField('EmpManagement.emp_master',  null=True, blank=True)
     weekend_model = models.ForeignKey(weekend_calendar,on_delete=models.CASCADE)
     created_at    = models.DateTimeField(auto_now_add=True)
@@ -234,7 +231,7 @@ class holiday(models.Model):
     description = models.CharField(max_length=50,unique=True)
     start_date  = models.DateField()
     end_date    = models.DateField()
-    calendar    = models.ForeignKey(holiday_calendar,on_delete=models.CASCADE,null=True)
+    calendar    = models.ForeignKey(holiday_calendar,on_delete=models.CASCADE,null=True,related_name='holiday_list')
     restricted  = models.BooleanField(default=False)
     created_at  = models.DateTimeField(auto_now_add=True)
     created_by  = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
@@ -250,8 +247,8 @@ class assign_holiday(models.Model):
     ]
     related_to     = models.CharField(max_length=20, choices=EMP_CHOICES,null=True)
     branch         = models.ManyToManyField('OrganisationManager.brnch_mstr',  null=True, blank=True)
-    department     = models.ManyToManyField('OrganisationManager.ctgry_master', null=True, blank=True)
-    category       = models.ManyToManyField('OrganisationManager.dept_master',  null=True, blank=True)
+    department    = models.ManyToManyField('OrganisationManager.dept_master',  null=True, blank=True)
+    category      = models.ManyToManyField('OrganisationManager.ctgry_master', null=True, blank=True)
     employee       = models.ManyToManyField('EmpManagement.emp_master',  null=True, blank=True)
     holiday_model  = models.ForeignKey(holiday_calendar,on_delete=models.CASCADE)
     created_at     = models.DateTimeField(auto_now_add=True)
@@ -293,6 +290,7 @@ def update_employee_weekend_calendar(sender, instance, action, **kwargs):
             # logger.debug(f"Updated employee ID {employee.id}")
 def update_employee_yearly_calendar_with_holidays(employee, holiday_calendar):
     year = holiday_calendar.year
+    print("holiday")
     try:
         yearly_calendar, created = EmployeeYearlyCalendar.objects.get_or_create(emp=employee, year=year)
         updated_data = yearly_calendar.daily_data
@@ -307,7 +305,7 @@ def update_employee_yearly_calendar_with_holidays(employee, holiday_calendar):
                         "remarks": holiday.description
                     }
                 current_date += timedelta(days=1)
-
+        print("holiday1")
         yearly_calendar.daily_data = updated_data
         yearly_calendar.save()
 
