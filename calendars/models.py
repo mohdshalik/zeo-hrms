@@ -61,6 +61,20 @@ class weekend_calendar(models.Model):
 
     def __str__(self):
         return f"{self.calendar_code} - {self.year}"
+    def get_weekend_days(self):
+        """Return list of day names that are marked as 'leave'."""
+        days = {
+            'Monday': self.monday,
+            'Tuesday': self.tuesday,
+            'Wednesday': self.wednesday,
+            'Thursday': self.thursday,
+            'Friday': self.friday,
+            'Saturday': self.saturday,
+            'Sunday': self.sunday,
+        }
+        return [day for day, value in days.items() if value == 'leave']
+    def __str__(self):
+        return f"{self.calendar_code} - {self.year}"
 class WeekendDetail(models.Model):
     WEEKDAY_CHOICES = [
         ('Monday', 'Monday'),
