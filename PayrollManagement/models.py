@@ -83,17 +83,13 @@ class Payslip(models.Model):
     net_salary = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     total_deductions = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     total_additions = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    status = models.CharField(max_length=20, choices=[('pending', 'Pending'), ('paid', 'Paid')], default='pending')
+    status = models.CharField(max_length=20, choices=[('pending', 'Pending'),('processed', 'Processed'), ('paid', 'Paid')], default='pending')
     created_at = models.DateTimeField(auto_now_add=True)
     # New fields for working days
     total_working_days = models.PositiveIntegerField(default=0, help_text="Total working days in the payroll period")
     days_worked = models.PositiveIntegerField(default=0, help_text="Number of days the employee worked")
     pro_rata_adjustment = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, help_text="Pro-rata adjustment")  # New field
     arrears = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, help_text="Arrears amount")  # New field
-
-    # def __str__(self):
-        # return f"Payslip for {self.employee} - {self.payroll_run.get_month_display()} {self.payroll_run.year}"    # def __str__(self):
-    #     return f"Payslip for {self.employee} ({self.payroll_run.start_date} - {self.payroll_run.end_date})"
 
 
 class PayslipComponent(models.Model):

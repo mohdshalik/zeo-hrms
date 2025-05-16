@@ -53,7 +53,7 @@ router.register(r'lvBalanceReport', LvBalanceReportViewset, basename='lvBalanceR
 router.register(r'EmployeeYearlyCalendarViewset',EmployeeYearlyCalendarViewset , basename='EmployeeYearlyCalendarViewset')
 router.register(r'Emp-bulkupld-openings',EmpOpeningsBlkupldViewSet , basename='Emp-bulkupld-openings')
 router.register(r'monthly-attendance', MonthlyAttendanceSummaryViewSet, basename='monthly-attendance')
-router.register(r'Emp-overtiume',EmployeeOvertimeViewset , basename='EmployeeOvertime')
+router.register(r'Emp-overtime',EmployeeOvertimeViewset , basename='EmployeeOvertime')
 
 
 urlpatterns = [
