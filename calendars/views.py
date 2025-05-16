@@ -2,13 +2,13 @@ from django.shortcuts import render
 from .models import( weekend_calendar,assign_weekend,holiday,holiday_calendar,assign_holiday,WeekendDetail,leave_type,leave_entitlement,applicablity_critirea,emp_leave_balance,leave_accrual_transaction,leave_reset_transaction,employee_leave_request,Attendance,Shift,
                      EmployeeMachineMapping,LeaveReport,LeaveApprovalLevels,LeaveApproval,LvEmailTemplate,LvApprovalNotify,LvCommonWorkflow,LvRejectionReason,LeaveApprovalReport,
                      AttendanceReport,lvBalanceReport,EmployeeYearlyCalendar,CompensatoryLeaveRequest,CompensatoryLeaveTransaction,CompensatoryLeaveBalance,ShiftPattern,EmployeeShiftSchedule,ShiftOverride,WeekPatternAssignment,LeaveResetPolicy,LeaveCarryForwardTransaction,
-                    LeaveEncashmentTransaction,EmployeeRejoining,EmployeeOvertime
+                    LeaveEncashmentTransaction,EmployeeRejoining,EmployeeOvertime,MonthlyAttendanceSummary
                     )
 from . serializer import (WeekendCalendarSerailizer,WeekendAssignSerializer,HolidayAssignSerializer,HolidayCalandarSerializer,HolidaySerializer,WeekendDetailSerializer,LeaveTypeSerializer,LeaveEntitlementSerializer,ApplicableSerializer,EmployeeLeaveBalanceSerializer,AccrualSerializer,ResetSerializer,LeaveRequestSerializer,
                          AttendanceSerializer,ShiftSerializer,ImportAttendanceSerializer,EmployeeMappingSerializer,LeaveReportSerializer,LvApprovalLevelSerializer,EmployeeYearlyCalendarSerializer,
                          LvApprovalSerializer,LvEmailTemplateSerializer,LvApprovalNotifySerializer,LvCommonWorkflowSerializer,LvRejectionReasonSerializer,LvApprovalReportSerializer,AttendanceReportSerializer,lvBalanceReportSerializer,
                          CompensatoryLeaveRequestSerializer,CompensatoryLeaveTransactionSerializer,CompensatoryLeaveBalanceSerializer,ShiftOverrideSerializer,ShiftPatternSerializer,EmployeeShiftScheduleSerializer,WeekPatternAssignmentSerializer,LeaveResetPolicySerializer,LeaveCarryForwardTransactionSerializer,
-                         LeaveEncashmentTransactionSerializer,EmpOpeningsBlkupldSerializer,EmployeeRejoiningSerializer,EmployeeOvertimeSerializer
+                         LeaveEncashmentTransactionSerializer,EmpOpeningsBlkupldSerializer,EmployeeRejoiningSerializer,EmployeeOvertimeSerializer,MonthlyAttendanceSummarySerializer
                          )
 from rest_framework import viewsets,filters,status
 from rest_framework.response import Response
@@ -2221,3 +2221,39 @@ def month_name_to_number(month_name):
 class EmployeeOvertimeViewset(viewsets.ModelViewSet):
     queryset = EmployeeOvertime.objects.all()
     serializer_class = EmployeeOvertimeSerializer
+
+class MonthlyAttendanceSummaryViewSet(viewsets.ModelViewSet):
+    queryset = MonthlyAttendanceSummary.objects.all()
+    serializer_class = MonthlyAttendanceSummarySerializer
+    @action(detail=False, methods=['post'])
+    def generate(self, request):
+        month = int(request.data.get("month", date.today().month))
+        year = int(request.data.get("year", date.today().year))
+
+        start_date = date(year, month, 1)
+        end_date = start_date + relativedelta(months=1) - relativedelta(days=1)
+
+        all_employees = emp_master.objects.all()
+        result = []
+
+        for employee in all_employees:
+            summary_data = get_attendance_summary(employee, start_date, end_date)
+            if not summary_data:
+                continue
+
+            serializer = AttendanceSummarySerializer(summary_data)
+
+            summary_obj, _ = MonthlyAttendanceSummary.objects.update_or_create(
+                employee=employee,
+                month=month,
+                year=year,
+                defaults={
+                    "summary_data": serializer.data["summary"],
+                    "total_present": serializer.data["total_present"],
+                    "total_absent": serializer.data["total_absent"],
+                }
+            )
+
+            result.append(MonthlyAttendanceSummarySerializer(summary_obj).data)
+
+        return Response(result)

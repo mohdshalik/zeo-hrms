@@ -1808,6 +1808,17 @@ class EmployeeYearlyCalendar(models.Model):
             current_date += timedelta(days=1)
 
         self.save()
+
+class MonthlyAttendanceSummary(models.Model):
+    employee = models.ForeignKey(emp_master, on_delete=models.CASCADE)
+    month = models.IntegerField()  # 1 to 12
+    year = models.IntegerField()
+    summary_data = models.JSONField()  # To store daily records (date, status, leave_type)
+    total_present = models.IntegerField()
+    total_absent = models.IntegerField()
+    
+    class Meta:
+        unique_together = ('employee', 'month', 'year')  # Prevent duplicates
     
     
 

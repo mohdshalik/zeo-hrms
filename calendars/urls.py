@@ -4,7 +4,7 @@ from .  views import (WeekendViewset,AssignWeekendViewset,HolidayViewset,Holiday
                     LvApprovalViewset,LvEmailTemplateviewset,LvApprovalNotifyviewset,LvCommonWorkflowViewset,LvRejectionViewset,Lv_Approval_ReportViewset,
                     AttendanceReportViewset,LvBalanceReportViewset,EmployeeYearlyCalendarViewset,ShiftPatternViewSet,EmployeeShiftScheduleViewSet,WeekPatternAssignmentVSet,
                     ShiftOverrideViewSet,LeaveResetPolicyviewset,LeaveCarryForwardTransactionviewset,LeaveEncashmentTransactionviewset,EmpOpeningsBlkupldViewSet,ApplyOpeningsAPIView,EmployeeRejoiningViewset,ImmediateRejectAPIView,EmployeeAttendanceSummaryAPIView,MonthwiseAccrualSimulationView,
-                    LeaveResetPreviewAPIView,EmployeeOvertimeViewset
+                    LeaveResetPreviewAPIView,EmployeeOvertimeViewset,MonthlyAttendanceSummaryViewSet
                     )
 
 from rest_framework.routers import DefaultRouter
@@ -52,6 +52,7 @@ router.register(r'AttendanceReport', AttendanceReportViewset, basename='Attendan
 router.register(r'lvBalanceReport', LvBalanceReportViewset, basename='lvBalanceReport')
 router.register(r'EmployeeYearlyCalendarViewset',EmployeeYearlyCalendarViewset , basename='EmployeeYearlyCalendarViewset')
 router.register(r'Emp-bulkupld-openings',EmpOpeningsBlkupldViewSet , basename='Emp-bulkupld-openings')
+router.register(r'monthly-attendance', MonthlyAttendanceSummaryViewSet, basename='monthly-attendance')
 router.register(r'Emp-overtiume',EmployeeOvertimeViewset , basename='EmployeeOvertime')
 
 

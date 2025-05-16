@@ -4,7 +4,7 @@ from .models import (weekend_calendar,assign_weekend,holiday_calendar,holiday,as
                     ShiftOverride,WeekPatternAssignment,EmployeeMachineMapping,LeaveReport,
                      LeaveApprovalLevels,LeaveApproval,LvApprovalNotify,LvEmailTemplate,LvCommonWorkflow,LvRejectionReason,LeaveApprovalReport,
                     AttendanceReport,lvBalanceReport,CompensatoryLeaveRequest,CompensatoryLeaveBalance,CompensatoryLeaveTransaction,EmployeeYearlyCalendar,LeaveResetPolicy,LeaveCarryForwardTransaction,
-                    LeaveEncashmentTransaction,EmployeeRejoining,EmployeeOvertime
+                    LeaveEncashmentTransaction,EmployeeRejoining,EmployeeOvertime,MonthlyAttendanceSummary
 
 )
 from OrganisationManager.serializer import BranchSerializer,CtgrySerializer,DeptSerializer
@@ -527,7 +527,15 @@ class AttendanceSummarySerializer(serializers.Serializer):
     summary = DailyAttendanceSerializer(many=True)
     total_present = serializers.IntegerField()
     total_absent = serializers.IntegerField()
+class MonthlyAttendanceSummarySerializer(serializers.ModelSerializer):
+    employee_name = serializers.CharField(source='employee.emp_first_name', read_only=True)
 
+    class Meta:
+        model = MonthlyAttendanceSummary
+        fields = [
+            'id', 'employee', 'employee_name', 'month', 'year',
+            'summary_data', 'total_present', 'total_absent'
+        ]
 class EmployeeOvertimeSerializer(serializers.ModelSerializer):
     class Meta:
         model = EmployeeOvertime
