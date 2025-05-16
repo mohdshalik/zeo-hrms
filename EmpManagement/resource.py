@@ -162,7 +162,7 @@ class EmployeeResource(resources.ModelResource):
             'emp_mother_name',
             'emp_posting_location',
             'is_active',
-            'epm_ot_applicable',
+            'emp_ot_applicable',
             'emp_branch_id',
             'emp_dept_id',
             'emp_desgntn_id',
