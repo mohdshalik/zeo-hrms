@@ -9,7 +9,15 @@ class CompanyPolicySerializer(serializers.ModelSerializer):
     class Meta:
         model = CompanyPolicy
         fields = '__all__'
-
+    def to_representation(self, instance):
+        rep = super(CompanyPolicySerializer, self).to_representation(instance)
+        if instance.branch:
+            rep['branch'] =instance.branch.branch_name
+        if instance.department:
+            rep['department'] =instance.department.dept_name
+        if instance.category:
+            rep['category'] =instance.category.ctgry_title
+        return rep
 class BranchSerializer(serializers.ModelSerializer):
     holidays = serializers.SerializerMethodField()
     policies = serializers.SerializerMethodField()  # Add this field
