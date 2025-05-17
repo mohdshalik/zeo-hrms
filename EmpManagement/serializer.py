@@ -436,10 +436,15 @@ class ReqNotifySerializer(serializers.ModelSerializer):
 
 
 class EmailConfigurationSerializer(serializers.ModelSerializer):
+    email_host_password = serializers.CharField(write_only=True, required=False)
     class Meta:
         model = EmailConfiguration
         fields = '__all__'
-
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Mask the password field
+        data['email_host_password'] = '********' if instance.email_host_password else ''
+        return data
 class CommonWorkflowSerializer(serializers.ModelSerializer):
     class Meta:
         model = CommonWorkflow

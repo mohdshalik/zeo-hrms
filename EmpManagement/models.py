@@ -793,26 +793,49 @@ class Emp_Documents(models.Model):
 
 
 def check_document_expiry_and_notify(document):
-    """Check if the document is expired or about to expire, and send notifications."""
-    from .tasks import send_document_notification
+    from .tasks import send_document_notification, send_template_email
     today = timezone.now().date()
     expiry_date = document.emp_doc_expiry_date
+    employee = document.emp_id
+    branch = employee.emp_branch_id
+
+    if not branch:
+        return
 
     try:
-        branch = document.emp_id.emp_branch_id
-        notification_settings = NotificationSettings.objects.get(branch=branch)
-        days_before_expiry = notification_settings.days_before_expiry
+        settings = NotificationSettings.objects.get(branch=branch)
+        days_before = settings.days_before_expiry
+        ess_users = settings.notify_users.all()
     except NotificationSettings.DoesNotExist:
-        days_before_expiry = 7  # Default reminder 7 days before expiry
+        days_before = 7
+        ess_users = []
 
     days_until_expiry = (expiry_date - today).days
+    status = None
 
-    # Condition to check if expiry date is today or within before expiry period
     if expiry_date <= today:
-        send_document_notification(document, expiry_date, 'expired or expiring today')
+        status = 'expired or expiring today'
+    elif days_until_expiry <= days_before:
+        status = f'expiring in {days_until_expiry} days'
 
-    elif days_until_expiry <= days_before_expiry:
-        send_document_notification(document, expiry_date, f"expiring in {days_until_expiry} days")
+    if not status:
+        return  # No notification needed
+
+    # 🔹 Notify Employee
+    send_document_notification(document, expiry_date, status)
+
+    # 🔹 Notify ESS Users
+    if ess_users:
+        doc_message = (
+            f"{employee.emp_first_name} {employee.emp_last_name} - "
+            f"{document.document_type} is {status} on {expiry_date}"
+        )
+        for ess_user in ess_users:
+            context = {
+                'ess_user_first_name': ess_user.username,
+                'documents': doc_message
+            }
+            send_template_email('ESS User Notification', ess_user.email, context)
 #Document UDF
 class EmpDocuments_CustomField(models.Model):
     FIELD_TYPES = (   
