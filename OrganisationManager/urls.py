@@ -1,7 +1,9 @@
 from django.urls import path, include
 from . views import (FiscalYearViewSet,PeriodViewSet,BranchViewSet,DepartmentViewSet,DocNumberingviewset,FiscalPeriodDatesView,
                      DesignationViewSet,CatogoryViewSet,CompanyFiscalData,permissionviewset,Groupviewset,permviewset,FiscalYearDatesView,DeptBulkUploadViewSet,DesignationBulkUploadViewSet,
-                   save_notification_settings,CompanyPolicyViewSet,list_data_in_schema,AssetMasterViewSet,AssetTransactionViewSet,Asset_CustomFieldValueViewSet,CategoryBulkUploadViewSet)
+                   save_notification_settings,CompanyPolicyViewSet,list_data_in_schema,AssetMasterViewSet,AssetTransactionViewSet,Asset_CustomFieldValueViewSet,CategoryBulkUploadViewSet,AnnouncementViewSet,
+                   AnnouncementCommentViewSet
+                   )
 from rest_framework.routers import DefaultRouter
 
 router = DefaultRouter()
@@ -25,6 +27,8 @@ router.register(r'policies', CompanyPolicyViewSet, basename='companypolicy')
 router.register(r'assets', AssetMasterViewSet, basename='asset-master')
 router.register(r'asset-transactions', AssetTransactionViewSet, basename='asset-transaction')
 router.register(r'asset-customfield', Asset_CustomFieldValueViewSet, basename='assets-customfield')
+router.register(r'announcements', AnnouncementViewSet, basename='announcement')
+router.register('announcement-comments', AnnouncementCommentViewSet, basename='announcement-comments')
 # router.register(r'e-attendance', AttendanceViewSet, basename='e-attendance')
 
 

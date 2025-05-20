@@ -1,5 +1,6 @@
 from .models import (brnch_mstr,dept_master,desgntn_master,DocumentNumbering,
-                     ctgry_master,FiscalPeriod,FiscalYear,CompanyPolicy,AssetMaster,AssetMaster, AssetTransaction,Asset_CustomFieldValue)
+                     ctgry_master,FiscalPeriod,FiscalYear,CompanyPolicy,AssetMaster,AssetMaster, AssetTransaction,Asset_CustomFieldValue,
+                     Announcement,AnnouncementView,AnnouncementComment)
 from rest_framework import serializers
 from tenant_users.tenants.models import UserTenantPermissions
 from django.contrib.auth.models import Permission,Group
@@ -173,3 +174,17 @@ class Asset_CustomFieldValueSerializer(serializers.ModelSerializer):
     class Meta:
         model = Asset_CustomFieldValue
         fields = '__all__'   
+
+class AnnouncementSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Announcement
+        fields = '__all__'
+class AnnouncementViewSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AnnouncementView
+        fields = '__all__'
+class AnnouncementCommentSerializer(serializers.ModelSerializer):
+    employee_name = serializers.CharField(source='employee.first_name', read_only=True)
+    class Meta:
+        model = AnnouncementComment
+        fields = ['id', 'announcement', 'employee', 'comment', 'created_at', 'employee_name']

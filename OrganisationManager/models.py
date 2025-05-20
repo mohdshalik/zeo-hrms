@@ -274,3 +274,40 @@ class Asset_CustomFieldValue(models.Model):
             # Call full_clean to ensure that the clean method is called
             self.full_clean()
             super().save(*args, **kwargs)
+
+class Announcement(models.Model):
+    title = models.CharField(max_length=255)
+    message = models.TextField()
+    send_email = models.BooleanField(default=True)
+    is_sticky = models.BooleanField(default=False)
+    schedule_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    specific_employees = models.ManyToManyField(emp_master, blank=True, related_name='employee_announcements')
+    branches = models.ManyToManyField(brnch_mstr, blank=True, related_name='branch_announcements')
+    attachment = models.FileField(upload_to='announcements/', null=True, blank=True)
+    allow_comments = models.BooleanField(default=True)
+    created_by = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def is_expired(self):
+        return self.expires_at and self.expires_at < timezone.now()
+
+    def __str__(self):
+        return self.title
+class AnnouncementView(models.Model):
+    announcement = models.ForeignKey(Announcement, on_delete=models.CASCADE, related_name='announcement_views')
+    employee = models.ForeignKey(emp_master, on_delete=models.CASCADE)
+    viewed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('announcement', 'employee')  # Avoid duplicate views
+
+
+class AnnouncementComment(models.Model):
+    announcement = models.ForeignKey(Announcement, on_delete=models.CASCADE, related_name='announcement_comments')
+    employee = models.ForeignKey(emp_master, on_delete=models.CASCADE)
+    comment = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Comment by {self.employee} on {self.announcement}"

@@ -11,11 +11,13 @@ from django_tenants.utils import schema_context
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from .models import (brnch_mstr,dept_master,DocumentNumbering,
-                     desgntn_master,ctgry_master,FiscalPeriod,FiscalYear,CompanyPolicy,AssetMaster, AssetTransaction,Asset_CustomFieldValue)
+                     desgntn_master,ctgry_master,FiscalPeriod,FiscalYear,CompanyPolicy,AssetMaster, AssetTransaction,Asset_CustomFieldValue,Announcement,
+                     AnnouncementComment,AnnouncementView)
 
 from . serializer import (BranchSerializer,PermissionSerializer,GroupSerializer,permserializer,DocumentNumberingSerializer,
                           CtgrySerializer,DeptSerializer,DesgSerializer,FiscalYearSerializer,PeriodSerializer,DeptUploadSerializer,CtgryUploadSerializer,
-                          DesgUploadSerializer,CompanyPolicySerializer,AssetMasterSerializer,AssetTransactionSerializer,Asset_CustomFieldValueSerializer)
+                          DesgUploadSerializer,CompanyPolicySerializer,AssetMasterSerializer,AssetTransactionSerializer,Asset_CustomFieldValueSerializer,
+                          AnnouncementSerializer,AnnouncementCommentSerializer)
 from rest_framework.permissions import IsAuthenticated,AllowAny,IsAuthenticatedOrReadOnly,IsAdminUser
 from .resource import (DepartmentResource,DesignationResource,DesgtnReportResource,DeptReportResource,CategoryResource)
 from EmpManagement.models import emp_master
@@ -40,6 +42,9 @@ import os
 from django.utils import timezone
 from django.db.models import Q
 from django.contrib.contenttypes.models import ContentType
+from django.core.mail import EmailMessage
+from EmpManagement.models import EmailConfiguration  # Adjust path
+
 
 def get_model_permissions(model):
     content_type = ContentType.objects.get_for_model(model)
@@ -714,3 +719,92 @@ class Asset_CustomFieldValueViewSet(viewsets.ModelViewSet):
     queryset = Asset_CustomFieldValue.objects.all()
     serializer_class = Asset_CustomFieldValueSerializer
     permission_classes = [Asset_CustomFieldValuePermission]
+
+class AnnouncementViewSet(viewsets.ModelViewSet):
+    queryset = Announcement.objects.all()
+    serializer_class = AnnouncementSerializer
+    # permission_classes = [permissions.IsAuthenticated]
+
+    # def get_queryset(self):
+    #     user = self.request.user
+    #     employee = getattr(user, 'employee', None)
+
+    #     if not employee:
+    #         return Announcement.objects.none()
+
+    #     return Announcement.objects.filter(
+    #         Q(specific_employees=employee) | Q(branches=employee.branch),
+    #         Q(expires_at__isnull=True) | Q(expires_at__gt=timezone.now())
+    #     ).distinct().order_by('-is_sticky', '-created_at')
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        self.send_announcement_emails(instance)
+
+    def send_announcement_emails(self, announcement):
+        
+
+        if not announcement.send_email:
+            return
+
+        config = EmailConfiguration.objects.filter(is_active=True).first()
+        if not config or not config.email_host_user or not config.email_host_password:
+            return
+
+        recipients = set()
+        recipients.update(emp.emp_personal_email for emp in announcement.specific_employees.all() if emp.emp_personal_email)
+        for branch in announcement.branches.all():
+            branch_employees = emp_master.objects.filter(emp_branch_id=branch)
+            recipients.update(emp.emp_personal_email for emp in branch_employees if emp.emp_personal_email)
+
+        subject = f"{'[Sticky] ' if announcement.is_sticky else ''}New Announcement: {announcement.title}"
+        # body = announcement.message
+        body = f"""
+        Dear {announcement.message},
+
+        {announcement.message}
+
+        {'[Sticky]' if announcement.is_sticky else ''}
+        {'[Expires on {}]'.format(announcement.expires_at) if announcement.expires_at else ''}
+
+        Regards,
+        HR Team
+        """
+        email = EmailMessage(
+            subject,
+            body,
+            config.email_host_user,
+            list(recipients),
+        )
+
+        if announcement.attachment:
+            email.attach_file(announcement.attachment.path)
+
+        email.send(fail_silently=True)
+    # Mark announcement as viewed
+    @action(detail=True, methods=['post'])
+    def mark_as_viewed(self, request, pk=None):
+        announcement = self.get_object()
+        emp_id = request.data.get('employee_id')
+        try:
+            employee = emp_master.objects.get(id=emp_id)
+        except emp_master.DoesNotExist:
+            return Response({'error': 'Employee not found'}, status=404)
+
+        view_obj, created = AnnouncementView.objects.get_or_create(announcement=announcement, employee=employee)
+        return Response({'status': 'viewed', 'created': created})
+class AnnouncementCommentViewSet(viewsets.ModelViewSet):
+    queryset = AnnouncementComment.objects.all()
+    serializer_class = AnnouncementCommentSerializer
+
+    def create(self, request, *args, **kwargs):
+        announcement_id = request.data.get('announcement')
+        employee_id = request.data.get('employee')
+        try:
+            announcement = Announcement.objects.get(id=announcement_id)
+            if not announcement.allow_comments:
+                return Response({'error': 'Comments are disabled for this announcement.'}, status=400)
+        except Announcement.DoesNotExist:
+            return Response({'error': 'Announcement not found'}, status=404)
+
+        return super().create(request, *args, **kwargs)
