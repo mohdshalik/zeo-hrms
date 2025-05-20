@@ -71,15 +71,16 @@ def update_employee_salary_structure(sender, instance, created, **kwargs):
 
 @receiver(post_save, sender='PayrollManagement.PayrollRun')
 def run_payroll_on_save(sender, instance, created, **kwargs):
-    """
-    Process payroll on PayrollRun creation, including overtime for employees with emp_ot_applicable=True.
-    Only processes active employees.
-    """
     logger.info(f"Signal received for PayrollRun {instance.id} (Created: {created}, Status: {instance.status})")
     if created and instance.status == 'pending':
         logger.debug(f"Starting payroll processing for PayrollRun {instance.id}")
         EmpMaster = apps.get_model('EmpManagement', 'emp_master')
         EmployeeOvertime = apps.get_model('calendars', 'EmployeeOvertime')
+        SalaryComponent = apps.get_model('PayrollManagement', 'SalaryComponent')
+        EmployeeSalaryStructure = apps.get_model('PayrollManagement', 'EmployeeSalaryStructure')
+        Payslip = apps.get_model('PayrollManagement', 'Payslip')
+        PayslipComponent = apps.get_model('PayrollManagement', 'PayslipComponent')
+        Attendance = apps.get_model('calendars', 'Attendance')
 
         try:
             employees = EmpMaster.objects.filter(is_active=True)
@@ -93,21 +94,21 @@ def run_payroll_on_save(sender, instance, created, **kwargs):
 
         # Define possible codes for Basic Salary and Overtime
         basic_salary_codes = ['bs', 'basic', 'BS', 'BASIC', 'base', 'BASE']
-        overtime_codes = ['OT', 'ot', 'OVERTIME', 'overtime']
+        overtime_codes = ['ot', 'OT', 'overtime', 'OVERTIME']
 
-        # Fetch Overtime SalaryComponent using Q objects for case-insensitive matching
+        # Fetch Overtime SalaryComponent using Q objects
+        overtime_component = None
         try:
             overtime_query = Q()
             for code in overtime_codes:
                 overtime_query |= Q(code__iexact=code)
             overtime_component = SalaryComponent.objects.filter(overtime_query).first()
             if not overtime_component:
-                logger.error("No overtime component found with codes: {}".format(overtime_codes))
-                return
-            logger.debug(f"Overtime component verified: ID={overtime_component.id}, Code={overtime_component.code}")
+                logger.warning(f"No overtime component found with codes: {overtime_codes}")
+            else:
+                logger.debug(f"Overtime component verified: ID={overtime_component.id}, Code={overtime_component.code}")
         except Exception as e:
             logger.error(f"Error fetching overtime component: {e}")
-            return
 
         for employee in employees:
             logger.debug(f"Processing employee: {employee.id} - {employee}")
@@ -144,17 +145,21 @@ def run_payroll_on_save(sender, instance, created, **kwargs):
                 logger.error(f"Error creating payslip for {employee.id}: {e}")
                 continue
 
+            # Initialize base_hourly_rate with a default value
+            base_hourly_rate = Decimal('0.00')
+
             # Calculate base hourly rate from Basic Salary
             try:
                 basic_query = Q()
                 for code in basic_salary_codes:
                     basic_query |= Q(component__code__iexact=code)
                 base_salary_component = salary_components.filter(basic_query).first()
-                base_hourly_rate = Decimal('0.00')
                 if base_salary_component and base_salary_component.amount:
                     monthly_salary = Decimal(str(base_salary_component.amount))
                     base_hourly_rate = monthly_salary / (total_working_days * 8)  # Assume 8 hours/day
                     logger.debug(f"Base hourly rate for {employee.id}: {base_hourly_rate}")
+                else:
+                    logger.warning(f"No valid basic salary component found for {employee.id}")
             except Exception as e:
                 logger.error(f"Error fetching basic salary component for {employee.id}: {e}")
 
@@ -187,8 +192,8 @@ def run_payroll_on_save(sender, instance, created, **kwargs):
                 elif component.component_type == 'deduction':
                     total_deductions += calculated_amount
 
-            # Process overtime if emp_ot_applicable=True
-            if getattr(employee, 'emp_ot_applicable', False):
+            # Process overtime if emp_ot_applicable=True and overtime_component exists
+            if getattr(employee, 'emp_ot_applicable', False) and overtime_component:
                 try:
                     overtime_records = EmployeeOvertime.objects.filter(
                         employee=employee,
@@ -215,6 +220,8 @@ def run_payroll_on_save(sender, instance, created, **kwargs):
                             logger.debug(f"Added overtime component to payslip {payslip.id}")
                         except Exception as e:
                             logger.error(f"Error adding overtime component to payslip {payslip.id}: {e}")
+                    elif base_hourly_rate <= 0:
+                        logger.warning(f"Skipping overtime for {employee.id}: base_hourly_rate is {base_hourly_rate}")
                 except Exception as e:
                     logger.error(f"Error processing overtime for {employee.id}: {e}")
 

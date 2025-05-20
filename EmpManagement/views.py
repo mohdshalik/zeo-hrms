@@ -63,6 +63,7 @@ from rest_framework.exceptions import NotFound
 from calendars .serializer import EmployeeLeaveBalanceSerializer,LeaveTypeSerializer
 from calendars .models import leave_type, employee_leave_request
 from django.db.models import Q
+from PayrollManagement .serializer import PayslipSerializer
 
 r = redis.StrictRedis(host='localhost', port=6379, db=0)
 
@@ -272,7 +273,13 @@ class EmpViewSet(viewsets.ModelViewSet):
             "available_leave_types": leave_type_serializer.data,
         }, status=status.HTTP_200_OK)
     
-     
+    @action(detail=True, methods=['GET'])
+    def emp_payslip(self, request, pk=None):
+        employee = self.get_object()
+        if request.method == 'GET':
+            payslip = employee.payslips.all()
+            serializer = PayslipSerializer(payslip, many=True)
+            return Response(serializer.data) 
 
     @action(detail=False, methods=['get'])
     def filter_empty_user_non_ess(self, request):

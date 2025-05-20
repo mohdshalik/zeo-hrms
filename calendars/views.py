@@ -2229,14 +2229,33 @@ class MonthlyAttendanceSummaryViewSet(viewsets.ModelViewSet):
     def generate(self, request):
         month = int(request.data.get("month", date.today().month))
         year = int(request.data.get("year", date.today().year))
-
         start_date = date(year, month, 1)
         end_date = start_date + relativedelta(months=1) - relativedelta(days=1)
 
-        all_employees = emp_master.objects.all()
+        # Filters
+        employee_ids = request.data.get("employee_id")  # list of IDs
+        branch_id = request.data.get("branch_id")
+        department_id = request.data.get("department_id")
+        category_id = request.data.get("category_id")
+
+        # Filter employees
+        employees = emp_master.objects.all()
+
+        if employee_ids:
+            employees = employees.filter(id__in=employee_ids)
+
+        if branch_id:
+            employees = employees.filter(emp_branch_id=branch_id)
+
+        if department_id:
+            employees = employees.filter(emp_dept_id=department_id)
+
+        if category_id:
+            employees = employees.filter(emp_ctgry_id=category_id)
+
         result = []
 
-        for employee in all_employees:
+        for employee in employees:
             summary_data = get_attendance_summary(employee, start_date, end_date)
             if not summary_data:
                 continue
