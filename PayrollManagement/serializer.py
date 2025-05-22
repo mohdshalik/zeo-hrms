@@ -50,10 +50,11 @@ class PayrollRunSerializer(serializers.ModelSerializer):
         fields = '__all__'
 class PaySlipComponentSerializer(serializers.ModelSerializer):
     component_name = serializers.CharField(source='component.name', read_only=True)
+    component_type = serializers.CharField(source='component.get_component_type_display', read_only=True)
 
     class Meta:
         model = PayslipComponent
-        fields = ['id', 'component_name', 'amount']  # Explicitly list fields, excluding 'component'
+        fields = ['id', 'component_name', 'component_type', 'amount']
 
 
 class PayslipSerializer(serializers.ModelSerializer):
