@@ -46,9 +46,25 @@ class PayrollRun(models.Model):
         ('approved', 'Approved'),
         ('paid', 'Paid'),
     ]
+    
+    MONTH_CHOICES = [
+        (1, 'January'),
+        (2, 'February'),
+        (3, 'March'),
+        (4, 'April'),
+        (5, 'May'),
+        (6, 'June'),
+        (7, 'July'),
+        (8, 'August'),
+        (9, 'September'),
+        (10, 'October'),
+        (11, 'November'),
+        (12, 'December'),
+    ]
+    
     name = models.CharField(max_length=100, blank=True, help_text="Optional payroll run name")
-    start_date = models.DateField(help_text="Start date of payroll period")
-    end_date = models.DateField(help_text="End date of payroll period")
+    month = models.IntegerField(choices=MONTH_CHOICES, help_text="Month of the payroll period")
+    year = models.IntegerField(help_text="Year of the payroll period")
     payment_date = models.DateField(null=True, blank=True, help_text="When employees will be paid")
     branch = models.ForeignKey('OrganisationManager.brnch_mstr', on_delete=models.SET_NULL, null=True, blank=True)
     department = models.ForeignKey('OrganisationManager.dept_master', on_delete=models.SET_NULL, null=True, blank=True)
@@ -73,8 +89,14 @@ class PayrollRun(models.Model):
         except Exception as e:
             return emp_master.objects.none()
 
+    def get_month_display(self):
+        return dict(self.MONTH_CHOICES).get(self.month, 'Unknown')
+
     def __str__(self):
         return f"Payroll - {self.get_month_display()} {self.year} ({self.status})"
+
+    class Meta:
+        unique_together = ('month', 'year', 'branch', 'department', 'category')
 
 class Payslip(models.Model):
     payroll_run = models.ForeignKey(PayrollRun, on_delete=models.CASCADE, related_name='payslips')
