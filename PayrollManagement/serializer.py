@@ -49,7 +49,7 @@ class PayrollRunSerializer(serializers.ModelSerializer):
         model = PayrollRun
         fields = '__all__'
 class PaySlipComponentSerializer(serializers.ModelSerializer):
-    
+    component_name = serializers.CharField(source='component.name', read_only=True)
     class Meta:
         model = PayslipComponent
         fields = '__all__'

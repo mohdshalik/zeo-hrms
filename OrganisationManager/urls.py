@@ -28,7 +28,7 @@ router.register(r'assets', AssetMasterViewSet, basename='asset-master')
 router.register(r'asset-transactions', AssetTransactionViewSet, basename='asset-transaction')
 router.register(r'asset-customfield', Asset_CustomFieldValueViewSet, basename='assets-customfield')
 router.register(r'announcements', AnnouncementViewSet, basename='announcement')
-router.register('announcement-comments', AnnouncementCommentViewSet, basename='announcement-comments')
+router.register(r'announcement-comments', AnnouncementCommentViewSet, basename='announcement-comments')
 # router.register(r'e-attendance', AttendanceViewSet, basename='e-attendance')
 
 

@@ -209,6 +209,11 @@ class LoanTypeviewset(viewsets.ModelViewSet):
 class LoanApplicationviewset(viewsets.ModelViewSet):
     queryset = LoanApplication.objects.all()
     serializer_class = LoanApplicationSerializer
+    @action(detail=False, methods=['get'], url_path='paused-loans')
+    def paused_loans(self, request):
+        paused_loans = self.queryset.filter(status='Paused')
+        serializer = self.get_serializer(paused_loans, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
     @action(detail=True, methods=['post'])
     def pause(self, request, pk=None):
         """Pause loan repayments with a reason."""
