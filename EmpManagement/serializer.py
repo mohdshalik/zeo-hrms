@@ -416,7 +416,11 @@ class RequestTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = RequestType
         fields = '__all__'
-
+    def to_representation(self, instance):
+        rep = super(RequestTypeSerializer, self).to_representation(instance)
+        if instance.salary_component:  # Check if emp_state_id is not None
+            rep['salary_component'] = instance.salary_component.name
+        return rep
 class EmailTemplateSerializer(serializers.ModelSerializer):
     class Meta:
         model = EmailTemplate

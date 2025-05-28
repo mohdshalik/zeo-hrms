@@ -55,6 +55,7 @@ class PaySlipComponentSerializer(serializers.ModelSerializer):
     class Meta:
         model = PayslipComponent
         fields = ['id', 'component_name', 'component_type', 'amount']
+    
 
 
 class PayslipSerializer(serializers.ModelSerializer):
@@ -65,7 +66,11 @@ class PayslipSerializer(serializers.ModelSerializer):
         model = Payslip
         fields = '__all__'
 
-
+    # def to_representation(self, instance):
+    #     rep = super(PaySlipComponentSerializer, self).to_representation(instance)
+    #     if instance.component:  
+    #         rep['component'] = instance.component.name
+    #     return rep
 
 
 class LoanTypeSerializer(serializers.ModelSerializer):
@@ -76,10 +81,22 @@ class LoanApplicationSerializer(serializers.ModelSerializer):
     class Meta:
         model = LoanApplication
         fields = '__all__'
+    def to_representation(self, instance):
+        rep = super(LoanApplicationSerializer, self).to_representation(instance)
+        if instance.employee:
+            rep['employee'] =instance.employee.emp_first_name
+        if instance.loan_type:
+            rep['loan_type'] =instance.loan_type.loan_type
+        return rep
 class LoanRepaymentSerializer(serializers.ModelSerializer):
     class Meta:
         model = LoanRepayment
         fields = '__all__'
+    def to_representation(self, instance):
+        rep = super(LoanRepaymentSerializer, self).to_representation(instance)
+        if instance.loan:
+            rep['loan'] =instance.loan.loan_type.loan_type
+        return rep
 class LoanApprovalLevelsSerializer(serializers.ModelSerializer):
     class Meta:
         model = LoanApprovalLevels

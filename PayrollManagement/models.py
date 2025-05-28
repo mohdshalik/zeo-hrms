@@ -19,7 +19,8 @@ class SalaryComponent(models.Model):
     is_fixed = models.BooleanField(default=True, help_text="Is this component fixed (True) or variable (False)?")
     formula = models.CharField(max_length=255, blank=True, null=True, help_text="Formula to calculate this component (e.g., 'basic_salary * 0.4')")
     description = models.TextField(blank=True, null=True)
-
+    is_loan_component = models.BooleanField(default=False, help_text="Mark if this is the loan deduction component")
+    show_in_payslip = models.BooleanField(default=True, help_text="Should this component be shown on the payslip?")
 
     def __str__(self):
         return f"{self.name} ({self.get_component_type_display()})"
@@ -254,6 +255,7 @@ class LoanApplication(models.Model):
 
 class LoanRepayment(models.Model):
     loan = models.ForeignKey(LoanApplication, on_delete=models.CASCADE)
+    payslip = models.ForeignKey(Payslip, on_delete=models.CASCADE, null=True, blank=True)  # ADD THIS
     repayment_date = models.DateField()
     amount_paid = models.DecimalField(max_digits=10, decimal_places=2)
     remaining_balance = models.DecimalField(max_digits=10, decimal_places=2)
