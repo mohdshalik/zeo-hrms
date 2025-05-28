@@ -201,24 +201,9 @@ class LoanApplication(models.Model):
             self.remaining_balance = self.amount_requested
         super().save(*args, **kwargs)
 
-    # def pause(self, start_date, reason=None):
-    #     """Pause the loan repayments."""
-    #     self.status = 'Paused'
-    #     self.pause_start_date = start_date
-    #     self.pause_reason = reason
-    #     self.save()
-
-    # def resume(self, resume_date, reason=None):
-    #     """Resume the loan repayments."""
-    #     if self.status != 'Paused':
-    #         raise ValidationError("Loan is not currently paused.")
-    #     self.status = 'In Progress'
-    #     self.resume_date = resume_date
-    #     self.resume_reason = reason
-    #     self.save()
     def pause(self, start_date, reason=None):
         """Pause the loan repayments."""
-        if self.status not in ['Approved', 'In Progress']:
+        if self.status not in ['Approved']:
             raise ValidationError("Only active loans can be paused.")
         self.status = 'Paused'
         self.pause_start_date = start_date
@@ -229,7 +214,7 @@ class LoanApplication(models.Model):
         """Resume the loan repayments."""
         if self.status != 'Paused':
             raise ValidationError("Loan is not currently paused.")
-        self.status = 'In Progress'
+        self.status = 'Approved'
         self.resume_date = resume_date
         self.resume_reason = reason
         self.save()

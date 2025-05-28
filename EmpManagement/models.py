@@ -1155,6 +1155,7 @@ class RequestType(models.Model):
     updated_at          = models.DateField(auto_now_add=True)
     created_by          = models.ForeignKey('UserManagement.CustomUser',on_delete=models.CASCADE)
     use_common_workflow = models.BooleanField(default=False)
+    salary_component = models.ForeignKey('PayrollManagement.SalaryComponent', on_delete=models.SET_NULL,null=True, blank=True,help_text="Link to salary component for payroll integration")
     
     def __str__(self):
         return self.name

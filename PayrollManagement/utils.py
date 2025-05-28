@@ -7,6 +7,7 @@ import logging
 from datetime import datetime
 from calendar import monthrange
 
+
 # Set up logging
 logger = logging.getLogger(__name__)
 
