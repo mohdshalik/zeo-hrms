@@ -6,7 +6,7 @@ from django.db.models import Q
 import logging
 from datetime import datetime
 from calendar import monthrange
-
+from datetime import timedelta
 logger = logging.getLogger(__name__)
 from django.db.models import Sum
 from django.db.models.signals import post_save
@@ -29,6 +29,7 @@ from django.db.models import Sum
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from simpleeval import SimpleEval, NameNotDefined, FunctionNotDefined
+from calendars .utils import get_employee_holidays,get_employee_weekend_days
 
 
 # Initialize logger
@@ -103,6 +104,27 @@ def update_employee_salary_structure(sender, instance, created, **kwargs):
             )
             logger.info(f"Updated EmployeeSalaryStructure for {employee} with component {instance.name} - Amount: {amount}")
 
+
+def get_holiday_weekend_days_worked(employee, start_date, end_date):
+    from calendars.models import Attendance  # or wherever your Attendance model is
+
+    weekend_days = get_employee_weekend_days(employee)
+    holiday_dates = get_employee_holidays(employee, start_date, end_date)
+
+    worked_days = 0
+
+    for day in daterange(start_date, end_date):
+        weekday = day.strftime("%A")
+
+        is_weekend = weekday in weekend_days
+        is_holiday = day in holiday_dates
+
+        if is_weekend or is_holiday:
+            if Attendance.objects.filter(employee=employee, date=day).exists():
+                worked_days += 1
+
+    return worked_days
+
 def get_formula_variables(employee, start_date=None, end_date=None):
     Attendance = apps.get_model('calendars', 'Attendance')
     EmployeeOvertime = apps.get_model('calendars', 'EmployeeOvertime')
@@ -123,15 +145,12 @@ def get_formula_variables(employee, start_date=None, end_date=None):
         employee=employee, date__range=(start_date, end_date), approved=True
     ).aggregate(total_hours=Sum('hours'))['total_hours'] or Decimal('0.00')
 
-    working_days = Attendance.objects.filter(
-        employee=employee,
-        date__range=(start_date, end_date),
-        check_in_time__isnull=False,
-        check_out_time__isnull=False
-    ).exclude(date__week_day__in=[1, 7]).count()
-
-    variables['working_days'] = Decimal(str(working_days))
-
+    variables['holiday_weekend_days_worked'] = Decimal(str(
+        get_holiday_weekend_days_worked(employee, start_date, end_date)
+    ))
+    working_days = get_working_days(employee, start_date, end_date)
+    variables['working_days'] = float(working_days)
+    
     variables['employee.grade'] = str(getattr(employee, 'grade', ''))
     variables['employee.employee_type'] = str(getattr(employee, 'employee_type', ''))
     variables['employee.joining_date'] = (
@@ -151,28 +170,45 @@ def get_formula_variables(employee, start_date=None, end_date=None):
 
     return variables
 
+def daterange(start_date, end_date):
+    for n in range(int((end_date - start_date).days) + 1):
+        yield start_date + timedelta(n)
+def get_working_days(employee, start_date, end_date):
+    weekend_days = get_employee_weekend_days(employee)
+    holiday_dates = get_employee_holidays(employee, start_date, end_date)
+
+    working_days = 0
+
+    for day in daterange(start_date, end_date):
+        weekday_name = day.strftime("%A")
+        if weekday_name in weekend_days:
+            continue
+        if day in holiday_dates:
+            continue
+        if Attendance.objects.filter(
+            employee=employee,
+            date=day,
+            check_in_time__isnull=False,
+            check_out_time__isnull=False
+        ).exists():
+            working_days += 1
+
+    return working_days
 
 @receiver(post_save, sender='PayrollManagement.PayrollRun')
 def run_payroll_on_save(sender, instance, created, **kwargs):
-    logger.info(f"Signal received for PayrollRun {instance.id} (Created: {created}, Status: {instance.status})")
-
     if not created or instance.status != 'pending':
         return
 
-    # Load models dynamically
     EmpMaster = apps.get_model('EmpManagement', 'emp_master')
     SalaryComponent = apps.get_model('PayrollManagement', 'SalaryComponent')
     EmployeeSalaryStructure = apps.get_model('PayrollManagement', 'EmployeeSalaryStructure')
     Payslip = apps.get_model('PayrollManagement', 'Payslip')
     PayslipComponent = apps.get_model('PayrollManagement', 'PayslipComponent')
-    Attendance = apps.get_model('calendars', 'Attendance')
     GeneralRequest = apps.get_model('EmpManagement', 'GeneralRequest')
-    EmployeeOvertime = apps.get_model('calendars', 'EmployeeOvertime')
     LoanRequest = apps.get_model('PayrollManagement', 'LoanApplication')
     LoanRepayment = apps.get_model('PayrollManagement', 'LoanRepayment')
-    # Holiday = apps.get_model('calendars', 'Holiday')
 
-    # Set date range
     try:
         total_working_days = monthrange(instance.year, instance.month)[1]
         start_date = datetime(instance.year, instance.month, 1).date()
@@ -182,113 +218,27 @@ def run_payroll_on_save(sender, instance, created, **kwargs):
         return
 
     employees = EmpMaster.objects.filter(is_active=True)
-    logger.info(f"Found {employees.count()} active employees")
 
     for employee in employees:
-        logger.debug(f"Processing employee: {employee.id} - {employee}")
+        variables = get_formula_variables(employee, start_date, end_date)
 
-        # Attendance
-        days_worked = Attendance.objects.filter(
-            employee=employee,
-            date__range=(start_date, end_date)
-        ).exclude(
-            Q(check_in_time__isnull=True) & Q(check_out_time__isnull=True)
-        ).count()
-
-        # Salary structure
         salary_components = EmployeeSalaryStructure.objects.filter(employee=employee, is_active=True)
         total_additions = Decimal('0.00')
         total_deductions = Decimal('0.00')
 
-        # Create Payslip
+        days_worked = variables.get('working_days', 0)
         payslip = Payslip.objects.create(
             payroll_run=instance,
             employee=employee,
             total_working_days=total_working_days,
             days_worked=days_worked,
         )
-
-        # Overtime hours
-        overtime_hours = EmployeeOvertime.objects.filter(
-            employee=employee,
-            date__range=(start_date, end_date),
-            approved=True
-        ).aggregate(total_hours=Sum('hours'))['total_hours'] or Decimal('0.00')
-        if not isinstance(overtime_hours, Decimal):
-            overtime_hours = Decimal(str(overtime_hours))
-        logger.debug(f"Overtime hours: {overtime_hours}")
-
-        variables = {
-            'ot_hours': Decimal(str(overtime_hours)),
-            'calendar_days': Decimal(str((end_date - start_date).days + 1)),
-            'fixed_days': Decimal('30.0'),
-            'standard_hours': Decimal('160.0'),
-        }
-        # Add employee attributes
-        variables['employee.grade'] = str(getattr(employee, 'grade', ''))
-        variables['employee.employee_type'] = str(getattr(employee, 'employee_type', ''))
-        variables['employee.joining_date'] = (
-            employee.joining_date.strftime('%Y-%m-%d')
-            if hasattr(employee, 'joining_date') and employee.joining_date else ''
-        )
-
-        if hasattr(employee, 'joining_date') and employee.joining_date:
-            years_of_service = relativedelta(end_date, employee.joining_date).years + \
-                               relativedelta(end_date, employee.joining_date).months / 12.0
-            variables['years_of_service'] = round(years_of_service, 2)
-        else:
-            variables['years_of_service'] = 0.0
-
-        # Calculate working_days
-        working_days = Attendance.objects.filter(
-            employee=employee,
-            date__range=(start_date, end_date),
-            check_in_time__isnull=False,
-            check_out_time__isnull=False
-        # ).exclude(
-        #     date__in=Holiday.objects.filter(date__range=(start_date, end_date)).values('date')
-        ).exclude(
-            date__week_day__in=[1, 7]
-        ).count()
-
-        variables['working_days'] = float(working_days)
-        logger.debug(f"Variables for {employee.id}: {variables}")
-
-        # Include fixed salary components in variables
-        for sc in salary_components:
-            comp = sc.component
-            if comp:
-                # variables[comp.name.upper()] = sc.amount or Decimal('0.00')
-                variables[comp.code] = sc.amount or Decimal('0.00')
-                # logger.debug(f"Fixed component: {comp.name.upper()} = {variables[comp.name.upper()]}")
-
-        # Evaluate OTAmount
-        ot_amount_component = SalaryComponent.objects.filter(code__iexact='OTAmount').first()
-        ot_amount_value = Decimal('0.00')
-        if ot_amount_component and ot_amount_component.formula:
-            try:
-                ot_amount_value = Decimal(str(evaluate_formula(ot_amount_component.formula, variables, employee, ot_amount_component)))
-                PayslipComponent.objects.create(
-                    payslip=payslip,
-                    component=ot_amount_component,
-                    amount=ot_amount_value
-                )
-                logger.debug(f"OTAmount for {employee.id}: {ot_amount_value}")
-            except Exception as e:
-                logger.error(f"OTAmount error for {employee.id}: {e}")
-        variables['OTAmount'] = ot_amount_value
-
-        # Other salary components
         for sc in salary_components:
             component = sc.component
-            if component == ot_amount_component:
-                continue
-
             amount = sc.amount or Decimal('0.00')
             if not component.is_fixed and component.formula:
                 try:
                     amount = Decimal(str(evaluate_formula(component.formula, variables, employee, component)))
-                    logger.debug(f"Evaluated {component.name}: {amount}")
                 except Exception as e:
                     logger.error(f"Formula error for {component.name}: {e}")
                     amount = Decimal('0.00')
@@ -304,7 +254,6 @@ def run_payroll_on_save(sender, instance, created, **kwargs):
             elif component.component_type == 'deduction':
                 total_deductions += amount
 
-        # Approved request components
         approved_requests = GeneralRequest.objects.filter(
             employee=employee,
             status='Approved',
@@ -323,12 +272,8 @@ def run_payroll_on_save(sender, instance, created, **kwargs):
                     total_additions += request.total
                 elif component.component_type == 'deduction':
                     total_deductions += request.total
-        #loan
-        active_loans = LoanRequest.objects.filter(
-        employee=employee,
-        status='Approved',
-        )
 
+        active_loans = LoanRequest.objects.filter(employee=employee, status='Approved')
         for loan in active_loans:
             # Count past repayments
             repayment_count = LoanRepayment.objects.filter(loan=loan).count()
