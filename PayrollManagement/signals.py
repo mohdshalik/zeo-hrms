@@ -5,8 +5,9 @@ from calendars.models import Attendance
 from django.db.models import Q
 import logging
 from datetime import datetime
-from calendar import monthrange
 from datetime import timedelta
+from calendar import monthrange
+
 logger = logging.getLogger(__name__)
 from django.db.models import Sum
 from django.db.models.signals import post_save
@@ -65,7 +66,8 @@ def evaluate_formula(formula, variables, employee, component):
             'MIN': min,
             'AVG': lambda *args: sum(args) / len(args) if args else 0,
             'SUM': sum,
-            'ROUND': round
+            'ROUND': round,
+            'IF': lambda cond, true_val, false_val: true_val if cond else false_val,
         })
 
         result = s.eval(formula)  # ✅ No keyword argument here
@@ -105,26 +107,6 @@ def update_employee_salary_structure(sender, instance, created, **kwargs):
             logger.info(f"Updated EmployeeSalaryStructure for {employee} with component {instance.name} - Amount: {amount}")
 
 
-def get_holiday_weekend_days_worked(employee, start_date, end_date):
-    from calendars.models import Attendance  # or wherever your Attendance model is
-
-    weekend_days = get_employee_weekend_days(employee)
-    holiday_dates = get_employee_holidays(employee, start_date, end_date)
-
-    worked_days = 0
-
-    for day in daterange(start_date, end_date):
-        weekday = day.strftime("%A")
-
-        is_weekend = weekday in weekend_days
-        is_holiday = day in holiday_dates
-
-        if is_weekend or is_holiday:
-            if Attendance.objects.filter(employee=employee, date=day).exists():
-                worked_days += 1
-
-    return worked_days
-
 def get_formula_variables(employee, start_date=None, end_date=None):
     Attendance = apps.get_model('calendars', 'Attendance')
     EmployeeOvertime = apps.get_model('calendars', 'EmployeeOvertime')
@@ -134,7 +116,7 @@ def get_formula_variables(employee, start_date=None, end_date=None):
         today = datetime.today().date()
         start_date = today.replace(day=1)
         end_date = today.replace(day=monthrange(today.year, today.month)[1])
-
+    
     variables = {
         'calendar_days': Decimal(str((end_date - start_date).days + 1)),
         'fixed_days': Decimal('30.0'),
@@ -144,10 +126,29 @@ def get_formula_variables(employee, start_date=None, end_date=None):
     variables['ot_hours'] = EmployeeOvertime.objects.filter(
         employee=employee, date__range=(start_date, end_date), approved=True
     ).aggregate(total_hours=Sum('hours'))['total_hours'] or Decimal('0.00')
+    weekend_days = get_employee_weekend_days(employee)
+    holiday_dates = get_employee_holidays(employee, start_date, end_date)
 
-    variables['holiday_weekend_days_worked'] = Decimal(str(
-        get_holiday_weekend_days_worked(employee, start_date, end_date)
-    ))
+    weekend_ot_days = 0
+    holiday_ot_days = 0
+
+    for single_date in daterange(start_date, end_date):
+        weekday = single_date.strftime("%A")
+        is_weekend = weekday in weekend_days
+        is_holiday = single_date in holiday_dates
+        attended = Attendance.objects.filter(employee=employee, date=single_date).exists()
+
+        if is_weekend and attended:
+            weekend_ot_days += 1
+        elif is_holiday and attended:
+            holiday_ot_days += 1
+
+    variables['weekend_ot_days'] = Decimal(weekend_ot_days)
+    variables['holiday_ot_days'] = Decimal(holiday_ot_days)
+    variables['holiday_weekend_ot_days'] = Decimal(weekend_ot_days + holiday_ot_days)
+    # variables['holiday_weekend_days_worked'] = Decimal(str(
+    #     get_holiday_weekend_days_worked(employee, start_date, end_date)
+    # ))
     working_days = get_working_days(employee, start_date, end_date)
     variables['working_days'] = float(working_days)
     
@@ -208,6 +209,7 @@ def run_payroll_on_save(sender, instance, created, **kwargs):
     GeneralRequest = apps.get_model('EmpManagement', 'GeneralRequest')
     LoanRequest = apps.get_model('PayrollManagement', 'LoanApplication')
     LoanRepayment = apps.get_model('PayrollManagement', 'LoanRepayment')
+    MonthlyAttendanceSummary = apps.get_model('calendars', 'MonthlyAttendanceSummary')
 
     try:
         total_working_days = monthrange(instance.year, instance.month)[1]
@@ -226,34 +228,61 @@ def run_payroll_on_save(sender, instance, created, **kwargs):
         total_additions = Decimal('0.00')
         total_deductions = Decimal('0.00')
 
-        days_worked = variables.get('working_days', 0)
+        # Fetch attendance summary for the employee for the given month and year
+        try:
+            attendance = MonthlyAttendanceSummary.objects.get(
+                employee=employee,
+                month=instance.month,
+                year=instance.year
+            )
+            days_worked = attendance.total_present
+            days_absent = attendance.total_absent
+        except MonthlyAttendanceSummary.DoesNotExist:
+            logger.warning(f"No attendance summary for {employee} for {instance.month}/{instance.year}")
+            days_worked = total_working_days  # Assume full attendance if no record
+            days_absent = 0
+
         payslip = Payslip.objects.create(
             payroll_run=instance,
             employee=employee,
             total_working_days=total_working_days,
             days_worked=days_worked,
         )
+
+        # Process salary components
         for sc in salary_components:
             component = sc.component
-            amount = sc.amount or Decimal('0.00')
+            original_amount = sc.amount or Decimal('0.00')
+
+            # Calculate amount, considering formula if applicable
             if not component.is_fixed and component.formula:
                 try:
-                    amount = Decimal(str(evaluate_formula(component.formula, variables, employee, component)))
+                    original_amount = Decimal(str(evaluate_formula(component.formula, variables, employee, component)))
                 except Exception as e:
                     logger.error(f"Formula error for {component.name}: {e}")
-                    amount = Decimal('0.00')
+                    original_amount = Decimal('0.00')
 
+            # Apply leave deduction if deduct_leave is True and there are absent days
+            amount = original_amount
+            if component.deduct_leave and days_absent > 0 and total_working_days > 0:
+                per_day_amount = original_amount / total_working_days
+                leave_deduction = per_day_amount * days_absent
+                amount = original_amount - leave_deduction
+
+            # Create PayslipComponent with the adjusted amount
             PayslipComponent.objects.create(
                 payslip=payslip,
                 component=component,
                 amount=amount
             )
 
+            # Update totals based on component type
             if component.component_type == 'addition':
                 total_additions += amount
             elif component.component_type == 'deduction':
                 total_deductions += amount
 
+        # Process approved general requests
         approved_requests = GeneralRequest.objects.filter(
             employee=employee,
             status='Approved',
@@ -263,28 +292,31 @@ def run_payroll_on_save(sender, instance, created, **kwargs):
         for request in approved_requests:
             component = request.request_type.salary_component
             if component and request.total is not None:
+                amount = request.total
+                # Apply leave deduction if deduct_leave is True
+                if component.deduct_leave and days_absent > 0 and total_working_days > 0:
+                    per_day_amount = amount / total_working_days
+                    leave_deduction = per_day_amount * days_absent
+                    amount = amount - leave_deduction
+
                 PayslipComponent.objects.create(
                     payslip=payslip,
                     component=component,
-                    amount=request.total
+                    amount=amount
                 )
                 if component.component_type == 'addition':
-                    total_additions += request.total
+                    total_additions += amount
                 elif component.component_type == 'deduction':
-                    total_deductions += request.total
+                    total_deductions += amount
 
+        # Process active loans
         active_loans = LoanRequest.objects.filter(employee=employee, status='Approved')
         for loan in active_loans:
-            # Count past repayments
             repayment_count = LoanRepayment.objects.filter(loan=loan).count()
-
             if repayment_count < loan.repayment_period:
-                # Deduct this month's EMI
                 emi_amount = loan.emi_amount
                 loan_component = SalaryComponent.objects.filter(is_loan_component=True).first()
-
                 if loan_component:
-                    # Add EMI as deduction in payslip
                     PayslipComponent.objects.create(
                         payslip=payslip,
                         component=loan_component,
@@ -294,8 +326,7 @@ def run_payroll_on_save(sender, instance, created, **kwargs):
 
                     total_paid = LoanRepayment.objects.filter(loan=loan).aggregate(total=Sum('amount_paid'))['total'] or Decimal('0.00')
                     remaining_balance = loan.amount_requested - total_paid - emi_amount
-                    
-                    # Save LoanRepayment
+
                     LoanRepayment.objects.create(
                         loan=loan,
                         payslip=payslip,
@@ -305,10 +336,10 @@ def run_payroll_on_save(sender, instance, created, **kwargs):
                     )
                     loan.remaining_balance = remaining_balance
                     loan.save(update_fields=['remaining_balance'])
-                    # If loan fully paid, close it
                     if remaining_balance <= 0:
                         loan.status = 'Closed'
                         loan.save()
+
         # Finalize payslip
         gross_salary = total_additions
         net_salary = gross_salary - total_deductions
@@ -371,4 +402,5 @@ def update_dependent_salary_components(sender, instance, created, **kwargs):
                 }
             )
             logger.info(f"Updated EmployeeSalaryStructure for {employee} with component {component.name} - Amount: {amount}")
+
 
