@@ -293,7 +293,6 @@ class LeaveRequestviewset(viewsets.ModelViewSet):
                 doc_config = DocumentNumbering.objects.get(
                     branch_id=branch_id,
                     type='leave_request',
-                    leave_type=leave_type
                 )
             except DocumentNumbering.DoesNotExist:
                 raise NotFound(f"No document numbering configuration found for branch {branch_id} and leave type {leave_type}.")
