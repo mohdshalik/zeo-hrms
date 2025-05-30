@@ -104,9 +104,6 @@ class DocumentNumbering(models.Model):
     branch_id = models.ForeignKey('brnch_mstr', on_delete=models.CASCADE)
     type = models.CharField(max_length=50, choices=DOCUMENT_TYPES)
     user = models.ForeignKey('UserManagement.CustomUser', on_delete=models.CASCADE, related_name='document_numbering_user')
-
-    leave_type = models.ForeignKey('calendars.leave_type', on_delete=models.CASCADE, null=True, blank=True)
-
     # automatic_numbering = models.BooleanField(default=True)
     prefix = models.CharField(max_length=50)
     suffix = models.CharField(max_length=50, blank=True, null=True)
@@ -124,29 +121,14 @@ class DocumentNumbering(models.Model):
     )
 
     class Meta:
-        # unique_together = ('branch_id', 'type', 'leave_type')
         constraints = [
-            models.UniqueConstraint(fields=['branch_id', 'type'],name='unique_general_request_per_branch',condition=models.Q(type='general_request')),
-            models.UniqueConstraint(fields=['branch_id', 'leave_type'],name='unique_leave_request_per_branch_leave_type',condition=models.Q(type='leave_request')),
-        ]
+            models.UniqueConstraint(fields=['branch_id', 'type'],name='unique_type_per_branch'),]
     def __str__(self):
         return f"{self.branch_id.branch_name} - {self.type}"
 
     def clean(self):
-        if self.type == 'leave_request' and not self.leave_type:
-            raise ValidationError({'leave_type': "Leave type is required for leave requests."})
-        if self.type == 'general_request' and self.leave_type:
-            raise ValidationError({'leave_type': "Leave type should not be set for general requests."})
-        
-        # Check for duplicates before saving
-        if self.type == 'general_request':
-            if DocumentNumbering.objects.filter(branch_id=self.branch_id, type='general_request').exclude(id=self.id).exists():
-                raise ValidationError("A general request document numbering already exists for this branch.")
-
-        if self.type == 'leave_request':
-            if DocumentNumbering.objects.filter(branch_id=self.branch_id, leave_type=self.leave_type, type='leave_request').exclude(id=self.id).exists():
-                raise ValidationError("A leave request document numbering already exists for this branch and leave type.")
-    # Validate start and end dates
+        if DocumentNumbering.objects.filter(branch_id=self.branch_id, type=self.type).exclude(id=self.id).exists():
+            raise ValidationError("A document numbering already exists for this branch and type.")    # Validate start and end dates
         if self.start_date >= self.end_date:
             raise ValidationError({'end_date': "End date must be greater than start date."})
         if self.total_length < len(self.prefix) + len(self.suffix) + 2:  # Ensure total length can accommodate the format
