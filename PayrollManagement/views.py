@@ -7,7 +7,7 @@ from django.shortcuts import render
 from .models import (SalaryComponent,EmployeeSalaryStructure,PayrollRun,Payslip,PayslipComponent,LoanType,LoanApplication,
                      LoanRepayment,LoanApprovalLevels,LoanApproval)
 from .serializer import (SalaryComponentSerializer,EmployeeSalaryStructureSerializer,PayslipSerializer,PaySlipComponentSerializer,LoanTypeSerializer,LoanApplicationSerializer,LoanRepaymentSerializer,
-                         LoanApprovalSerializer,LoanApprovalLevelsSerializer,PayrollRunSerializer)
+                         LoanApprovalSerializer,LoanApprovalLevelsSerializer,PayrollRunSerializer,PayslipConfirmedSerializer)
 from rest_framework import status,generics,viewsets,permissions
 from .permissions import(SalaryComponentPermission,EmployeeSalaryStructurePermission,PayrollRunPermission,PayslipComponentPermission,PayslipPermission)
 from .resource import EmployeeSalaryStructureResource
@@ -201,6 +201,11 @@ class LoanApplicationviewset(viewsets.ModelViewSet):
             return Response({"status": "resumed", "resume_date": resume_date, "reason": reason}, status=status.HTTP_200_OK)
         except ValidationError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+class PayslipConfirmedViewSet(viewsets.ModelViewSet):
+    queryset = Payslip.objects.all()
+    serializer_class = PayslipConfirmedSerializer
+    def get_queryset(self):
+        return Payslip.objects.filter(status='processed')
 class LoanRepaymentviewset(viewsets.ModelViewSet):
     queryset = LoanRepayment.objects.all()
     serializer_class = LoanRepaymentSerializer

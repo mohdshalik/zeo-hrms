@@ -1115,7 +1115,7 @@ class employee_leave_request(models.Model):
             carry_forward_entry.final_carry_forward += leave_days_to_restore
             carry_forward_entry.save()
     def __str__(self):
-        return f"{self.employee} - {self.leave_type} from {self.start_date} to {self.end_date}"
+        return f"{self.document_number}"
     
     # def get_employee_requests(employee_id):
     #     return employee_leave_request.objects.filter(employee_id=employee_id).order_by('-applied_on')

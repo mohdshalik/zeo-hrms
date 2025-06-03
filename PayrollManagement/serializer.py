@@ -114,7 +114,72 @@ class PayslipSerializer(serializers.ModelSerializer):
 
         return combined
 
+class PayslipConfirmedSerializer(serializers.ModelSerializer):
+    payroll_run = PayrollRunSerializer(read_only=True)
+    employee = serializers.StringRelatedField()
+    components = serializers.SerializerMethodField()
 
+    class Meta:
+        model = Payslip
+        fields = '__all__'
+    def get_components(self, obj):
+        # Fetch PayslipComponent data
+        payslip_components = PaySlipComponentSerializer(
+            obj.components.all(), many=True
+        ).data
+
+        # Fetch EmployeeSalaryStructure data
+        salary_structures = EmployeeSalaryStructureSerializer(
+            obj.employee.salary_structures.filter(is_active=True), many=True
+        ).data
+
+        # Combine data into a single list
+        combined = []
+        component_names = set()
+
+        # Process PayslipComponent entries
+        for pc in payslip_components:
+            combined.append({
+                'id': pc['id'],
+                'component_name': pc['component_name'],
+                'component_type': pc['component_type'],
+                'payslip_amount': pc['amount'],
+                'structure_amount': None,
+                'is_active': None,
+                'date_created': None,
+                'date_updated': None,
+                'employee': str(obj.employee),
+                'component': pc['component_name']
+            })
+            component_names.add(pc['component_name'])
+
+        # Process EmployeeSalaryStructure entries
+        for ss in salary_structures:
+            if ss['component'] in component_names:
+                # Update existing component with structure data
+                for item in combined:
+                    if item['component_name'] == ss['component']:
+                        item['structure_amount'] = ss['amount']
+                        item['is_active'] = ss['is_active']
+                        item['date_created'] = ss['date_created']
+                        item['date_updated'] = ss['date_updated']
+                        break
+            else:
+                # Add new component from salary structure
+                combined.append({
+                    'id': ss['id'],
+                    'component_name': ss['component'],
+                    'component_type': ss['component_type'],
+                    'payslip_amount': None,
+                    'structure_amount': ss['amount'],
+                    'is_active': ss['is_active'],
+                    'date_created': ss['date_created'],
+                    'date_updated': ss['date_updated'],
+                    'employee': ss['employee'],
+                    'component': ss['component']
+                })
+
+        return combined
 class LoanTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = LoanType

@@ -615,8 +615,8 @@ class Leave_ReportViewset(viewsets.ModelViewSet):
         super(Leave_ReportViewset, self).__init__(*args, **kwargs)
         self.leave_standard_report_exists()
     def get_available_fields(self):
-        excluded_fields = {'id', 'created_by'}
-        included_emp_master_fields = { 'emp_first_name', 'emp_dept_id', 'emp_desgntn_id', 'emp_ctgry_id'}
+        excluded_fields = {'id', 'created_by','created_at'}
+        included_emp_master_fields = { 'emp_first_name', 'emp_dept_id', 'emp_desgntn_id', 'emp_ctgry_id','emp_branch_id'}
         
         display_names = {
             "employee": "Employee Code",
@@ -1006,8 +1006,8 @@ class Lv_Approval_ReportViewset(viewsets.ModelViewSet):
         super(Lv_Approval_ReportViewset, self).__init__(*args, **kwargs)
         self.lv_apprvl_std_report_exists()
     def get_available_fields(self):
-        excluded_fields = {'id', 'created_by'}
-        included_emp_master_fields = { 'emp_first_name', 'emp_dept_id', 'emp_desgntn_id', 'emp_ctgry_id'}
+        excluded_fields = {'id', 'created_by','created_at'}
+        included_emp_master_fields = { 'emp_first_name', 'emp_dept_id', 'emp_desgntn_id', 'emp_ctgry_id','emp_branch_id'}
         
         display_names = {
             "employee": "Employee Code",
@@ -1596,8 +1596,8 @@ class LvBalanceReportViewset(viewsets.ModelViewSet):
         super(LvBalanceReportViewset, self).__init__(*args, **kwargs)
         self.lvbalance_standard_report_exists()
     def get_available_fields(self):
-        excluded_fields = {'id', 'created_by'}
-        included_emp_master_fields = { 'emp_first_name', 'emp_dept_id', 'emp_desgntn_id', 'emp_ctgry_id'}
+        excluded_fields = {'id', 'created_by','created_at'}
+        included_emp_master_fields = { 'emp_first_name', 'emp_dept_id', 'emp_desgntn_id', 'emp_ctgry_id','emp_branch_id'}
         
         display_names = {
             "employee": "Employee Code",

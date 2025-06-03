@@ -1785,7 +1785,7 @@ class GeneralRequestViewset(viewsets.ModelViewSet):
                 doc_config = DocumentNumbering.objects.get(
                     branch_id=branch_id,
                     type='general_request',
-                    leave_type__isnull=True
+                    # leave_type__isnull=True
                 )
             except DocumentNumbering.DoesNotExist:
                 raise NotFound(f"No document numbering configuration found for branch {branch_id} and general request.")
