@@ -1110,70 +1110,47 @@ class Lv_Approval_ReportViewset(viewsets.ModelViewSet):
         emp_master_fields = [field.name for field in emp_master._meta.get_fields() if isinstance(field, Field) and field.name != 'id']
         leave_approval_fields = [field.name for field in LeaveApproval._meta.get_fields() if isinstance(field, Field) and field.name != 'id']
 
-        report_data = defaultdict(list)
+        report_data = {}
 
         for document in generalreport:
-            # Determine if the document is for a leave_request or compensatory_request
             leave_request = document.leave_request
             compensatory_request = document.compensatory_request
-            leave_request_id = leave_request.id if leave_request else (compensatory_request.id if compensatory_request else 'N/A')
-            approval_data = {}
+            request_id = leave_request.id if leave_request else (compensatory_request.id if compensatory_request else 'N/A')
 
-            # Fetch related employee
-            employee = leave_request.employee if leave_request else (compensatory_request.employee if compensatory_request else None)
+            # Shared information container (one per request_id)
+            if request_id not in report_data:
+                shared_data = {
+                    "request_id": request_id,
+                    "approvals": []
+                }
+
+                employee = leave_request.employee if leave_request else (compensatory_request.employee if compensatory_request else None)
+
+                for field in fields_to_include:
+                    if field in emp_master_fields and employee:
+                        shared_data[field] = getattr(employee, field, 'N/A')
+                    elif field == 'leave_request' and leave_request:
+                        shared_data['leave_request'] = str(leave_request)
+                    elif field == 'compensatory_request' and compensatory_request:
+                        shared_data['compensatory_request'] = str(compensatory_request)
+                
+                report_data[request_id] = shared_data
+
+            # Approval-specific info
+            approval_data = {}
             approver = document.approver if document.approver else None
 
             for field in fields_to_include:
-                # Employee-specific fields
-                if field in emp_master_fields and employee:
-                    value = getattr(employee, field, 'N/A')
-                
-                # Leave approval fields
-                elif field in leave_approval_fields:
-                    value = getattr(document, field, 'N/A')
-                
-                # Fields specific to leave_request
-                elif leave_request:
-                    if field == 'leave_type':
-                        value = leave_request.leave_type.name if leave_request.leave_type else 'N/A'
-                    elif field == 'reason':
-                        value = leave_request.reason
-                    elif field == 'applied_on':
-                        value = leave_request.applied_on.isoformat() if leave_request.applied_on else 'N/A'
-                    else:
-                        value = 'N/A'
-                
-                # Fields specific to compensatory_request
-                elif compensatory_request:
-                    if field == 'compensatory_date':
-                        value = compensatory_request.compensatory_date.isoformat() if compensatory_request.compensatory_date else 'N/A'
-                    elif field == 'compensatory_reason':
-                        value = compensatory_request.reason
-                    elif field == 'requested_on':
-                        value = compensatory_request.requested_on.isoformat() if compensatory_request.requested_on else 'N/A'
-                    else:
-                        value = 'N/A'
-                
-                # Approver-specific fields
-                elif field == 'approver_name' and approver:
-                    value = approver.username
+                if field in leave_approval_fields:
+                    approval_data[field] = getattr(document, field, 'N/A')
+                elif field == 'approver' and approver:
+                    approval_data['approver'] = approver.username
                 elif field == 'rejection_reason' and document.rejection_reason:
-                    value = document.rejection_reason.reason_text
-                
-                # Default value for unmatched fields
-                else:
-                    value = 'N/A'
+                    approval_data['rejection_reason'] = document.rejection_reason.reason_text
 
-                # Format dates
-                if isinstance(value, date):
-                    value = value.isoformat()
-                approval_data[field] = value
+            report_data[request_id]["approvals"].append(approval_data)
 
-            # Add to report data grouped by leave_request_id
-            report_data[leave_request_id].append(approval_data)
-
-        # Format data for the report
-        return [{'request_id': req_id, 'approvals': details} for req_id, details in report_data.items()]
+        return list(report_data.values())
     
     
     @action(detail=False, methods=['get'])
