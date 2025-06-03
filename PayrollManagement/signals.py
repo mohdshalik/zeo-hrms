@@ -1,7 +1,7 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from .models import PayslipComponent, LoanRepayment, EmployeeSalaryStructure,SalaryComponent,LoanApplication
-from calendars.models import Attendance
+from calendars.models import Attendance,LeaveEncashmentTransaction
 from django.db.models import Q
 import logging
 from datetime import datetime
@@ -164,6 +164,17 @@ def get_formula_variables(employee, start_date=None, end_date=None):
     else:
         variables['years_of_service'] = 0.0
 
+    # Add encashed_days from LeaveEncashmentTransaction
+    encashment_amount = LeaveEncashmentTransaction.objects.filter(
+        employee=employee,
+        reset_date__range=(start_date, end_date)
+    ).aggregate(total_encashment=Sum('encashment_amount'))['total_encashment'] or Decimal('0.00')
+    variables['encashed_days'] = encashment_amount
+
+    salary_components = EmployeeSalaryStructure.objects.filter(employee=employee, is_active=True)
+    for sc in salary_components:
+        if sc.component and sc.amount is not None:
+            variables[sc.component.code] = Decimal(str(sc.amount))
     salary_components = EmployeeSalaryStructure.objects.filter(employee=employee, is_active=True)
     for sc in salary_components:
         if sc.component and sc.amount is not None:
