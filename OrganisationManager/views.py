@@ -11,13 +11,14 @@ from django_tenants.utils import schema_context
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from .models import (brnch_mstr,dept_master,DocumentNumbering,
-                     desgntn_master,ctgry_master,FiscalPeriod,FiscalYear,CompanyPolicy,AssetMaster, AssetTransaction,Asset_CustomFieldValue,Announcement,
-                     AnnouncementComment,AnnouncementView)
+                     desgntn_master,ctgry_master,FiscalPeriod,FiscalYear,CompanyPolicy,Announcement,
+                     AnnouncementComment,AnnouncementView,Asset, AssetAllocation,AssetRequest,AssetCustomField,AssetType,
+                     AssetReport,AssetCustomFieldValue,AssetTransactionReport)
 
 from . serializer import (BranchSerializer,PermissionSerializer,GroupSerializer,permserializer,DocumentNumberingSerializer,
                           CtgrySerializer,DeptSerializer,DesgSerializer,FiscalYearSerializer,PeriodSerializer,DeptUploadSerializer,CtgryUploadSerializer,
-                          DesgUploadSerializer,CompanyPolicySerializer,AssetMasterSerializer,AssetTransactionSerializer,Asset_CustomFieldValueSerializer,
-                          AnnouncementSerializer,AnnouncementCommentSerializer)
+                          DesgUploadSerializer,CompanyPolicySerializer,AnnouncementSerializer,AnnouncementCommentSerializer,AssetSerializer,AssetAllocationSerializer,AssetRequestSerializer,AssetCustomFieldSerializer,
+                          AssetTypeSerializer,AssetCustomFieldValueSerializer,AssetReportSerializer,AssetTransactionReportSerializer)
 from rest_framework.permissions import IsAuthenticated,AllowAny,IsAuthenticatedOrReadOnly,IsAdminUser
 from .resource import (DepartmentResource,DesignationResource,DesgtnReportResource,DeptReportResource,CategoryResource)
 from EmpManagement.models import emp_master
@@ -40,10 +41,17 @@ from rest_framework.decorators import action
 import subprocess
 import os
 from django.utils import timezone
-from django.db.models import Q
+from django.db.models import Q,Field
 from django.contrib.contenttypes.models import ContentType
 from django.core.mail import EmailMessage
 from EmpManagement.models import EmailConfiguration  # Adjust path
+from django.views.decorators.csrf import csrf_exempt
+from django.db import transaction
+from django.conf import settings
+import json
+from datetime import date,datetime
+from django.core.cache import cache
+from django.utils import timezone
 
 
 def get_model_permissions(model):
@@ -704,22 +712,6 @@ def list_data_in_schema(request):
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 
-class AssetMasterViewSet(viewsets.ModelViewSet):
-    queryset = AssetMaster.objects.all()
-    serializer_class = AssetMasterSerializer
-    permission_classes = [AssetMasterPermission]
-    
-
-class AssetTransactionViewSet(viewsets.ModelViewSet):
-    queryset = AssetTransaction.objects.all()
-    serializer_class = AssetTransactionSerializer
-    permission_classes = [AssetTransactionPermission]
-    
-class Asset_CustomFieldValueViewSet(viewsets.ModelViewSet):
-    queryset = Asset_CustomFieldValue.objects.all()
-    serializer_class = Asset_CustomFieldValueSerializer
-    permission_classes = [Asset_CustomFieldValuePermission]
-
 class AnnouncementViewSet(viewsets.ModelViewSet):
     queryset = Announcement.objects.all()
     serializer_class = AnnouncementSerializer
@@ -808,3 +800,648 @@ class AnnouncementCommentViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Announcement not found'}, status=404)
 
         return super().create(request, *args, **kwargs)
+
+class AssetTypeViewSet(viewsets.ModelViewSet):
+    queryset = AssetType.objects.all()
+    serializer_class = AssetTypeSerializer
+  
+class AssetMasterViewSet(viewsets.ModelViewSet):
+    queryset = Asset.objects.all()
+    serializer_class = AssetSerializer
+
+class AssetRequestViewSet(viewsets.ModelViewSet):
+    queryset = AssetRequest.objects.all()
+    serializer_class = AssetRequestSerializer
+    
+    @action(detail=True, methods=['post'])
+    def approve(self, request, pk=None):
+        asset_request = self.get_object()
+        
+        # Check if an asset is already assigned to the request
+        if not asset_request.requested_asset:
+            # Try to assign an available asset of the requested type
+            available_asset = Asset.objects.filter(
+                asset_type=asset_request.asset_type,
+                status="available"
+            ).first()
+            
+            if not available_asset:
+                return Response(
+                    {"error": "No available asset of the requested type."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Assign the asset to the request
+            asset_request.requested_asset = available_asset
+            asset_request.save()
+
+        # Proceed with approval
+        asset = asset_request.requested_asset
+
+        if asset.status != "available":
+            return Response(
+                {"error": f"Asset '{asset.name}' is not available."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Approve the request and allocate the asset
+        with transaction.atomic():  # Ensures all database updates happen together
+            # Update the request status
+            asset_request.status = "approved"
+            asset_request.save()
+
+            # Update the asset status
+            asset.status = "assigned"
+            asset.save()
+
+            # Create the AssetAllocation entry
+            AssetAllocation.objects.create(
+                asset=asset,
+                employee=asset_request.employee,
+                assigned_date=timezone.now().date(),
+            )
+
+        return Response(
+            {
+                "status": "approved",
+                "message": f"Asset '{asset.name}' has been allocated to {asset_request.employee}."
+            },
+            status=status.HTTP_200_OK
+        )
+    @action(detail=True, methods=['post'])
+    def reject(self, request, pk=None):
+        asset_request = self.get_object()
+        asset_request.status = "rejected"
+        asset_request.save()
+        return Response({"status": "rejected"}, status=status.HTTP_200_OK)
+
+class AssetAllocationViewSet(viewsets.ModelViewSet):
+    queryset = AssetAllocation.objects.all()
+    serializer_class = AssetAllocationSerializer
+    @action(detail=True, methods=['post'])
+    def return_asset(self, request, pk=None):
+        allocation = self.get_object()
+        condition = request.data.get('return_condition')
+        returned_date = request.data.get('returned_date')  # Optional
+        
+        if not condition:
+            return Response(
+                {"error": "Return condition is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            allocation.return_asset(condition, returned_date)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(
+            {"message": "Asset returned successfully."},
+            status=status.HTTP_200_OK
+        )
+    
+class Asset_CustomFieldValueViewSet(viewsets.ModelViewSet):
+    queryset = AssetCustomFieldValue.objects.all()
+    serializer_class = AssetCustomFieldValueSerializer
+
+class AssetCustomFieldViewSet(viewsets.ModelViewSet):
+    queryset = AssetCustomField.objects.all()
+    serializer_class = AssetCustomFieldSerializer
+
+
+class AssetReportViewset(viewsets.ModelViewSet):
+    queryset = AssetReport.objects.all()
+    serializer_class = AssetReportSerializer
+    
+    def __init__(self, *args, **kwargs):
+        super(AssetReportViewset, self).__init__(*args, **kwargs)
+        self.ensure_standard_report_exists()
+
+    def get_available_fields(self):
+        excluded_fields = {'id'}
+        display_names = {
+            "asset_type": "Asset Type",
+            "name": "Name",
+            "model": "Model",
+            "purchase_date": "Purchase Date",
+            "status": "Status",
+            "condition": "Condition",
+        }
+        
+        asset_fields = [field.name for field in Asset._meta.get_fields() if isinstance(field, Field) and field.name not in excluded_fields]
+        custom_fields = list(AssetCustomField.objects.values_list('name', flat=True))        
+        available_fields = {field: display_names.get(field, field) for field in asset_fields + custom_fields} 
+        return available_fields
+
+    @action(detail=False, methods=['get'])
+    def select_employee_fields(self, request, *args, **kwargs):
+        available_fields = self.get_available_fields()
+        return Response({'available_fields': available_fields})
+        
+
+    @csrf_exempt
+    @action(detail=False, methods=['post'])
+    def emp_select_report(self, request, *args, **kwargs):
+        # if not request.user.is_superuser:
+        #     return Response({"error": "You do not have permission to access this resource."}, status=status.HTTP_403_FORBIDDEN)
+        if request.method == 'POST':
+            try:
+                file_name = request.POST.get('file_name', 'reports')  # Default to 'report' if 'file_name' is not provided
+                fields_to_include = request.POST.getlist('fields', [])
+            except Exception as e:
+                return JsonResponse({'status': 'error', 'message': str(e)})
+
+            if not fields_to_include:
+                fields_to_include = list(self.get_available_fields().keys())
+
+            assets = Asset.objects.all()
+
+            report_data = self.generate_report_data(fields_to_include, assets)
+            file_path = os.path.join(settings.MEDIA_ROOT, file_name + '.json')  # Use 'file_name' provided by the user
+
+            with open(file_path, 'w') as file:
+                json.dump(report_data, file, default=str)  # Serialize dates to string format
+
+            AssetReport.objects.create(file_name=file_name, report_data=file_name + '.json')
+            return JsonResponse({
+                'status': 'success',
+                'file_path': file_path,
+                'selected_fields_data': fields_to_include,
+                
+            })
+
+        return JsonResponse({'status': 'error', 'message': 'Invalid request method'})
+    
+    def ensure_standard_report_exists(self):
+        # Update the standard report if it exists, otherwise create a new one
+        if AssetReport.objects.filter(file_name='std_report').exists():
+            self.generate_standard_report()
+        else:
+            self.generate_standard_report()
+    
+    def generate_standard_report(self):
+        try:
+            file_name = 'std_report'
+            fields_to_include = self.get_available_fields().keys()
+            asset = Asset.objects.all()
+
+            report_data = self.generate_report_data(fields_to_include, asset)
+            file_path = os.path.join(settings.MEDIA_ROOT, file_name + '.json')
+
+            # Save report data to a file
+            with open(file_path, 'w') as file:
+                json.dump(report_data, file, default=str)
+
+            # Update or create the standard report entry in the database
+            AssetReport.objects.update_or_create(
+                file_name=file_name,
+                defaults={'report_data': file_name + '.json'}
+            )
+
+            print("Standard report generated successfully.")
+
+        except Exception as e:
+            print(f"Error generating standard report: {str(e)}")
+
+    @action(detail=False, methods=['get'])
+    def std_report(self, request, *args, **kwargs):
+        try:
+            # Ensure the standard report is up-to-date
+            self.generate_standard_report()
+            report = AssetReport.objects.get(file_name='std_report')
+            serializer = self.get_serializer(report)
+            return Response(serializer.data)
+        except AssetReport.DoesNotExist:
+            return Response({"error": "Standard report not found."}, status=status.HTTP_404_NOT_FOUND)
+    
+    def generate_report_data(self, fields_to_include, assets):
+        asset_fields = [field.name for field in Asset._meta.get_fields() if isinstance(field, Field) and field.name != 'id']
+        report_data = []
+
+        for asset in assets:
+            # Get custom fields specific to the asset type
+            asset_custom_fields = AssetCustomField.objects.filter(asset_type=asset.asset_type).values_list('name', flat=True)
+            employee_data = {}
+
+            for field in fields_to_include:
+                if field in asset_fields:
+                    # Handle standard asset fields
+                    value = getattr(asset, field, 'N/A')
+                    if isinstance(value, date):
+                        value = value.isoformat()  # Convert date to ISO format string
+                elif field in asset_custom_fields:
+                    # Handle custom fields specific to the asset type
+                    custom_field_value = AssetCustomFieldValue.objects.filter(
+                        asset=asset,
+                        custom_field__name=field
+                    ).first()
+                    value = custom_field_value.field_value if custom_field_value else 'N/A'
+                else:
+                    # Field not found
+                    value = 'N/A'
+
+                employee_data[field] = value
+            report_data.append(employee_data)
+
+        return report_data
+    
+    @action(detail=False, methods=['get'])
+    def select_filter_fields(self, request, *args, **kwargs):
+        available_fields = self.get_available_fields()
+        selected_fields = request.session.get('selected_fields', [])  # Get selected fields from session
+        print("selected fields:",selected_fields)
+        report_id = request.GET.get('report_id')  # Get report_id from query parameters
+
+        return Response({
+            'available_fields': available_fields,
+            'selected_fields': selected_fields,
+            'report_id': report_id
+        })
+    
+    @csrf_exempt
+    @action(detail=False, methods=['post'])
+    def generate_employee_filter_table(self, request, *args, **kwargs):
+        selected_fields = request.POST.getlist('selected_fields')
+        report_id = request.POST.get('report_id')
+        available_fields = self.get_available_fields()
+       
+        # Save selected fields to session
+        request.session['selected_fields'] = selected_fields
+        print("select fields",selected_fields)
+        # Fetch report data based on report_id
+        try:
+            report = AssetReport.objects.get(id=report_id)
+            report_file_path = os.path.join(settings.MEDIA_ROOT, report.report_data.name)  # Assuming report_data is a FileField
+            with open(report_file_path, 'r') as file:
+                report_content = json.load(file)  # Load content of the report file as JSON
+        except AssetReport.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': 'Report not found'})
+        print("reportcontnt",report_content)
+        # If no fields are selected for filtration, default to all existing fields in the report
+        if not selected_fields:
+            if report_content:
+                selected_fields = list(report_content[0].keys())  # Default to all keys in the first record
+            else:
+                selected_fields = []  # No data in the report
+
+        # Fetch employees data from emp_master
+        employees = Asset.objects.all()
+
+        # Get unique values for selected_fields
+        unique_values = self.get_unique_values_for_fields(employees, selected_fields, report_content)
+        processed_unique_values = {}
+        for field, values in unique_values.items():
+            processed_unique_values[field] = {
+                'values': values,
+            }
+
+        return JsonResponse({
+            'selected_fields': selected_fields,
+            'report_id': report_id,
+            'report_content': report_content,  # Pass report_content to the frontend
+            'unique_values': processed_unique_values,
+        })
+
+       
+
+    def get_unique_values_for_fields(self, employees, selected_fields, report_content):
+        unique_values = {field: set() for field in selected_fields}
+
+        # Extract data from the JSON content
+        for record in report_content:
+            for field in selected_fields:
+                if field in record:
+                    unique_values[field].add(record[field])
+
+        # Fetch additional data from Emp_CustomField if necessary
+        for field in selected_fields:
+            if field not in unique_values:
+                continue
+            for employee in employees:
+                if not hasattr(employee, field):
+                    custom_field_value = AssetCustomField.objects.filter(Asset=employee, field_name=field).first()
+                    if custom_field_value:
+                        unique_values[field].add(custom_field_value.field_value)
+
+        # Convert sets to lists
+        for field in unique_values:
+            unique_values[field] = list(unique_values[field])
+        return unique_values
+    
+    
+    @csrf_exempt
+    @action(detail=False, methods=['post'])
+    def filter_existing_report(self, request, *args, **kwargs):
+        report_id = request.data.get('report_id')
+        if not report_id:
+            return HttpResponse('Report ID is missing', status=400)
+
+        try:
+            report_instance = AssetReport.objects.get(id=report_id)
+            report_data = json.loads(report_instance.report_data.read().decode('utf-8'))
+        except (AssetReport.DoesNotExist, json.JSONDecodeError) as e:
+            return HttpResponse(f'Report not found or invalid JSON format: {str(e)}', status=404)
+
+        selected_fields = [key for key in request.data.keys() if key != 'report_id']
+        filter_criteria = {}
+
+        for field in selected_fields:
+            values = [val.strip() for val in request.data.getlist(field) if val.strip()]
+            if values:
+                filter_criteria[field] = values
+
+        field_names = {
+            "Asset Type":"asset_type",
+            "Name":"name",
+            "Model":"model" ,
+            "Purchase Date":"purchase_date",
+            "Status":"status",
+            "Condition":"condition",
+            # Add other field mappings as per your needs
+        }
+
+        filtered_data = [row for row in report_data if self.match_filter_criteria(row, filter_criteria, field_names)]
+        print("filtered data",filtered_data)
+        # Save filtered data to session for Excel generation
+        request.session['filtered_data'] = filtered_data
+        request.session.modified = True
+        display_named = self.get_available_fields()
+
+        return JsonResponse({
+        'filtered_data': filtered_data,
+        'report_id': report_id,
+    })
+        
+
+    def match_filter_criteria(self, row_data, filter_criteria, field_names):
+        for column_heading, field_name in field_names.items():
+            if field_name in filter_criteria:
+                values = filter_criteria[field_name]
+                row_value = row_data.get(field_name)
+                if row_value is None or row_value.strip() not in values:
+                    return False
+        for custom_field_name in filter_criteria.keys():
+            if custom_field_name not in field_names.values():
+                custom_field_values = filter_criteria[custom_field_name]
+                custom_field_value = row_data.get(custom_field_name, '').strip().lower()
+                if custom_field_value and custom_field_value not in [val.lower() for val in custom_field_values]:
+                    return False
+        return True
+class AssetTransactionReportViewset(viewsets.ModelViewSet):
+    queryset = AssetTransactionReport.objects.all()
+    serializer_class = AssetTransactionReportSerializer
+
+    def get_available_fields(self):
+        excluded_fields = {'id'}
+        included_emp_master_fields = { 'emp_first_name', 'emp_dept_id', 'emp_desgntn_id', 'emp_ctgry_id'}
+        
+        display_names = {
+            "employee": "Employee Code",
+            "emp_first_name": "First Name",
+            "emp_active_date": "Active Date",
+            "branch":"Branches",
+            "emp_dept_id": "Department",
+            "emp_desgntn_id": "Designation",
+            "emp_ctgry_id": "Category",
+            "asset":"Asset",
+            "assigned_date":"Assigned Date",
+            "returned_date":"returned_date",
+            "return_condition":"Return Condition"
+
+
+           
+        }
+
+        emp_master_fields = [field.name for field in emp_master._meta.get_fields() if isinstance(field, Field) and field.name in included_emp_master_fields]
+        asset_fields = [field.name for field in AssetAllocation._meta.get_fields() if isinstance(field, Field) and field.name not in excluded_fields]
+        
+        available_fields = {field: display_names.get(field, field) for field in emp_master_fields + asset_fields}
+        return available_fields
+    @action(detail=False, methods=['get'])
+    def select_asset_fields(self, request, *args, **kwargs):
+        available_fields = self.get_available_fields()
+        return Response({'available_fields': available_fields})
+    
+    @action(detail=False, methods=['post'])
+    def generate_general_report(self, request, *args, **kwargs):
+        if request.method == 'POST':
+            try:
+                file_name = request.POST.get('file_name', 'report')
+                fields_to_include = request.POST.getlist('fields', [])
+                # from_date = parse_date(request.POST.get('from_date'))
+                # to_date = parse_date(request.POST.get('to_date'))
+            except Exception as e:
+                return JsonResponse({'status': 'error', 'message': str(e)})
+            
+            if not fields_to_include:
+                fields_to_include = list(self.get_available_fields().keys())
+            
+            generalreport = AssetAllocation.objects.all()
+            # documents = self.filter_documents_by_date_range(documents)
+
+            report_data = self.generate_report_data(fields_to_include,generalreport)
+            file_path = os.path.join(settings.MEDIA_ROOT, file_name + '.json')
+            with open(file_path, 'w') as file:
+                json.dump(report_data, file, default=str)  # Serialize dates to string format
+
+
+            AssetTransactionReport.objects.create(file_name=file_name, report_data=file_name + '.json')
+            return JsonResponse({'status': 'success', 'file_path': file_path,'selected_fields_data': fields_to_include,})
+        return JsonResponse({'status': 'error', 'message': 'Invalid request method'})
+
+   
+    def general_standard_report_exists(self):
+        # Update the standard report if it exists, otherwise create a new one
+        if AssetTransactionReport.objects.filter(file_name='generalrequest_std_report').exists():
+            self.generate_standard_report()
+        else:
+            self.generate_standard_report()
+    
+    def generate_standard_report(self):
+        try:
+            file_name = 'generalrequest_std_report'
+            fields_to_include = self.get_available_fields().keys()
+            generalreport = AssetAllocation.objects.all()
+
+            report_data = self.generate_report_data(fields_to_include, generalreport)
+            file_path = os.path.join(settings.MEDIA_ROOT, file_name + '.json')
+
+            # Save report data to a file
+            with open(file_path, 'w') as file:
+                json.dump(report_data, file, default=str)
+
+            # Update or create the standard report entry in the database
+            AssetTransactionReport.objects.update_or_create(
+                file_name=file_name,
+                defaults={'report_data': file_name + '.json'}
+            )
+        except Exception as e:
+            print(f"Error generating standard report: {str(e)}")
+
+    @action(detail=False, methods=['get'])
+    def std_report(self, request, *args, **kwargs):
+        try:
+            # Ensure the standard report is up-to-date
+            self.generate_standard_report()
+            report = AssetTransactionReport.objects.get(file_name='generalrequest_std_report')
+            serializer = self.get_serializer(report)
+            return Response(serializer.data)
+        except AssetTransactionReport.DoesNotExist:
+            return Response({"error": "Standard report not found."}, status=status.HTTP_404_NOT_FOUND)
+    
+    def generate_report_data(self, fields_to_include,generalreport):
+        column_headings = {
+            "employee": "Employee Code",
+            "emp_first_name": "First Name",
+            "branch": "Branch",
+            "emp_dept_id": "Department",
+            "emp_desgntn_id": "Designation",
+            "emp_ctgry_id": "Category",
+            "asset":"Asset",
+            "assigned_date":"Assigned Date",
+            "returned_date":"returned_date",
+            "return_condition":"Return Condition"
+        }
+
+        emp_master_fields = [field.name for field in emp_master._meta.get_fields() if isinstance(field, Field) and field.name != 'id']
+        general_request_fields = [field.name for field in AssetAllocation._meta.get_fields() if isinstance(field, Field) and field.name != 'id']
+
+        report_data = []
+        for document in generalreport:
+            general_data = {}
+            for field in fields_to_include:
+                if field in emp_master_fields:
+                    value = getattr(document.employee, field, 'N/A')
+                    if isinstance(value, date):
+                        value = value.isoformat()
+                elif field in general_request_fields:
+                    value = getattr(document, field, 'N/A')
+                else:
+                    value = 'N/A'
+                general_data[field] = value
+            report_data.append(general_data)
+        return report_data            
+
+    @action(detail=False, methods=['get'])
+    def select_filter_fields(self, request, *args, **kwargs):
+        available_fields = self.get_available_fields()
+        selected_fields = request.session.get('selected_fields', [])
+        report_id = request.GET.get('report_id')  # Get report_id from query parameters
+
+        
+        return Response({
+            'available_fields': available_fields,
+            'selected_fields': selected_fields,
+            'report_id': report_id
+        }) 
+      
+    @action(detail=False, methods=['post'])
+    def filter_by_date(self, request, *args, **kwargs):
+        tenant_id = request.tenant.schema_name
+        report_id = request.data.get('report_id')
+        start_date = request.data.get('start_date')
+        end_date = request.data.get('end_date')
+
+        # Replace slashes with hyphens
+        start_date = start_date.replace('/', '-')
+        end_date = end_date.replace('/', '-')
+
+        # Parse and validate the date range
+        try:
+            start_date = datetime.fromisoformat(start_date)
+            end_date = datetime.fromisoformat(end_date)
+        except ValueError as e:
+            return JsonResponse({'status': 'error', 'message': f'Invalid date format: {str(e)}'}, status=400)
+
+        # Fetch report data from your database
+        try:
+            report_instance = AssetTransactionReport.objects.get(id=report_id)
+            report_data = json.loads(report_instance.report_data.read().decode('utf-8'))
+        except AssetTransactionReport.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': 'Report not found'}, status=404)
+
+        # Filter data by date range
+        date_filtered_data = [
+            row for row in report_data
+            if 'created_at_date' in row and row['assigned_date'] and
+            start_date <= datetime.fromisoformat(row['assigned_date']) <= end_date
+        ]
+
+        # Save filtered data to Redis cache
+        cache_key = f"{tenant_id}_{report_id}_date_filtered_data"
+        cache.set(cache_key, date_filtered_data, timeout=None)  # Set timeout as needed
+
+        return JsonResponse({
+            'date_filtered_data': date_filtered_data,
+            'report_id': report_id,
+        })
+    
+    @action(detail=False, methods=['post'])
+    def generate_filter_table(self, request, *args, **kwargs):
+        selected_fields = request.POST.getlist('selected_fields')
+        report_id = request.data.get('report_id')
+
+        # Fetch previously filtered date data from the `apply_date_filter` method
+        date_filtered_data = getattr(self, 'date_filtered_data', [])
+        print("previous",date_filtered_data)
+
+        # If no date-filtered data, attempt to fetch full report
+        if not date_filtered_data:
+            report_instance = get_object_or_404(AssetTransactionReport, id=report_id)
+            report_data = json.loads(report_instance.report_data.read().decode('utf-8'))
+            date_filtered_data = report_data
+
+        # Default to all fields if no specific fields selected
+        if not selected_fields and date_filtered_data:
+            selected_fields = list(date_filtered_data[0].keys())
+
+        # Get unique values for selected_fields from date-filtered data
+        unique_values = self.get_unique_values_for_fields(date_filtered_data, selected_fields)
+
+        processed_unique_values = {
+            field: {'values': values}
+            for field, values in unique_values.items()
+        }
+
+        return JsonResponse({
+            'selected_fields': selected_fields,
+            'report_id': report_id,
+            'report_content': date_filtered_data,
+            'unique_values': processed_unique_values,
+            # 'column_headings': column_headings
+        })
+
+    def get_unique_values_for_fields(self, data, selected_fields):
+        unique_values = {field: set() for field in selected_fields}
+        for record in data:
+            for field in selected_fields:
+                if field in record:
+                    unique_values[field].add(record[field])
+
+        for field in unique_values:
+            unique_values[field] = list(unique_values[field])
+        return unique_values
+    @action(detail=False, methods=['post'])
+    def general_filter_report(self, request, *args, **kwargs):
+        tenant_id = request.tenant.schema_name
+        report_id = request.data.get('report_id')
+
+        # Retrieve filtered data from Redis cache
+        cache_key = f"{tenant_id}_{report_id}_date_filtered_data"
+        filtered_data = cache.get(cache_key)
+
+        if filtered_data is None:
+            return JsonResponse({'status': 'error', 'message': 'No date-filtered data available'}, status=404)
+        # Apply additional filtering here if needed
+        # For example, based on other fields:
+        additional_filters = {key: value for key, value in request.data.items() if key not in ('report_id',)}
+        
+        # Further filter based on additional criteria
+        filtered_data = [
+            row for row in filtered_data
+            if all(row.get(key) == value for key, value in additional_filters.items())
+        ]
+        return JsonResponse({
+            'filtered_data': filtered_data,
+            'report_id': report_id,
+        })

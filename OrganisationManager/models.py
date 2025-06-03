@@ -177,85 +177,6 @@ class CompanyPolicy(models.Model):
 
     def __str__(self):
         return self.title
-    
-class AssetMaster(models.Model):
-    name               = models.CharField(max_length=255)
-    description        = models.TextField(blank=True, null=True)
-    total_quantity     = models.PositiveIntegerField()
-    available_quantity = models.PositiveIntegerField()
-    created_at         = models.DateTimeField(auto_now_add=True)
-    updated_at         = models.DateTimeField(auto_now=True)
-    created_at         = models.DateTimeField(auto_now_add=True)
-    created_by         = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
-
-
-    def __str__(self):
-        return self.name
-class AssetTransaction(models.Model):
-    ISSUE = 'ISSUE'
-    RETURN = 'RETURN'
-
-    TRANSACTION_TYPE_CHOICES = [
-        (ISSUE, 'Issue'),
-        (RETURN, 'Return'),
-    ]
-
-    employee         = models.ForeignKey(emp_master, on_delete=models.CASCADE, related_name="asset_transactions")
-    asset            = models.ForeignKey(AssetMaster, on_delete=models.CASCADE, related_name="transactions")
-    transaction_type = models.CharField(max_length=10, choices=TRANSACTION_TYPE_CHOICES)
-    quantity         = models.PositiveIntegerField()
-    date             = models.DateField(auto_now_add=True)
-    remarks          = models.TextField(blank=True, null=True)
-    created_at         = models.DateTimeField(auto_now_add=True)
-    created_by         = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
-
-
-    def __str__(self):
-        return f"{self.transaction_type} - {self.asset.name} ({self.quantity})"
-
-    def save(self, *args, **kwargs):
-        # Update available quantity in AssetMaster
-        if self.transaction_type == self.ISSUE:
-            self.asset.available_quantity -= self.quantity
-        elif self.transaction_type == self.RETURN:
-            self.asset.available_quantity += self.quantity
-
-        self.asset.save()
-        super().save(*args, **kwargs)
-
-class Asset_CustomFieldValue(models.Model):
-    asset_custom_field = models.CharField(max_length=100)
-    field_value      = models.TextField(null=True, blank=True)  # Field value provided by end user
-    asset_master      = models.ForeignKey('AssetMaster', on_delete=models.CASCADE, related_name='custom_field_values',null=True)
-    created_at         = models.DateTimeField(auto_now_add=True)
-    created_by         = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
-
-    def __str__(self):
-        return f'{self.asset_custom_field.emp_custom_field}: {self.field_value}'
-    
-    def save(self, *args, **kwargs):
-        if not self.asset_custom_field:
-            raise ValueError("Field name cannot be None or empty.")
-        if not Emp_CustomField.objects.filter(emp_custom_field=self.asset_custom_field).exists():
-            raise ValueError(f"Field name '{self.asset_custom_field}' does not exist in Emp_CustomField.")
-
-        # Check if a custom field value already exists for the same emp_master and emp_custom_field
-        existing_value = Asset_CustomFieldValue.objects.filter(
-            emp_custom_field=self.asset_custom_field,
-            emp_master=self.emp_master
-        ).first()
-
-        if existing_value:
-            # If it exists, update the existing record instead of creating a new one
-            existing_value.field_value = self.field_value
-            # Use update() to avoid calling save() and prevent recursion
-            Asset_CustomFieldValue.objects.filter(
-                id=existing_value.id
-            ).update(field_value=self.field_value)
-        else:
-            # Call full_clean to ensure that the clean method is called
-            self.full_clean()
-            super().save(*args, **kwargs)
 
 class Announcement(models.Model):
     title = models.CharField(max_length=255)
@@ -293,3 +214,184 @@ class AnnouncementComment(models.Model):
 
     def __str__(self):
         return f"Comment by {self.employee} on {self.announcement}"
+
+class AssetType(models.Model):
+    name        = models.CharField(max_length=255, unique=True)
+    description = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return self.name
+class AssetCustomField(models.Model):
+    FIELD_TYPES = (
+        ('dropdown', 'DropdownField'),
+        ('radio', 'RadioButtonField'),
+        ('date', 'DateField'),
+        ('text', 'TextField'),
+        ('checkbox', 'CheckboxField'),
+    )
+    asset_type       = models.ForeignKey(AssetType,on_delete=models.CASCADE,related_name='custom_fields',null=True)
+    name             = models.CharField(unique=True, max_length=100)  # Field name
+    data_type        = models.CharField(max_length=20, choices=FIELD_TYPES, null=True, blank=True)
+    dropdown_values  = models.JSONField(null=True, blank=True)
+    radio_values     = models.JSONField(null=True, blank=True)
+    checkbox_values  = models.JSONField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.asset_type})"
+
+    def clean(self):
+        # Validate field values based on type
+        if self.data_type == 'dropdown' and not self.dropdown_values:
+            raise ValidationError("Provide values for the dropdown options.")
+        elif self.data_type == 'radio' and not self.radio_values:
+            raise ValidationError("Provide values for the radio options.")
+        elif self.data_type == 'checkbox' and not self.checkbox_values:
+            raise ValidationError("Provide values for the checkbox options.")
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
+class Asset(models.Model):
+    STATUS_CHOICES = [
+        ('available', 'Available'),
+        ('assigned', 'Assigned'),
+        ('maintenance', 'Under Maintenance'),
+        ('disposed', 'Disposed'),
+    ]
+
+    CONDITION_CHOICES = [
+        ('healthy', 'Healthy'),
+        ('minor_damage', 'Minor Damage'),
+        ('major_damage', 'Major Damage'),
+    ]
+
+    asset_type     = models.ForeignKey(AssetType, on_delete=models.CASCADE, related_name="assets")
+    name           = models.CharField(max_length=100)
+    serial_number  = models.CharField(max_length=100, unique=True)
+    model = models.CharField(max_length=100, blank=True)
+    purchase_date  = models.DateField()
+    # warranty_until = models.DateField(null=True, blank=True)
+    status         = models.CharField(max_length=20, choices=STATUS_CHOICES, default='available')
+    condition      = models.CharField(max_length=20, choices=CONDITION_CHOICES, default='healthy')
+
+    def __str__(self):
+        return self.name
+
+class AssetRequest(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+
+    employee          = models.ForeignKey(emp_master, on_delete=models.CASCADE, related_name="asset_requests")
+    asset_type        = models.ForeignKey(AssetType, on_delete=models.CASCADE, related_name="asset_requests")
+    requested_asset   = models.ForeignKey(Asset, on_delete=models.SET_NULL, null=True, blank=True)
+    reason            = models.TextField()
+    status            = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    # request_date      = models.DateField(auto_now_add=True)
+    request_date        = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Request by {self.employee} for {self.asset_category}"
+    def approve(self):
+        if self.status != 'pending':
+            raise ValueError("Request already processed")
+        self.status = 'approved'
+        self.save()
+
+        # Allocate the asset to the employee
+        if self.requested_asset:
+            self.requested_asset.status = 'assigned'
+            self.requested_asset.save()
+
+            # Create an allocation record
+            AssetAllocation.objects.create(
+                asset=self.requested_asset,
+                employee=self.employee,
+                assigned_date=timezone.now().date()
+            )
+
+    def reject(self):
+        if self.status != 'pending':
+            raise ValueError("Request already processed")
+        self.status = 'rejected'
+        self.save()
+class AssetAllocation(models.Model):
+    CONDITION_CHOICES = [
+        ('healthy', 'Healthy'),
+        ('minor_damage', 'Minor Damage'),
+        ('major_damage', 'Major Damage'),
+    ]
+
+    asset            = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name="allocations")
+    employee         = models.ForeignKey(emp_master, on_delete=models.CASCADE, related_name="allocations")
+    assigned_date    = models.DateField(auto_now_add=True)
+    returned_date    = models.DateField(null=True, blank=True)
+    return_condition = models.CharField(max_length=20, choices=CONDITION_CHOICES, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.asset} allocated to {self.employee}"
+    def return_asset(self, condition, returned_date=None):
+        if self.returned_date:
+            raise ValueError("This asset has already been returned.")
+
+        # Update the returned condition
+        self.return_condition = condition
+
+        # Assign the provided returned_date or use the current date
+        self.returned_date = returned_date or timezone.now().date()
+        self.save()
+
+        # Update the asset status to available
+        self.asset.status = "available"
+        self.asset.condition = condition
+        self.asset.save()
+    
+class AssetCustomFieldValue(models.Model):
+    asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name='custom_field_values',null=True)
+    custom_field = models.ForeignKey(AssetCustomField,on_delete=models.CASCADE,related_name='field_values',null=True)
+    field_value = models.TextField(null=True, blank=True)  # Value provided by the user
+
+    def __str__(self):
+        return f"{self.asset.name} - {self.custom_field.name}: {self.field_value}"
+
+    
+    def clean(self):
+        # Ensure the custom field belongs to the correct asset type
+        if self.custom_field.asset_type != self.asset_master.asset_type:
+            raise ValidationError("The custom field does not belong to this asset type.")
+
+    def save(self, *args, **kwargs):
+        # self.clean()
+        super().save(*args, **kwargs)
+
+
+
+class AssetReport(models.Model):
+    file_name   = models.CharField(max_length=100,null=True,unique=True)
+    report_data = models.FileField(upload_to='asset_report/', null=True, blank=True) 
+    # created_at = models.DateTimeField(auto_now_add=True,null=True,blank =True)
+    class Meta:
+        permissions = (
+            ('export_report', 'Can export report'),
+            # Add more custom permissions here
+        )
+    
+    
+    def __str__(self):
+        return self.file_name
+class AssetTransactionReport(models.Model):
+    file_name   = models.CharField(max_length=100,null=True,unique=True)
+    report_data = models.FileField(upload_to='asset_transaction_report/', null=True, blank=True) 
+    # created_at = models.DateTimeField(auto_now_add=True,null=True,blank =True)
+    class Meta:
+        permissions = (
+            ('export_report', 'Can export report'),
+            # Add more custom permissions here
+        )
+    
+    
+    def __str__(self):
+        return self.file_name

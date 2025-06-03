@@ -1,8 +1,8 @@
 from django.urls import path, include
 from . views import (FiscalYearViewSet,PeriodViewSet,BranchViewSet,DepartmentViewSet,DocNumberingviewset,FiscalPeriodDatesView,
                      DesignationViewSet,CatogoryViewSet,CompanyFiscalData,permissionviewset,Groupviewset,permviewset,FiscalYearDatesView,DeptBulkUploadViewSet,DesignationBulkUploadViewSet,
-                   save_notification_settings,CompanyPolicyViewSet,list_data_in_schema,AssetMasterViewSet,AssetTransactionViewSet,Asset_CustomFieldValueViewSet,CategoryBulkUploadViewSet,AnnouncementViewSet,
-                   AnnouncementCommentViewSet
+                   save_notification_settings,CompanyPolicyViewSet,list_data_in_schema,CategoryBulkUploadViewSet,AnnouncementViewSet,
+                   AnnouncementCommentViewSet,AssetTypeViewSet,AssetMasterViewSet,Asset_CustomFieldValueViewSet,AssetReportViewset,AssetTransactionReportViewset,AssetAllocationViewSet,AssetRequestViewSet,AssetCustomFieldViewSet
                    )
 from rest_framework.routers import DefaultRouter
 
@@ -24,12 +24,17 @@ router.register(r'Group', Groupviewset)
 router.register(r'perm', permviewset)
 router.register(r'document-numbering', DocNumberingviewset)
 router.register(r'policies', CompanyPolicyViewSet, basename='companypolicy')
-router.register(r'assets', AssetMasterViewSet, basename='asset-master')
-router.register(r'asset-transactions', AssetTransactionViewSet, basename='asset-transaction')
-router.register(r'asset-customfield', Asset_CustomFieldValueViewSet, basename='assets-customfield')
 router.register(r'announcements', AnnouncementViewSet, basename='announcement')
 router.register(r'announcement-comments', AnnouncementCommentViewSet, basename='announcement-comments')
 # router.register(r'e-attendance', AttendanceViewSet, basename='e-attendance')
+router.register(r'asset-type', AssetTypeViewSet, basename='asset-type')
+router.register(r'assets', AssetMasterViewSet, basename='asset-master')
+router.register(r'asset-allocations', AssetAllocationViewSet, basename='asset-allocations')
+router.register(r'asset-Request', AssetRequestViewSet, basename='assets-Request')
+router.register(r'asset-customfield', AssetCustomFieldViewSet, basename='assets-customfield')
+router.register(r'asset-customfield-value', Asset_CustomFieldValueViewSet, basename='assets-customfield-value')
+router.register(r'asset-Report', AssetReportViewset, basename='assets-Report')
+router.register(r'asset-transaction-report', AssetTransactionReportViewset, basename='assets-transaction-report')
 
 
 urlpatterns = [

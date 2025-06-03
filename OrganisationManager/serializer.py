@@ -1,6 +1,7 @@
 from .models import (brnch_mstr,dept_master,desgntn_master,DocumentNumbering,
-                     ctgry_master,FiscalPeriod,FiscalYear,CompanyPolicy,AssetMaster,AssetMaster, AssetTransaction,Asset_CustomFieldValue,
-                     Announcement,AnnouncementView,AnnouncementComment)
+                     ctgry_master,FiscalPeriod,FiscalYear,CompanyPolicy,
+                     Announcement,AnnouncementView,AnnouncementComment,Asset,AssetAllocation,AssetType, AssetRequest,AssetCustomField,AssetReport,
+                     AssetCustomFieldValue,AssetTransactionReport)
 from rest_framework import serializers
 from tenant_users.tenants.models import UserTenantPermissions
 from django.contrib.auth.models import Permission,Group
@@ -149,32 +150,6 @@ class DocumentNumberingSerializer(serializers.ModelSerializer):
         #     rep['category'] = instance.category.ctgry_title
         return rep
     
-
-class AssetMasterSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = AssetMaster
-        fields = '__all__'
-
-class AssetTransactionSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = AssetTransaction
-        fields = '__all__'
-
-    def validate(self, data):
-        asset = data.get('asset')
-        transaction_type = data.get('transaction_type')
-        quantity = data.get('quantity')
-
-        if transaction_type == AssetTransaction.ISSUE and asset.available_quantity < quantity:
-            raise serializers.ValidationError("Insufficient quantity available for issuance.")
-        
-        return data
-
-class Asset_CustomFieldValueSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Asset_CustomFieldValue
-        fields = '__all__'   
-
 class AnnouncementSerializer(serializers.ModelSerializer):
     class Meta:
         model = Announcement
@@ -188,3 +163,41 @@ class AnnouncementCommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = AnnouncementComment
         fields = ['id', 'announcement', 'employee', 'comment', 'created_at', 'employee_name']
+
+class AssetSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Asset
+        fields = '__all__'
+
+class AssetAllocationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AssetAllocation
+        fields = '__all__'
+
+class AssetRequestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AssetRequest
+        fields = '__all__'
+
+
+class AssetCustomFieldValueSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AssetCustomFieldValue
+        fields = '__all__'   
+class AssetCustomFieldSerializer(serializers.ModelSerializer):
+    # field_values = AssetCustomFieldValueSerializer(many=True, read_only=True)
+    class Meta:
+        model = AssetCustomField
+        fields = '__all__'   
+class AssetTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AssetType
+        fields = '__all__' 
+class AssetReportSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AssetReport
+        fields = '__all__' 
+class AssetTransactionReportSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AssetTransactionReport
+        fields = '__all__' 
