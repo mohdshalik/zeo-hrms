@@ -1925,13 +1925,13 @@ class GeneralReportViewset(viewsets.ModelViewSet):
 
     def get_available_fields(self):
         excluded_fields = {'id', 'created_by'}
-        included_emp_master_fields = { 'emp_first_name', 'emp_dept_id', 'emp_desgntn_id', 'emp_ctgry_id'}
+        included_emp_master_fields = { 'emp_first_name', 'emp_dept_id', 'emp_desgntn_id', 'emp_ctgry_id','emp_branch_id'}
         
         display_names = {
             "employee": "Employee Code",
             "emp_first_name": "First Name",
             "emp_active_date": "Active Date",
-            "branch":"Branches",
+            "emp_branch_id":"Branches",
             "emp_dept_id": "Department",
             "emp_desgntn_id": "Designation",
             "emp_ctgry_id": "Category",
