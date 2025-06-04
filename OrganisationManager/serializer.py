@@ -6,6 +6,7 @@ from rest_framework import serializers
 from tenant_users.tenants.models import UserTenantPermissions
 from django.contrib.auth.models import Permission,Group
 from calendars .models import assign_holiday,holiday,holiday_calendar
+from django.utils import timezone
 
 class CompanyPolicySerializer(serializers.ModelSerializer):
     class Meta:
@@ -46,7 +47,14 @@ class BranchSerializer(serializers.ModelSerializer):
         policies = obj.policies.all()  # Using related_name='policies' from CompanyPolicy model
         return CompanyPolicySerializer(policies, many=True, context={'request': self.context.get('request')}).data
     
-    
+    def get_announcements(self, obj):
+        from OrganisationManager.serializer import AnnouncementSerializer  
+        announcements = obj.branch_announcements.all()  #Use the related_name from Announcement model
+        # Optional: filter out expired announcements
+        current_time = timezone.now()
+        active_announcements = announcements.filter(expires_at__isnull=True) | announcements.filter(expires_at__gt=current_time)
+        return AnnouncementSerializer(active_announcements.distinct(), many=True, context={'request': self.context.get('request')}).data
+
     
 #DEPARTMENT SERIALIZER
 class DeptSerializer(serializers.ModelSerializer):

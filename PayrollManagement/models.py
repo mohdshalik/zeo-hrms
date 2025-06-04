@@ -113,8 +113,14 @@ class Payslip(models.Model):
     days_worked = models.PositiveIntegerField(default=0, help_text="Number of days the employee worked")
     pro_rata_adjustment = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, help_text="Pro-rata adjustment")  # New field
     arrears = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, help_text="Arrears amount")  # New field
-
-
+    send_email = models.BooleanField(default=False, help_text="Send this payslip via email if True")
+    payslip_pdf = models.FileField(upload_to='payslips/',null=True,blank=True,validators=[FileExtensionValidator(allowed_extensions=['pdf'])],)
+    confirm_status = models.BooleanField(default=False, help_text="confirm this payslip  if True")
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if self.send_email and self.payslip_pdf:
+            from .utils import send_payslip_email  # Adjust import as needed
+            send_payslip_email(self)
 class PayslipComponent(models.Model):
     payslip = models.ForeignKey(Payslip, on_delete=models.CASCADE, related_name='components')
     component = models.ForeignKey(SalaryComponent, on_delete=models.CASCADE)

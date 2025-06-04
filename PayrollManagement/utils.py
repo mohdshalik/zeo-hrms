@@ -214,3 +214,38 @@ def generate_payslip_pdf(request, payslip):
     response = HttpResponse(pdf_data, content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
+
+from django.core.mail import EmailMessage
+from django.conf import settings
+from EmpManagement .models import EmailConfiguration
+
+def send_payslip_email(payslip):
+    config = EmailConfiguration.objects.filter(is_active=True).first()
+    if not config:
+        logger.error("No active email configuration found.")
+        return False
+
+    employee_email = payslip.employee.emp_personal_email
+    if not employee_email:
+        logger.warning(f"Skipping email: Employee {payslip.employee.emp_code} has no personal email.")
+        return False  # Skip without raising error
+
+    if not payslip.payslip_pdf:
+        logger.warning(f"Skipping email: No PDF attached for payslip ID {payslip.id}")
+        return False
+
+    try:
+        email = EmailMessage(
+            subject='Your Payslip',
+            body='Please find attached your payslip.',
+            from_email=config.email_host_user,
+            to=[employee_email],
+        )
+        email.attach_file(payslip.payslip_pdf.path)
+        email.send()
+        logger.info(f"Payslip email sent to {employee_email} for employee {payslip.employee.emp_code}")
+        return True
+
+    except Exception as e:
+        logger.exception(f"Failed to send payslip email to {employee_email}: {str(e)}")
+        return False
