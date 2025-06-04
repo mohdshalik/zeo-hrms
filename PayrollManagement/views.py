@@ -18,7 +18,7 @@ from rest_framework.response import Response
 from tablib import Dataset
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.db import transaction
-from .utils import generate_payslip_pdf 
+from .utils import generate_payslip_pdf,send_payslip_email
 from .models import (SalaryComponent,EmployeeSalaryStructure,PayrollRun,Payslip,PayslipComponent,LoanType,LoanApplication,
                      LoanRepayment,LoanApprovalLevels,LoanApproval)
 from .serializer import (SalaryComponentSerializer,EmployeeSalaryStructureSerializer,PayslipSerializer,PaySlipComponentSerializer,LoanTypeSerializer,LoanApplicationSerializer,LoanRepaymentSerializer,
@@ -108,6 +108,38 @@ class PayslipViewSet(viewsets.ModelViewSet):
             )
         except ValueError:
             return Response({"error": "Invalid year or month format"}, status=status.HTTP_400_BAD_REQUEST)
+    @action(detail=True, methods=['post'], url_path='upload-pdf')
+    def upload_pdf(self, request, pk=None):
+        payslip = self.get_object()
+        pdf_file = request.FILES.get('payslip_pdf')
+        send_email = request.data.get('send_email', False)
+
+        if not pdf_file:
+            return Response({'error': 'PDF file is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        payslip.payslip_pdf.save(pdf_file.name, pdf_file, save=True)
+
+        email_sent = False
+        if send_email:
+            try:
+                email_sent = send_payslip_email(payslip)
+            except Exception as e:
+                # Catch any uncaught exceptions and just log
+                logger.exception(f"Unhandled error sending email for payslip {payslip.id}: {str(e)}")
+
+        message = "PDF uploaded."
+        if send_email:
+            if email_sent:
+                message += " Email sent successfully."
+            else:
+                if payslip.employee.emp_personal_email:
+                    message += " Email failed."
+                else:
+                    message += " Email skipped (no personal email)."
+
+        return Response({'message': message}, status=status.HTTP_200_OK)
+
+
 class PayslipComponentViewSet(viewsets.ModelViewSet):
     queryset = PayslipComponent.objects.all()
     serializer_class = PaySlipComponentSerializer
