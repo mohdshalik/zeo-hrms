@@ -175,11 +175,6 @@ def get_formula_variables(employee, start_date=None, end_date=None):
     for sc in salary_components:
         if sc.component and sc.amount is not None:
             variables[sc.component.code] = Decimal(str(sc.amount))
-    salary_components = EmployeeSalaryStructure.objects.filter(employee=employee, is_active=True)
-    for sc in salary_components:
-        if sc.component and sc.amount is not None:
-            variables[sc.component.code] = Decimal(str(sc.amount))
-
     return variables
 
 def daterange(start_date, end_date):
