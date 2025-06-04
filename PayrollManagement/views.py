@@ -41,10 +41,6 @@ class EmployeeSalaryStructureViewSet(viewsets.ModelViewSet):
     queryset = EmployeeSalaryStructure.objects.all()
     serializer_class = EmployeeSalaryStructureSerializer
 
-# class PayrollFormulaViewSet(viewsets.ModelViewSet):
-#     queryset = PayrollFormula.objects.all()
-#     serializer_class = PayrollFormulaSerializer
-
 class PayslipViewSet(viewsets.ModelViewSet):
     queryset = Payslip.objects.all()
     serializer_class = PayslipSerializer
@@ -139,7 +135,6 @@ class PayslipViewSet(viewsets.ModelViewSet):
 
         return Response({'message': message}, status=status.HTTP_200_OK)
 
-
 class PayslipComponentViewSet(viewsets.ModelViewSet):
     queryset = PayslipComponent.objects.all()
     serializer_class = PaySlipComponentSerializer
@@ -189,6 +184,11 @@ class EmpBulkuploadSalaryStructureViewSet(viewsets.ModelViewSet):
                 return Response({"error": "Invalid file format. Only Excel files (.xlsx) are supported."}, status=400)
         else:
             return Response({"error": "Please provide an Excel file."}, status=400)
+class PayslipConfirmedViewSet(viewsets.ModelViewSet):
+    queryset = Payslip.objects.all()
+    serializer_class = PayslipConfirmedSerializer
+    def get_queryset(self):
+        return Payslip.objects.filter(status='processed')
 
 class LoanTypeviewset(viewsets.ModelViewSet):
     queryset = LoanType.objects.all()

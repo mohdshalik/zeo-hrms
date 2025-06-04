@@ -106,7 +106,6 @@ def update_employee_salary_structure(sender, instance, created, **kwargs):
             )
             logger.info(f"Updated EmployeeSalaryStructure for {employee} with component {instance.name} - Amount: {amount}")
 
-
 def get_formula_variables(employee, start_date=None, end_date=None):
     Attendance = apps.get_model('calendars', 'Attendance')
     EmployeeOvertime = apps.get_model('calendars', 'EmployeeOvertime')
@@ -163,7 +162,6 @@ def get_formula_variables(employee, start_date=None, end_date=None):
         variables['years_of_service'] = round(delta.years + delta.months / 12.0, 2)
     else:
         variables['years_of_service'] = 0.0
-
     # Add encashed_days from LeaveEncashmentTransaction
     encashment_amount = LeaveEncashmentTransaction.objects.filter(
         employee=employee,
@@ -175,6 +173,7 @@ def get_formula_variables(employee, start_date=None, end_date=None):
     for sc in salary_components:
         if sc.component and sc.amount is not None:
             variables[sc.component.code] = Decimal(str(sc.amount))
+
     return variables
 
 def daterange(start_date, end_date):
@@ -201,6 +200,15 @@ def get_working_days(employee, start_date, end_date):
             working_days += 1
 
     return working_days
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from django.apps import apps
+from calendar import monthrange
+from datetime import datetime
+from decimal import Decimal
+import logging
+
+logger = logging.getLogger(__name__)
 
 @receiver(post_save, sender='PayrollManagement.PayrollRun')
 def run_payroll_on_save(sender, instance, created, **kwargs):
@@ -408,5 +416,4 @@ def update_dependent_salary_components(sender, instance, created, **kwargs):
                 }
             )
             logger.info(f"Updated EmployeeSalaryStructure for {employee} with component {component.name} - Amount: {amount}")
-
 
