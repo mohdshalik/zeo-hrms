@@ -176,16 +176,33 @@ class AssetSerializer(serializers.ModelSerializer):
     class Meta:
         model = Asset
         fields = '__all__'
-
+    def to_representation(self, instance):
+        rep = super(AssetSerializer, self).to_representation(instance)
+        if instance.asset_type:
+            rep['asset_type'] =instance.asset_type.name
+        return rep
 class AssetAllocationSerializer(serializers.ModelSerializer):
     class Meta:
         model = AssetAllocation
         fields = '__all__'
-
+    def to_representation(self, instance):
+        rep = super(AssetAllocationSerializer, self).to_representation(instance)
+        if instance.asset:
+            rep['asset'] =instance.asset.asset_type.name
+        if instance.employee:
+            rep['employee'] =instance.employee.emp_code
+        return rep
 class AssetRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = AssetRequest
         fields = '__all__'
+    def to_representation(self, instance):
+        rep = super(AssetRequestSerializer, self).to_representation(instance)
+        if instance.asset_type:
+            rep['asset_type'] =instance.asset_type.name
+        if instance.employee:
+            rep['employee'] =instance.employee.emp_code
+        return rep
 
 
 class AssetCustomFieldValueSerializer(serializers.ModelSerializer):
@@ -208,4 +225,4 @@ class AssetReportSerializer(serializers.ModelSerializer):
 class AssetTransactionReportSerializer(serializers.ModelSerializer):
     class Meta:
         model = AssetTransactionReport
-        fields = '__all__' 
+        fields = '__all__'

@@ -327,7 +327,7 @@ class AssetAllocation(models.Model):
 
     asset            = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name="allocations")
     employee         = models.ForeignKey(emp_master, on_delete=models.CASCADE, related_name="allocations")
-    assigned_date    = models.DateField(auto_now_add=True)
+    assigned_date    = models.DateField(null=True, blank=True)
     returned_date    = models.DateField(null=True, blank=True)
     return_condition = models.CharField(max_length=20, choices=CONDITION_CHOICES, null=True, blank=True)
 
