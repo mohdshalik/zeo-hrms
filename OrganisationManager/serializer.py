@@ -202,6 +202,8 @@ class AssetRequestSerializer(serializers.ModelSerializer):
             rep['asset_type'] =instance.asset_type.name
         if instance.employee:
             rep['employee'] =instance.employee.emp_code
+        if instance.requested_asset:
+            rep['requested_asset'] =instance.requested_asset.name
         return rep
 
 
