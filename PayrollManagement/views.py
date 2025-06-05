@@ -1,13 +1,11 @@
 from django.shortcuts import render
 from .models import (SalaryComponent,EmployeeSalaryStructure,PayslipComponent,Payslip,PayrollRun,LoanType,LoanApplication,
                      LoanRepayment,LoanApprovalLevels,LoanApproval)
-from .serializer import (SalaryComponentSerializer,EmployeeSalaryStructureSerializer,PayrollRunSerializer,PayslipSerializer,PaySlipComponentSerializer,LoanTypeSerializer,LoanApplicationSerializer,LoanRepaymentSerializer,
-                         LoanApprovalSerializer,LoanApprovalLevelsSerializer,EmpBulkuploadSalaryStructureSerializer)
 from django.shortcuts import render
 from .models import (SalaryComponent,EmployeeSalaryStructure,PayrollRun,Payslip,PayslipComponent,LoanType,LoanApplication,
                      LoanRepayment,LoanApprovalLevels,LoanApproval)
-from .serializer import (SalaryComponentSerializer,EmployeeSalaryStructureSerializer,PayslipSerializer,PaySlipComponentSerializer,LoanTypeSerializer,LoanApplicationSerializer,LoanRepaymentSerializer,
-                         LoanApprovalSerializer,LoanApprovalLevelsSerializer,PayrollRunSerializer,PayslipConfirmedSerializer)
+from .serializer import (SalaryComponentSerializer,EmpBulkuploadSalaryStructureSerializer,EmployeeSalaryStructureSerializer,PayslipSerializer,PaySlipComponentSerializer,LoanTypeSerializer,LoanApplicationSerializer,LoanRepaymentSerializer,
+                         LoanApprovalSerializer,LoanApprovalLevelsSerializer,PayrollRunSerializer,PayslipConfirmedSerializer,SIFSerializer)
 from rest_framework import status,generics,viewsets,permissions
 from .permissions import(SalaryComponentPermission,EmployeeSalaryStructurePermission,PayrollRunPermission,PayslipComponentPermission,PayslipPermission)
 from .resource import EmployeeSalaryStructureResource
@@ -26,7 +24,10 @@ from .serializer import (SalaryComponentSerializer,EmployeeSalaryStructureSerial
 from rest_framework import status,generics,viewsets,permissions
 import datetime
 import logging
-
+from django_tenants.utils import get_tenant_model
+from django.http import HttpResponse
+from rest_framework.views import APIView
+import csv
 # Set up logging
 logger = logging.getLogger(__name__)
 # Create your views here.
@@ -275,3 +276,56 @@ class LoanApprovalviewset(viewsets.ModelViewSet):
 
         approval.reject(rejection_reason=rejection_reason_id, note=note)
         return Response({'status': 'rejected', 'note': note, 'rejection_reason': rejection_reason_id}, status=status.HTTP_200_OK)
+class SIFDownloadView(APIView):
+    def post(self, request):
+        serializer = SIFSerializer(data=request.data)
+        if serializer.is_valid():
+            sif_data = serializer.generate_sif_data()
+            
+            # Create CSV response
+            response = HttpResponse(content_type='text/csv')
+            response['Content-Disposition'] = f'attachment; filename="salary_{datetime.now().strftime("%Y%m%d_%H%M%S")}.sif"'
+            
+            writer = csv.DictWriter(
+                response,
+                fieldnames=['Type', 'Person ID', 'Routing Code', 'IBAN Number', 'Pay Start Date',
+                            'Pay End Date', 'Number of Days', 'Fixed Income', 'Variable Income', 'Days on Leave']
+            )
+            writer.writeheader()
+            
+            # Add employer details (using company model)
+            tenant = get_tenant_model().objects.filter(schema_name=request.tenant.schema_name).first()
+            if tenant:
+                writer.writerow({
+                    'Type': 'HDR',
+                    'Person ID': tenant.name,  # Use company name as a substitute for employer_id
+                    'Routing Code': '',
+                    'IBAN Number': '',
+                    'Pay Start Date': '',
+                    'Pay End Date': '',
+                    'Number of Days': '',
+                    'Fixed Income': '',
+                    'Variable Income': '',
+                    'Days on Leave': ''
+                })
+            else:
+                # Fallback if tenant not found
+                writer.writerow({
+                    'Type': 'HDR',
+                    'Person ID': 'UNKNOWN_COMPANY',
+                    'Routing Code': '',
+                    'IBAN Number': '',
+                    'Pay Start Date': '',
+                    'Pay End Date': '',
+                    'Number of Days': '',
+                    'Fixed Income': '',
+                    'Variable Income': '',
+                    'Days on Leave': ''
+                })
+            
+            # Write employee data
+            for row in sif_data:
+                writer.writerow(row)
+            
+            return response
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

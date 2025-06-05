@@ -26,6 +26,7 @@ from django.template import Context, Template
 from django.utils import timezone
 from django.core.mail import EmailMultiAlternatives,get_connection, send_mail
 from Core .models import LanguageSkill,MarketingSkill,ProgrammingLanguageSkill
+from django.core.validators import RegexValidator
 import logging
 logger = logging.getLogger((__name__))
 
@@ -73,8 +74,7 @@ class emp_master(models.Model):
     emp_weekend_calendar     = models.ForeignKey("calendars.weekend_calendar",on_delete = models.CASCADE,null=True,blank =True)
     holiday_calendar         = models.ForeignKey("calendars.holiday_calendar",on_delete = models.CASCADE,null=True,blank =True)
     users                    = models.ForeignKey('UserManagement.CustomUser', on_delete=models.CASCADE, related_name='employees',null=True,blank =True)
-    created_at               = models.DateTimeField(auto_now_add=True)
-    created_by               = models.ForeignKey('UserManagement.CustomUser', on_delete=models.SET_NULL, null=True, related_name='%(class)s_created_by')
+    person_id                = models.CharField(max_length=14,unique=True,validators=[RegexValidator(r'^\d{14}$', 'Must be a 14-digit number')],help_text="14-digit Person ID from Ministry of Labor",blank=True,null=True)
     
 
     def save(self, *args, **kwargs):
@@ -1468,8 +1468,8 @@ class EmployeeBankDetail(models.Model):
     branch_name = models.CharField(max_length=255,blank=True, null=True)
     account_number = models.CharField(max_length=50, unique=True)
     bank_address = models.TextField(blank=True, null=True)
-    route_code = models.CharField(max_length=20, blank=True, null=True)
-    iban_number = models.CharField(max_length=50, blank=True, null=True)  # For international banking
+    route_code = models.CharField(max_length=9, validators=[RegexValidator(r'^\d{9}$', 'Must be a 9-digit number')],null=True,blank=True)
+    iban_number = models.CharField(max_length=23, validators=[RegexValidator(r'^[A-Z0-9]{23}$', 'Must be a 23-character IBAN')],null=True,blank=True) # For international banking
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

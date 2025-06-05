@@ -1,7 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (SalaryComponentViewSet,EmployeeSalaryStructureViewSet,PayslipViewSet,PayrollRunViewSet,PayslipComponentViewSet,LoanTypeviewset,LoanApplicationviewset,LoanRepaymentviewset,LoanApprovalviewset,LoanApprovalLevelsviewset,
-                    EmpBulkuploadSalaryStructureViewSet,PayslipConfirmedViewSet
+                    EmpBulkuploadSalaryStructureViewSet,PayslipConfirmedViewSet,SIFDownloadView
                     
                     )
 
@@ -22,4 +22,5 @@ router.register(r'loan-approval', LoanApprovalviewset, basename='loan-approval')
 
 urlpatterns = [
     path('api/', include(router.urls)),
+    path('api/sif/download/', SIFDownloadView.as_view(), name='sif-download'),
 ]
