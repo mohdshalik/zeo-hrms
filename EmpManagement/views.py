@@ -41,20 +41,13 @@ from rest_framework import status,generics,viewsets,permissions
 from .permissions import EmployeePermission
 from datetime import datetime, timedelta
 from OrganisationManager.models import DocumentNumbering
-from OrganisationManager.serializer import DocumentNumberingSerializer
-# from rest_framework.authentication import SessionAuthentication,TokenAuthentication
-from rest_framework.permissions import IsAuthenticated,AllowAny,IsAuthenticatedOrReadOnly,IsAdminUser
-# from django. utils. timezone import timedelta
+from OrganisationManager.serializer import AnnouncementSerializer,AssetAllocationSerializer
 from rest_framework.parsers import MultiPartParser, FormParser
 import pandas as pd,openpyxl
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404, redirect
-from django.contrib.contenttypes.models import ContentType
-from rest_framework import views, status
-from django.forms.models import model_to_dict
-from .tasks import send_document_expiry_notifications_for_all_tenants
 from django.core.cache import cache
 import redis
 import json
@@ -63,7 +56,7 @@ from rest_framework.exceptions import NotFound
 from calendars .serializer import EmployeeLeaveBalanceSerializer,LeaveTypeSerializer
 from calendars .models import leave_type, employee_leave_request
 from django.db.models import Q
-from PayrollManagement .serializer import PayslipSerializer
+from PayrollManagement .serializer import PayslipSerializer,LoanApplicationSerializer
 
 r = redis.StrictRedis(host='localhost', port=6379, db=0)
 
@@ -276,9 +269,30 @@ class EmpViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['GET'])
     def emp_payslip(self, request, pk=None):
         employee = self.get_object()
+        # Only fetch payslips where confirm_status is True
+        payslips = employee.payslips.filter(confirm_status=True)
+        serializer = PayslipSerializer(payslips, many=True)
+        return Response(serializer.data)
+    @action(detail=True, methods=['GET'])
+    def emp_asset(self, request, pk=None):
+        employee = self.get_object()
         if request.method == 'GET':
-            payslip = employee.payslips.all()
-            serializer = PayslipSerializer(payslip, many=True)
+            payslip = employee.allocations.all()
+            serializer = AssetAllocationSerializer(payslip, many=True)
+            return Response(serializer.data)
+    @action(detail=True, methods=['GET'])
+    def emp_announcement(self, request, pk=None):
+        employee = self.get_object()
+        if request.method == 'GET':
+            payslip = employee.employee_announcements.all()
+            serializer = AnnouncementSerializer(payslip, many=True)
+            return Response(serializer.data)
+    @action(detail=True, methods=['GET'])
+    def emp_loan(self, request, pk=None):
+        employee = self.get_object()
+        if request.method == 'GET':
+            payslip = employee.loan.all()
+            serializer = LoanApplicationSerializer(payslip, many=True)
             return Response(serializer.data) 
 
     @action(detail=False, methods=['get'])

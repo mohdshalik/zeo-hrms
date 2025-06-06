@@ -170,7 +170,7 @@ class LoanApplication(models.Model):
 
     ]
 
-    employee = models.ForeignKey('EmpManagement.emp_master', on_delete=models.CASCADE)
+    employee = models.ForeignKey('EmpManagement.emp_master', on_delete=models.CASCADE,related_name="loan")
     loan_type = models.ForeignKey(LoanType, on_delete=models.CASCADE)
     amount_requested = models.DecimalField(max_digits=10, decimal_places=2)
     repayment_period = models.PositiveIntegerField()  # In months
