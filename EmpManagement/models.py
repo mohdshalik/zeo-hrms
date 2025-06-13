@@ -74,8 +74,7 @@ class emp_master(models.Model):
     emp_weekend_calendar     = models.ForeignKey("calendars.weekend_calendar",on_delete = models.CASCADE,null=True,blank =True)
     holiday_calendar         = models.ForeignKey("calendars.holiday_calendar",on_delete = models.CASCADE,null=True,blank =True)
     users                    = models.ForeignKey('UserManagement.CustomUser', on_delete=models.CASCADE, related_name='employees',null=True,blank =True)
-    person_id                = models.CharField(max_length=14,unique=True,validators=[RegexValidator(r'^\d{14}$', 'Must be a 14-digit number')],help_text="14-digit Person ID from Ministry of Labor",blank=True,null=True)
-    
+    person_id                = models.CharField(max_length=14,unique=True,validators=[RegexValidator(r'^\d{14}$', 'Must be a 14-digit number')],help_text="14-digit Person ID from Ministry of Labor",blank=True,null=True)    
 
     def save(self, *args, **kwargs):
         created = not self.pk  # Check if the instance is being created

@@ -12,6 +12,7 @@ from django_tenants.models import TenantMixin, DomainMixin
 from tenant_users.tenants.models import UserTenantPermissions
 import re
 from django.utils.text import slugify
+from django.core.validators import RegexValidator
 
 from django_tenants.utils import schema_context
 
@@ -22,7 +23,20 @@ class company(TenantMixin):
     created_on = models.DateField(auto_now_add=True)
     country = models.ForeignKey('Core.cntry_mstr', on_delete=models.CASCADE)
     logo = models.ImageField(null=True, blank=True)
-
+    employer_unique_id = models.CharField(
+        max_length=13,
+        validators=[RegexValidator(r'^\d{13}$', 'Must be a 13-digit number')],
+        help_text="13-digit Employer Unique ID from Ministry of Labor",
+        blank=True,
+        null=True
+    )
+    bank_routing_code = models.CharField(
+        max_length=9,
+        validators=[RegexValidator(r'^\d{9}$', 'Must be a 9-digit number')],
+        help_text="9-digit bank routing code for employer's corporate account",
+        blank=True,
+        null=True
+    )
     # Automatically create schema when saving
     auto_create_schema = True
 

@@ -28,6 +28,9 @@ from django_tenants.utils import get_tenant_model
 from django.http import HttpResponse
 from rest_framework.views import APIView
 import csv
+from rest_framework import serializers
+import pytz
+
 # Set up logging
 logger = logging.getLogger(__name__)
 # Create your views here.
@@ -276,56 +279,63 @@ class LoanApprovalviewset(viewsets.ModelViewSet):
 
         approval.reject(rejection_reason=rejection_reason_id, note=note)
         return Response({'status': 'rejected', 'note': note, 'rejection_reason': rejection_reason_id}, status=status.HTTP_200_OK)
-class SIFDownloadView(APIView):
+class SIFDataView(APIView):
     def post(self, request):
         serializer = SIFSerializer(data=request.data)
         if serializer.is_valid():
-            sif_data = serializer.generate_sif_data()
-            
-            # Create CSV response
-            response = HttpResponse(content_type='text/csv')
-            response['Content-Disposition'] = f'attachment; filename="salary_{datetime.now().strftime("%Y%m%d_%H%M%S")}.sif"'
-            
-            writer = csv.DictWriter(
-                response,
-                fieldnames=['Type', 'Person ID', 'Routing Code', 'IBAN Number', 'Pay Start Date',
-                            'Pay End Date', 'Number of Days', 'Fixed Income', 'Variable Income', 'Days on Leave']
-            )
-            writer.writeheader()
-            
-            # Add employer details (using company model)
+            try:
+                sif_data, total_salary = serializer.generate_sif_data()
+            except serializers.ValidationError as e:
+                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Get tenant for HDR and SCR
             tenant = get_tenant_model().objects.filter(schema_name=request.tenant.schema_name).first()
-            if tenant:
-                writer.writerow({
-                    'Type': 'HDR',
-                    'Person ID': tenant.name,  # Use company name as a substitute for employer_id
-                    'Routing Code': '',
-                    'IBAN Number': '',
-                    'Pay Start Date': '',
-                    'Pay End Date': '',
-                    'Number of Days': '',
-                    'Fixed Income': '',
-                    'Variable Income': '',
-                    'Days on Leave': ''
-                })
-            else:
-                # Fallback if tenant not found
-                writer.writerow({
-                    'Type': 'HDR',
-                    'Person ID': 'UNKNOWN_COMPANY',
-                    'Routing Code': '',
-                    'IBAN Number': '',
-                    'Pay Start Date': '',
-                    'Pay End Date': '',
-                    'Number of Days': '',
-                    'Fixed Income': '',
-                    'Variable Income': '',
-                    'Days on Leave': ''
-                })
+
+            # HDR row
+            hdr_row = {
+                'Type': 'HDR',
+                'Person ID': tenant.name if tenant and tenant.name else 'UNKNOWN_COMPANY',
+                'Routing Code': '',
+                'IBAN Number': '',
+                'Pay Start Date': '',
+                'Pay End Date': '',
+                'Number of Days': '',
+                'Fixed Income': '',
+                'Variable Income': '',
+                'Days on Leave': ''
+            }
+
+            # SCR row
+            payroll_run = PayrollRun.objects.get(id=serializer.validated_data['payroll_run_id'])
+            month, year = payroll_run.month, payroll_run.year
+            ist = pytz.timezone('Asia/Kolkata')
+            current_time = datetime.now(ist)
             
-            # Write employee data
-            for row in sif_data:
-                writer.writerow(row)
-            
-            return response
+            employer_unique_id = tenant.employer_unique_id.zfill(13) if tenant and tenant.employer_unique_id else '0' * 13
+            bank_routing_code = tenant.bank_routing_code if tenant and tenant.bank_routing_code else '0' * 9
+
+            scr_row = {
+                'Type': 'SCR',
+                'Person ID': employer_unique_id,
+                'Routing Code': bank_routing_code,
+                'IBAN Number': current_time.strftime('%Y-%m-%d'),
+                'Pay Start Date': current_time.strftime('%H%M'),
+                'Pay End Date': f"{month:02d}{year}",
+                'Number of Days': len(sif_data),
+                'Fixed Income': f"{total_salary:.2f}",
+                'Variable Income': 'AED',
+                'Days on Leave': ''  # Employer Reference Number (optional)
+            }
+
+            # Combine all rows
+            response_data = {
+                'status': 'success',
+                'data': {
+                    'hdr': hdr_row,
+                    'edr': sif_data,
+                    'scr': scr_row
+                }
+            }
+
+            return Response(response_data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

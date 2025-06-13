@@ -3,6 +3,7 @@ from .models import (SalaryComponent,EmployeeSalaryStructure,PayrollRun,Payslip,
                     LoanRepayment,LoanApprovalLevels,LoanApproval)
 from calendars. models import MonthlyAttendanceSummary
 import calendar
+from EmpManagement .models import EmployeeBankDetail
 
 
 class SalaryComponentSerializer(serializers.ModelSerializer):
@@ -224,7 +225,7 @@ class SIFSerializer(serializers.Serializer):
 
     def generate_sif_data(self):
         payroll_run = PayrollRun.objects.get(id=self.validated_data['payroll_run_id'])
-        employees  = payroll_run.get_employees()
+        employees = payroll_run.get_employees()
         month, year = payroll_run.month, payroll_run.year
         last_day = calendar.monthrange(year, month)[1]
         pay_start_date = f"{year}-{month:02d}-01"
@@ -232,13 +233,27 @@ class SIFSerializer(serializers.Serializer):
 
         sif_data = []
         for employee in employees:
-            bank_detail = employee.bank_details.first()
+            # Validate Person ID
+            if not employee.person_id:
+                raise serializers.ValidationError(f"Employee {employee.emp_code} is missing a valid 14-digit Person ID")
+
+            # Access bank details (OneToOneField, no .first() needed)
+            try:
+                bank_detail = employee.bank_details
+            except EmployeeBankDetail.DoesNotExist:
+                raise serializers.ValidationError(f"Employee {employee.emp_code} has no bank details")
+
+            # Validate Routing Code and IBAN
+            if not bank_detail.route_code:
+                raise serializers.ValidationError(f"Employee {employee.emp_code} is missing a valid 9-digit routing code")
+            if not bank_detail.iban_number:
+                raise serializers.ValidationError(f"Employee {employee.emp_code} is missing a valid 23-character IBAN")
+
+            # Get attendance
             attendance = MonthlyAttendanceSummary.objects.filter(employee=employee, month=month, year=year).first()
-            
-            # Person ID: Ensure it's 14 digits
-            person_id = employee.person_id
-            
-            # Fixed and Variable Income–
+            unpaid_leave_days = attendance.get_unpaid_leave_days() if attendance else 0
+
+            # Calculate fixed and variable income
             fixed_income = sum(
                 structure.amount for structure in employee.salary_structures.filter(
                     component__is_fixed=True, is_active=True
@@ -249,15 +264,12 @@ class SIFSerializer(serializers.Serializer):
                     component__is_fixed=False, is_active=True
                 )
             )
-            
-            # Unpaid leave days
-            unpaid_leave_days = attendance.get_unpaid_leave_days() if attendance else 0
-            
+
             row = {
                 'Type': 'EDR',
-                'Person ID': person_id,
-                'Routing Code': bank_detail.route_code if bank_detail else '',
-                'IBAN Number': bank_detail.iban_number if bank_detail else '',
+                'Person ID': employee.person_id,
+                'Routing Code': bank_detail.route_code,
+                'IBAN Number': bank_detail.iban_number,
                 'Pay Start Date': pay_start_date,
                 'Pay End Date': pay_end_date,
                 'Number of Days': last_day,
@@ -266,5 +278,5 @@ class SIFSerializer(serializers.Serializer):
                 'Days on Leave': unpaid_leave_days
             }
             sif_data.append(row)
-        
+
         return sif_data
